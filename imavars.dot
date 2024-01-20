@@ -1,0 +1,152 @@
+EXPORT='export'
+
+$EXPORT IMASRCDIR="${IMASRCDIR:-`pwd`}"
+[ -f "$IMASRCDIR/imavars.dot" ] || {
+    echo "internal error: wrong IMASRCDIR=$IMASRCDIR in env, no IMASRCDIR/imavars.dot found"
+    exit 1
+}
+$EXPORT IMATMPDIR="${IMATMPDIR:-/tmp}"
+
+DEVTTY='/dev/tty'
+
+AWK="${AWK:-awk}"
+BASENAME="${BASENAME:-basename}"
+$EXPORT CAT="${CAT:-/bin/cat}"
+CMP="${CMP:-cmp}"
+CP="${CP:-cp}"
+DATE="${DATE:-date}"
+ECHO="${ECHO:-echo -e}"
+EVAL="${EVAL:-eval}"
+EXEC="${EXEC:-exec}"
+EXIT="${EXIT:-exit}"
+EXPR="${EXPR:-expr}"
+FIND="${FIND:-find}"
+GREP="${GREP:-grep -E}"
+KILL="${KILL:-kill}"
+LESS="${LESS:-less}"
+LS="${LS:-ls}"
+MKDIR="${MKDIR:-mkdir -pv}"
+MOUNT="${MOUNT:-mount}"
+MV="${MV:-/bin/mv}"
+OD="${OD:-/bin/od}"
+$EXPORT PERL="${PERL:-/bin/perl}"
+PS="${PS:-ps}"
+READ="${READ:-read}"
+RM="${RM:-rm -v}"
+SED="${SED:-sed -E}"
+SLEEP="${SLEEP:-sleep}"
+SORT="${SORT:-sort}"
+TAIL="${TAIL:-tail}"
+TEE="${TEE:-tee}"
+TR="${TR:-tr}"
+TRUE="${TRUE:-true}"
+UMOUNT="${UMOUNT:-umount}"
+UNIQ="${UNIQ:-/bin/uniq}"
+WC="${WC:-/bin/wc}"
+
+DEVNULL="${DEVNULL:-/dev/null}"
+
+$EXPORT MYSQL="${MYSQL:-mysql}"
+$EXPORT MYSQLD="${MYSQLD:-mysqld}"
+$EXPORT MYSQLROUTER="${MYSQLROUTER:-mysqlrouter}"
+$EXPORT MYSQLSH="${MYSQLSH:-/bin/mysqlsh}"
+$EXPORT ROUTERDIR="${ROUTERDIR:=/root/mysqlrouter}"
+$EXPORT SANDBOXDIR="/root/mysql-sandboxes"
+
+CMAKE="${CMAKE:-cmake}"
+MAKE="${MAKE:-make}"
+
+$EXPORT IMAPAS="${IMAPAS:-${IMASRCDIR}/imapas.dot}"
+$EXPORT IMAROOT="${IMAROOT:-root}"
+
+IMACLUNAME="${IMACLUNAME:-imaclu}"
+IMACLUREPBASE="${IMACLUREPBASE:-imaclurep}"
+IMACLUSETNAME="${IMACLUSETNAME:-imacluset}"
+IMAREPSETNAME="${IMAREPSETNAME:-imarepset}"
+IMAPORTBASE="${IMAPORTBASE:-4200}"
+IMAPORTBAXX="${IMAPORTBAXX:-4300}"
+$EXPORT IMABASCHEMA="${IMABASCHEMA:-imaschema}"
+$EXPORT IMABATABLE="${IMABATABLE:-imatable}"
+$EXPORT IMABASTRUCT="${IMABASTRUCT:-i INTEGER PRIMARY KEY}"
+$EXPORT IMABAVALUES="${IMABAVALUES:-42}"
+IMAUSER="${IMAUSER:-root}"
+
+IMACHECKMANY="${IMACHECKMANY:-$IMASRCDIR/checkms.sh}"
+IMACHECKONE="${IMACHECKONE:-$IMASRCDIR/check1sa.sh}"
+IMACLUADDMANY="${IMACLUADDMANY:-$IMASRCDIR/cluaddms.sh}"
+IMACLUCREATE="${IMACLUCREATE:-$IMASRCDIR/createclu.sh}"
+IMAREPSETADDMANY="${IMAREPSETADDMANY:-$IMASRCDIR/repsetaddms.sh}"
+IMACREATEONE="${IMACREATEONE:-$IMASRCDIR/create1sa.sh}"
+$EXPORT IMACREATEMANY="${IMACREATEMANY:-$IMASRCDIR/createms.sh}"
+$EXPORT IMADESTROYMANY="${IMADESTROYMANY:-$IMASRCDIR/destroyms.sh}"
+IMADESTROYONE="${IMADESTROYONE:-$IMASRCDIR/destroy1sa.sh}"
+IMAHAKILLONE="${IMAHAKILLONE:-$IMASRCDIR/hakill1sa.sh}"
+$EXPORT IMAHAKILLMANY="${IMAHAKILLMANY:-$IMASRCDIR/hakillms.sh}"
+IMAINITMANY="${IMAINITMANY:-$IMASRCDIR/initms.sh}"
+$EXPORT IMAINITONE="${IMAINITONE:-$IMASRCDIR/init1sa.sh}"
+$EXPORT IMAKILLMANY="${IMAKILLMANY:-$IMASRCDIR/killms.sh}"
+IMAKILLONE="${IMAKILLONE:-$IMASRCDIR/kill1sa.sh}"
+IMAREBOOTCLU="${IMAREBOOTCLU:-$IMASRCDIR/rebootclu.sh}"
+IMASHOWALL="${IMASHOWALL:-$IMASRCDIR/showall.sh}"
+IMASHOWMANY="${IMASHOWMANY:-$IMASRCDIR/showms.sh}"
+IMASHOWONE="${IMASHOWONE:-$IMASRCDIR/show1sa.sh}"
+$EXPORT IMASTARTMANY="${IMASTARTMANY:-$IMASRCDIR/startms.sh}"
+IMASTARTONE="${IMASTARTONE:-$IMASRCDIR/start1sa.sh}"
+STARTROUTER="$_ROUTERDIR/start.sh"
+$EXPORT IMASTOPMANY="${IMASTOPMANY:-$IMASRCDIR/stopms.sh}"
+IMASTOPONE="${IMASTOPONE:-$IMASRCDIR/stop1sa.sh}"
+IMAWAITMANY="${IMAWAITMANY:-$IMASRCDIR/waitms.sh}"
+IMAWAITONE="${IMAWAITONE:-$IMASRCDIR/wait1sa.sh}"
+
+### 3,4-5 to ' 3 4 5 '
+function ima_tolist() {
+  _tolist_rc=''
+  _tolist_s="$1"
+  _tolist_mor=`$ECHO "$_tolist_s" | $SED 's/,/ /g'`
+  for _tolist_sub in $_tolist_mor ; do
+    _tolist_nom=`$ECHO "$_tolist_sub" | $SED 's/-/ /g'`
+    [ "$_tolist_sub" = "$_tolist_nom" ] && {
+      _tolist_rc="$_tolist_rc $_tolist_sub"
+      continue
+    }
+    _tolist_st=`$ECHO "$_tolist_nom" | $SED 's/ *([^ ]+).*/\1/'`
+    _tolist_end=`$ECHO "$_tolist_nom" | $SED 's/.* +([^ ]+)/\1/'`
+    _tolist_mor=''
+    _tolist_num="$_tolist_st"
+    while [ "$_tolist_num" -le "$_tolist_end" ] ; do
+      _tolist_mor="$_tolist_mor $_tolist_num"
+      _tolist_num=$(($_tolist_num + 1))
+    done 
+    _tolist_rc="$_tolist_rc $_tolist_mor"
+  done
+  _tolist_rc="`$ECHO \" $_tolist_rc \" | $SED 's/  */ /g'`"
+  $ECHO "$_tolist_rc"
+}
+
+### prefix message with timestamp
+### expects mostly one line messages so replaces newlines with \n
+function ima_say() {
+  _ts=`$DATE -u +%Y%m%d%H%M%S.%N`
+  $ECHO "#S $$ $_ts $@" | $AWK '{printf("%s\\n",$0)}' | $SED 's/\\n$//'
+  $ECHO ''
+}
+
+### show commented out file contents
+### 1: script name
+### 2: file name
+function ima_file() {
+  _me="$1"
+  _fil="$2"
+  ima_say "$me : start contents (commented out) of file $_fil :"
+  $CAT "$_fil" | $SED 's/^/#F /'
+  ima_say "$me : end contents (commented out) of file $_fil :"
+}
+
+### read input and output it prefixed and commented
+### 1: script name
+function ima_report() {
+  me="$1"
+  while $READ _lin ; do
+    ima_say "$me : $_lin"
+  done
+}
