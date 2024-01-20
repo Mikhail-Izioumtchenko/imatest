@@ -122,12 +122,6 @@ datatype_floating:
   allowed: Rseq       
   mandatory: True
   only_values_allowed: FLOAT,DOUBLE
-datetime_fractional:
-  mandatory: True
-  allowed: Rseq
-datetime_fractional_illegal_p:
-  mandatory: True
-  allowed: probability
 datatype_integer:
   allowed: Rseq       
   mandatory: True
@@ -152,6 +146,15 @@ datatype_varchar_len:
   allowed: Rseq
   only_non_negative_integers: True
   mandatory: True
+datetime_fractional:
+  mandatory: True
+  allowed: Rseq
+datetime_fractional_illegal_p:
+  mandatory: True
+  allowed: probability
+datetime_month_value:
+  mandatory: True
+  allowed: Rseq
 datetime_year_value:
   mandatory: True
   allowed: Rseq
@@ -506,9 +509,6 @@ threads:
   only_positive_integers: True
   mandatory: True
 #here
-datetime_month_value:
-  mandatory: True
-  allowed: Rseq
 datetime_day_value:
   mandatory: True
   allowed: Rseq
