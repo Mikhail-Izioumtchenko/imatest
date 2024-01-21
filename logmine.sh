@@ -3,7 +3,7 @@
 
 . `pwd`/imavars.dot
 
-efiles="/tmp/imatest.pl.out /tmp/1.tmp"
+efiles="/tmp/imatest.pl.out /tmp/1.tmp /tmp/client_thread_*.*"
 myfiles="/root/mysql-sandboxes/4202/*/error.log"
 
 out=`$CAT $efiles $myfiles |
@@ -36,3 +36,7 @@ $ECHO "$mor"
 $ECHO "\n===\n"
 $ECHO "$mor" |
   $GREP -v ' 1 '
+
+$ECHO "\n===\n"
+$ECHO "looked at $efiles"
+$ECHO "and looked at $myfiles"

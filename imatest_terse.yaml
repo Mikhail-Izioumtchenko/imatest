@@ -1,20 +1,14 @@
 ---
 # todo: see imatest.pl, but some here
-# on values kinds and syntax see comments imatest_syntax.yaml
+# on values kind and syntax see comments imatest_syntax.yaml
 # atm one level deep, a sequence of name: value
 # general test parameters
 # loosely grouped, no requirements on order
-
-# STRICT if True, every key must be described in syntax checker e.g. imatest_syntax.yaml
 strict: True
 # alternatively to_check_inline: can be used
-
-# TO_CHECK_FILE file against which contents of the test file are checked. Absolute path is OK.
 to_check_file: imatest_syntax.yaml
-
-# Do we create test sandbox anew. It may already exist in which case it is NOT destroyed and recreated.
+# e.g. sandbox
 create_server: False
-
 # create database, may run if something already exists
 create_db: True
 # destroy e.g. sandbox, datadir and all

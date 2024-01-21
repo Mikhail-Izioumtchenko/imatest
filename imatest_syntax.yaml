@@ -31,6 +31,10 @@ character_set:
   mandatory: True
   allowed: Rseq
   only_names: True
+client_thread_err:
+  mandatory: True
+client_thread_out:
+  mandatory: True
 client_threads:
   allowed: only_positive_integers
   mandatory: True
@@ -94,6 +98,9 @@ datatype_binary:
 datatype_bit_len:
   allowed: Rseq
   mandatory: True
+datatype_binary_len:
+  mandatory: True
+  allowed: Rseq
 datatype_char_len:
   allowed: Rseq
   only_non_negative_integers: True
@@ -500,6 +507,14 @@ value_bigint:
 value_bit:
   mandatory: True
   allowed: Rseq
+value_binary_len:
+  mandatory: True
+  allowed: Rseq
+  only_non_negative_integers: True
+value_char_len:
+  mandatory: True
+  allowed: Rseq
+  only_non_negative_integers: True
 value_int:
   mandatory: True
   allowed: Rseq
@@ -516,6 +531,10 @@ value_spatial_len:
 value_tinyint:
   mandatory: True
   allowed: Rseq
+value_varchar_len:
+  mandatory: True
+  allowed: Rseq
+  only_non_negative_integers: True
 virtual_expression_depth:
   allowed: Rseq       
   mandatory: True
@@ -525,21 +544,6 @@ virtual_expression_length:
   mandatory: True
   only_positive_integers: True
 #here
-value_char_len:
-  mandatory: True
-  allowed: Rseq
-  only_non_negative_integers: True
-value_varchar_len:
-  mandatory: True
-  allowed: Rseq
-  only_non_negative_integers: True
-datatype_binary_len:
-  mandatory: True
-  allowed: Rseq
-value_binary_len:
-  mandatory: True
-  allowed: Rseq
-  only_non_negative_integers: True
 datatype_varbinary_len:
   mandatory: True
   allowed: Rseq

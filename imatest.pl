@@ -6,9 +6,11 @@ require 5.032;
 
 # todo
 # log miner, make perl
-# innodb config thgrough set persist, multiline yaml
+# my.cnf config thgrough set persist, multiline yaml
+# INSERT
 # implement shutdown-and-kill
 # dry but less dry
+# database discovery
 # better SELECT
 # check 'x' for constants
 # how enum set
@@ -249,7 +251,7 @@ sub dosayif {
     my ($format, @largs) = @ARG;
     my $res = shortmess();
     my @l = split(/\n/,$res);
-    $res = $l[scalar(@l)-1];
+    $res = $l[scalar(@l)-2];
     $res =~ s/\(.*//;
     $res =~ s/.*://;
     $res = 'main' if ($res eq 'dosayif');
@@ -921,6 +923,7 @@ sub db_create {
                 $ghst2cols{$tnam} = \@lcols;
             }
             my $can_autoinc = $FALSE;
+            my $indnum = 0;
             my %hcolcanind = ();
             my %hcolneedpref = ();
             my $srid = undef;
@@ -931,7 +934,6 @@ sub db_create {
                 my $canpk = $ghstcol2def{$colnam};      # can be part of PK unchanged e.g. CHAR but not TEXT
                 my $keylen = undef;
                 my $canunique = $canpk eq "$TRUE"? $FALSE : $TRUE;      # UNIQUE can be added to coldef
-                $hcolcanind{$cnam} = $TRUE if ($tclass ne 'JSON');
                 # sink for PK
                 if ($tclass eq 'SPATIAL' or $tclass eq 'JSON') {
                     $tclass = $INTEGER if ($ghstcol2def{$colnam} eq "$TRUE");
@@ -941,6 +943,7 @@ sub db_create {
                     $tclass = $INTEGER;
                 }
                 # now we have final datatype class
+                $hcolcanind{$cnam} = $TRUE if ($tclass ne 'JSON');
                 $ghstc2dtclass{$cnam} = $tclass;
                 $hcolneedpref{$cnam} = $tclass eq 'LOB'? $TRUE : $FALSE;
                 my $dt = $tclass;
@@ -962,6 +965,9 @@ sub db_create {
                             if (rand() < $ghreal{'pk_autoinc_p'}) {
                                 $ghst2pkautoinc{$tnam} = $TRUE;
                                 $dt .= " PRIMARY KEY";
+                            } else {
+                                # todo consider edge case of missing in any subsequent index/ autoinc_unique_p ?
+                                $dt .= " UNIQUE";
                             }
                         }
                     }
@@ -1048,13 +1054,17 @@ sub db_create {
                     $vis =~ s/_/ /;
                     $dt .= " $vis" if ($vis ne $EMPTY);
                 }
-                push(@lsql, "$cnam $dt,");
+                my $coldef = "$cnam $dt";
+                # small chance there will be no keys after the last column
+                $coldef .= ',' unless ($ghst2pkautoinc{$tnam} and $needind == 0 and $cnam eq $lcols[scalar(@lcols)-1]);
+                push(@lsql, $coldef);
             }
             $table_pk =~ s/^ *,+/ PRIMARY KEY(/;
             my $table_indexes = '';
             push(@lsql, "$table_pk)")
               unless ($ghst2pkautoinc{$tnam});
             my @lindcols = keys(%hcolcanind);
+            $needind = 0 if (scalar(@lindcols) == 0);
             foreach my $inum (1..$needind) {
                 my $needcols = process_rseq('columns_per_index');
                 if ($needcols eq 'ALL') {
@@ -1063,6 +1073,9 @@ sub db_create {
                 my @lhavecols = shuffle(@lindcols);
                 my $uniq = rand() < $ghreal{'index_unique_p'}? 'UNIQUE ' : '';
                 my $iline = ", ${uniq}INDEX ind$inum (";
+                ++$indnum;
+                # pk may not be before
+                $iline =~ s/,// if ($indnum == 1 and $ghst2pkautoinc{$tnam});
                 for my $colnum (1..$needcols) {
                     last if ($colnum > scalar(@lhavecols));
                     my $thiscol = $lhavecols[$colnum-1];
@@ -1244,8 +1257,13 @@ sub server_load_thread {
     my $lasttime = $starttime + $howlong;
     my $ec = $EC_OK;
     dosayif($VERBOSE_ANY, " started at %s %s load thread %s to run for %ss",$starttime,$klod,$tnum,$howlong);
-    my $shel = "$ghmisc{$MYSQLSH_BASE} --force";
-    open(my $msh, '|-', $shel) or croak("failed to open write pipe to $shel");
+    $ENV{_imatest_tmpdir} = $ghreal{'tmpdir'};
+    $ENV{_imatest_client_filebase} = "client_thread_$tnum";
+    my $outto = doeval($ghreal{'client_thread_out'});
+    my $errto = doeval($ghreal{'client_thread_err'});
+    dosayif($VERBOSE_ANY, " see also %s and %s",$outto,$errto);
+    my $shel = "$ghmisc{$MYSQLSH_BASE} --interactive --force >$outto 2>$errto";
+    my $wspid = open2(my $msout, my $msh, $shel);
     $msh->autoflush();
     my $snum = 0;
     while ($TRUE) {
@@ -1270,6 +1288,7 @@ sub server_load_thread {
     }
     close $msh;
     dosayif($VERBOSE_ANY, " %s load thread %s exiting at %s with exit code %s after executing %s statements",$klod,$tnum,time(),$ec,$snum);
+    dosayif($VERBOSE_ANY, " see also %s and %s",$outto,$errto);
     exit $ec;
 }
 
