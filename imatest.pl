@@ -1411,7 +1411,6 @@ my $phv = doeval("LoadFile('$test_script')") or die "bad yaml in file $test_scri
 %ghtest = %$phv;
 $phv = dclone(\%ghtest);
 %ghreal = %$phv;
-    croak("#debug+$ghreal{todo_test}");
 
 dosayif($VERBOSE_DEV, "%s start: %s\n%s end", $TESTYAML, Dumper(\%ghtest), $TESTYAML);
 
