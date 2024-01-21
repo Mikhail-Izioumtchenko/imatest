@@ -219,8 +219,8 @@ value_json_len: 0:0.1,1-100:0.2,100-1000:0.5,10000-20000:0.1,2147483000-21474840
 create_create: $ENV{IMACREATEMANY} $ENV{_imatest_port_rel}
 # start many instances sequentially
 server_start: $ENV{IMASTARTMANY} $ENV{_imatest_port_rel}
-todo_test: |
-  line 1
-  line 2 last
+#todo_test: |
+#  line 1
+#  line 2 last
 # teardown, executed with system()
 destroy_destroy: $ENV{IMADESTROYMANY} $ENV{_imatest_port_rel}
