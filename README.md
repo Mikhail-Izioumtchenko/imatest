@@ -1,4 +1,3 @@
-to be continued
 
 `imatest` is a testing tool for MySQL.
 
@@ -51,6 +50,7 @@ How it tests:
 User's guide:
 * have an installation of MySQL on a server
 * instantiate all files in this repo in a single directory, atm on the same server.
+* eventually there will be a self test. For now there is none.
 * become root.
 * cd to that directory
 * the environment should be suitable to use MySQL installation, MYSQL_HOME etc.
