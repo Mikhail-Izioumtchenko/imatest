@@ -1,18 +1,21 @@
 ---
+# probability is expected to be 0<=value<1. In fact it is not especially checked.
 # Rseq is RandomSequence
 # abc,def strings
-# 1-5,7-9 integer ranges
+# abc:0.5,def:0.5,ghi numbers are probability, 0.5 to choose abc, if not another roll, 0.5 to choose def, ghi is sink.
+# abc:0.5!def:0.4,ghi ! is cutoff, 0.5 is changed to nothing, values following ! are ignored in test. So abc becomes sink.
+# 1-5,7-9 integer ranges: e.g. first we choose 7-9 then 8
 # M5-3    M is Minus so this is -5 to 3
 # 4-2     allowed but changed to 2-4 with a warning
 # 1/5,7/9.3 decimal ranges e.g 7 to 9.3
 # abc,2-3,1.2/5.4 can be intermixed
 # strings with - or / inside are not supported yet
-# see other items starting with only_
 # no decimal subkinds yet
+# #
 # formats are expected to have a single %s inside, this is currently not verified
-# names start with a-zA-Z_ but may content % and similar characters
-# EMPTY means do not specify
-# preferred order is alphabetic aafter strict, _ is before a, numbers before letters, shorter values first
+# #
+# names start with a-zA-Z_ but inside may have % and similar characters
+# EMPTY usually means do not specify whatever in SQL
 # doeval is evaluated on load
 # M will NOT be converted to - for only_values_allowed
 _2levelkeys: [allowed, mandatory, needs_on_true, only_names, only_non_negative_integers, only_positive_integers, only_values_allowed, supported]
@@ -20,9 +23,14 @@ strict:
   allowed: [True, False]
   supported: [True, False]
   mandatory: True
+# preferred alphabethical order from here on, _ before a, numbers before letters, shorter values first
 autoinc_explicit_value_p:
   allowed: probability
   mandatory: True
+character_set:
+  mandatory: True
+  allowed: Rseq
+  only_names: True
 client_threads:
   allowed: only_positive_integers
   mandatory: True
@@ -65,15 +73,15 @@ columns_non_pk:
   mandatory: True
   only_non_negative_integers: True
 config:
-  allowed: ["single", "group", "chain", "InnoDBCluster", "ClusterSet", "ReplicationSet"]
-  supported: ["single"]
+  allowed: [single, group, chain, InnoDBCluster, ClusterSet, ReplicationSet]
+  supported: [single]
   mandatory: True
 create_create:
   mandatory: True
 create_server:
   allowed: [True, False]
   supported: [True, False]
-  needs_on_true: ["create_create"]
+  needs_on_true: [create_create]
   mandatory: True
 create_db:
   allowed: [True, False]
@@ -152,7 +160,22 @@ datetime_fractional:
 datetime_fractional_illegal_p:
   mandatory: True
   allowed: probability
+datetime_day_value:
+  mandatory: True
+  allowed: Rseq
+datetime_hour_value:
+  mandatory: True
+  allowed: Rseq
+datetime_microsecond_value:
+  mandatory: True
+  allowed: Rseq
+datetime_minute_value:
+  mandatory: True
+  allowed: Rseq
 datetime_month_value:
+  mandatory: True
+  allowed: Rseq
+datetime_second_value:
   mandatory: True
   allowed: Rseq
 datetime_year_value:
@@ -171,7 +194,7 @@ decimal_whole_value:
   mandatory: True
   allowed: Rseq
 destroy_destroy:
-  mandatory: False
+  mandatory: True
 double_value_exp:
   mandatory: True
   allowed: Rseq
@@ -329,6 +352,7 @@ load_sql_class:
   allowed: Rseq
   mandatory: True
   only_values_allowed: SELECT,UPDATE,INSERT,DELETE,INSEL,SELECTALL,ALTER
+  supported: SELECT
 null_illegitimate_p:
   allowed: probability
   mandatory: True
@@ -412,10 +436,11 @@ server_termination_every_seconds:
 server_termination_how:
   allowed: Rseq
   mandatory: True
-  only_values_allowed: shutdown,kill,sigkill,sigstop
+  only_values_allowed: shutdown,shutkill,kill,sigkill,sigstop
+  supported: shutdown,kill,sigkill,sigstop
 server_termination_wait:
-  allowed: [Yes, No]
-  supported: [Yes, No]
+  allowed: Yes, No
+  supported: Yes, No
   mandatory: True
 server_termination_wait_timeout:
   allowed: only_positive_integers
@@ -457,7 +482,7 @@ tables_per_schema:
 teardown:
   allowed: [True, False]
   supported: [True, False]
-  needs_on_true: ["destroy_destroy"]
+  needs_on_true: [destroy_destroy]
   mandatory: True
 test_duration_seconds:
   allowed: only_positive_integers
@@ -499,35 +524,7 @@ virtual_expression_length:
   allowed: Rseq       
   mandatory: True
   only_positive_integers: True
-thread_kinds:
-  allowed: Rseq
-  only_names: True
-  mandatory: True
-  only_values_allowed: rwl,rw,ro
-threads:
-  allowed: Rseq
-  only_positive_integers: True
-  mandatory: True
 #here
-datetime_day_value:
-  mandatory: True
-  allowed: Rseq
-datetime_hour_value:
-  mandatory: True
-  allowed: Rseq
-datetime_minute_value:
-  mandatory: True
-  allowed: Rseq
-datetime_second_value:
-  mandatory: True
-  allowed: Rseq
-datetime_microsecond_value:
-  mandatory: True
-  allowed: Rseq
-character_set:
-  mandatory: True
-  allowed: Rseq
-  only_names: True
 value_char_len:
   mandatory: True
   allowed: Rseq
@@ -627,7 +624,7 @@ usex:
   allowed: [True, False]
   supported: [True, False]
   mandatory: True
-  needs_on_true: ["xportoffset"]
+  needs_on_true: [xportoffset]
 datatype_lob_key_len:
   mandatory: True
   allowed: Rseq

@@ -5,32 +5,27 @@ use English;
 require 5.032;
 
 # todo
+# log miner, make perl
+# innodb config thgrough set persist, multiline yaml
+# implement shutdown-and-kill
+# dry but less dry
+# better SELECT
 # check 'x' for constants
 # how enum set
 # how group by
-# list unused test parameters
-# implement shutdown-and-kill
 # implement sleep in txn
 # implement txn
-# better SELECT
-# check allowed values in rseq list if no prob or even with probs
-# support supported for rseq
 # review rseq reporting
-# --version
-# dry but less dry
 # two way coms with load thread
 # style and more comments
-# log miner
+# db_discovery
 
 use Carp qw(croak shortmess);
 use Data::Dumper qw(Dumper);
 use DateTime;
-use DBI;
-use DBD::mysql;
 use IO::Handle;
 use Getopt::Long qw(GetOptions);
 use IPC::Open2 qw(open2);
-#use JSON qw(decode_json);
 use List::Util qw(shuffle);
 use POSIX ":sys_wait_h";
 use Scalar::Util qw(looks_like_number);
@@ -48,6 +43,7 @@ $Data::Dumper::Sortkeys = 1;
 # constants. Do not use constant.
 # UPPERCASE names
 my $DRYRUN = 'dry-run';
+my $HELP = 'help';
 my $SEE_ALSO = 'see-also';
 my $SEED = 'seed';
 my $TESTYAML = 'testyaml';
@@ -57,6 +53,7 @@ my $VERBOSE_SOME = 1;
 my $VERBOSE_MORE = 2;
 my $VERBOSE_DEV = 3;
 my $VERBOSE_NEVER = 4;      # still can be passed
+my $VERSION = 'version';
 
 my $USAGE_ERROR_EC = 1;
 # for internal subroutines
@@ -108,14 +105,15 @@ my $ONLY_VALUES_ALLOWED = 'only_values_allowed';
 my $PARENTHESIS = 'parenthesis';
 my $RSEED = 'rseed';
 my $STRING_TRUE = 'True';
+my $SUPPORTED = 'supported';
 my $TEARDOWN = 'teardown';
 my $TEST_DURATION = 'test_duration_seconds';
 my $V3072 = 3072;
 my $VIRTUAL = 'virtual';
 my $YES = 'Yes';
 
-my @LOPT = ("$DRYRUN!", "$TESTYAML=s", "$SEE_ALSO=s", "$SEED=i", "$VERBOSE=i");
-my %HDEFOPT = ("$DRYRUN" => 0, $VERBOSE => 0);      # option defaults
+my @LOPT = ("$DRYRUN!", "$HELP!", "$TESTYAML=s", "$SEE_ALSO=s", "$SEED=i", "$VERBOSE=i", "$VERSION!");
+my %HDEFOPT = ("$DRYRUN" => 0, $HELP => 0, $VERBOSE => 0, $VERSION => 0);      # option defaults
 
 # globals of sorts
 my %ghasopt = ();      # resulting options values hash
@@ -140,15 +138,20 @@ my %ghstcol2def = ();      # schema.table.column => column definition
 my %ghs2pltables = ();      # schema name => ref array table names
 my %ghmisc = ();         # e.g. mysqlsh_exec => invocation line prefix
 my %ghopsql = ();         # operators_sql PLUS => +
-my @glpids;      # rocess ids of load threads
+my @glpids;      # process ids of load threads
+
+$ghmisc{'version'} = $version;
 
 # parameters: usage message
 # exits with USAGE_ERROR_EC
 sub usage {
+    my $msg = "@ARG";
+    $msg .= "\nversion $ghmisc{$VERSION}" if (defined($ghasopt{$VERSION}) and $ghasopt{$VERSION});
     my $usage = <<EOF
-  @ARG
+  $msg
   Usage: $EXECUTABLE_NAME $PROGRAM_NAME option...
-    --[no]DRYRUN optional, run no test if supplied, just check test file syntax
+    --$HELP show this message and exit
+    --[no]$DRYRUN optional, run no test if supplied, just check test file syntax
     --$TESTYAML test_script.yaml: mandatory
     --$SEED integer: optional random seed, passed to srand(), no default
     --$VERBOSE integer: optional verbosity level, 0 is default, reasonable messaging.
@@ -157,6 +160,7 @@ sub usage {
         3 very verbose, mostly for internal development use
         4 or more extremely verbose
     --$SEE_ALSO string: optional, this string is output at the end of the run.
+    --$VERSION: show script version and exit
 EOF
     ;
     dosayif($VERBOSE_ANY, "%s", $usage);
@@ -317,12 +321,19 @@ sub process_rseq {
         if (defined($only_values_allowed)) {
             # Rule9: value list
             my @lal = split(/,/,$only_values_allowed);
+            my @lsup = defined($phverk->{'supported'})? split(/,/,$phverk->{$SUPPORTED}) : @lal;
             my $clval = $val;
             $clval =~ s/:[0-9.]*([,!])/$1/g;
             my @lhave = split(/[,!]/,$clval);
             foreach my $el (@lhave) {
               usage("$skey subvalue $el violates Rseq Rule9: with $ONLY_VALUES_ALLOWED value must be one of: @lal")
-                if ($check and (scalar(grep {$_ eq $el} @lal) == 0));
+                if (scalar(grep {$_ eq $el} @lal) == 0);
+            }
+            $clval =~ s/!.*//;
+            my @lsohave = split(/,/,$clval);
+            foreach my $el (@lsohave) {
+              usage("$skey subvalue $el violates Rseq Rule10: with '$SUPPORTED' value must be one of: @lsup")
+                if (scalar(grep {$_ eq $el} @lsup) == 0);
             }
         }
     }
@@ -1356,7 +1367,7 @@ sub init_db {
     dosayif($VERBOSE_ANY,"invoked");
     $rc = $RC_ZERO if $ghasopt{$DRYRUN};
 
-    my $subec = $ghasopt{$DRYRUN}? 0 : doeval("system(\"$ghreal{$SERVER_START}\")");
+    my $subec = $ghasopt{$DRYRUN}? 0 : doeval("system(\"$ghreal{$SERVER_START} wait $ghreal{'server_start_timeout'}\")");
     dosayif($VERBOSE_ANY,"execution (--%s=%s of %s of '%s' resulted in exit code %s",
       $DRYRUN,$ghasopt{$DRYRUN},$SERVER_START,$ghreal{$SERVER_START},$subec);
   
@@ -1371,12 +1382,15 @@ sub init_db {
     return $rc;
 }
 
-dosayif($VERBOSE_ANY, "invoked with %s", "@ARGV");
+# start execution. Execution starts HERE.
 GetOptions(\%ghasopt, @LOPT) or usage("invalid options supplied");
 scalar(@ARGV) == 0 or usage("no arguments are allowed");
 foreach my $soname (keys(%HDEFOPT)) {
     $ghasopt{$soname} = $HDEFOPT{$soname} if (not defined($ghasopt{$soname}));
 }
+usage("invoked with --help") if ($ghasopt{$HELP});
+usage("invoked with --version") if ($ghasopt{$VERSION});
+dosayif($VERBOSE_ANY, "invoked with %s", "@ARGV");
 dosayif($VERBOSE_ANY, "Options to use are %s", Dumper(\%ghasopt));
 exists($ghasopt{$TESTYAML}) or usage("--".$TESTYAML." must be supplied");
 
@@ -1397,6 +1411,7 @@ my $phv = doeval("LoadFile('$test_script')") or die "bad yaml in file $test_scri
 %ghtest = %$phv;
 $phv = dclone(\%ghtest);
 %ghreal = %$phv;
+    croak("#debug+$ghreal{todo_test}");
 
 dosayif($VERBOSE_DEV, "%s start: %s\n%s end", $TESTYAML, Dumper(\%ghtest), $TESTYAML);
 

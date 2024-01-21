@@ -36,7 +36,7 @@ SHOW WARNINGS;
 SELECT * FROM $IMABASCHEMA.$IMABATABLE;
 SHOW WARNINGS;
 EOF
-ima_file "$me" "$fil"
+#ima_file "$me" "$fil"
 
 try=`$CAT <<EOF
 Connecting to MySQL at: root@localhost:$port$
@@ -71,7 +71,10 @@ while true; do
     ima_say "$me : exiting with exit code $exitro"
     $EXIT "$exitro"
   }
-  [ "$dowait" = 'wait' ] || break
+  [ "$dowait" = 'wait' ] || {
+    ima_say "rc=$rc so instance $port is broken"
+    break
+  }
   now=`$DATE +%s`
   [ $(($now - $strt)) -ge "$timeout" ] && break
   [ $(($now - $dorep)) -ge "$rep" ] && {

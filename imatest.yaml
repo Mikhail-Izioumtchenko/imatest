@@ -1,32 +1,42 @@
 ---
+# todo: see imatest.pl, but some here
+# on values kind and syntax see comments imatest_syntax.yaml
+# atm one level deep, a sequence of name: value
 # general test parameters
+# loosely grouped, no requirements on order
 strict: True
+# alternatively to_check_inline: can be used
 to_check_file: imatest_syntax.yaml
-# todo: False False is not supported yet, db_discovery
+# e.g. sandbox
 create_server: False
+# create database, may run if something already exists
 create_db: True
+# destroy e.g. sandbox, datadir and all
 teardown: False
 test_duration_seconds: 300
 # general configuration
 config: single
+# one for now, relative ports
 ports: 2
+# the port will be e.g. 4202, x protocol port 4302
 portoffset: 4200
 xportoffset: 100
+# this and similar will be evaluated once at startup
 mysqlsh: $ENV{MYSQLSH}
 user: $ENV{IMAROOT}
 passfile: $ENV{IMAPAS}
 tmpdir: defined($ENV{IMATMPDIR})? $ENV{IMATMPDIR} : qw(/tmp)
+# prefer x protocol
 usex: True
-# InnoDB configuration, for SET GLOBAL
-# idea: flatten
+# InnoDB configuration, for SET PERSIST
+# todo: flatten, make multiline
 innodb_buffer_pool_size: 100000000,200000000,300000000
 # test load
 # test load: shutdown or kill and restart
 server_terminate: Yes
-#server_termination_every_seconds: 55-65
-server_termination_every_seconds: 5
-#server_termination_every_seconds: 600-700
-server_termination_how: shutdown,kill,sigkill,sigstop
+# see comments on Rseq in imatest_syntax.yaml
+server_termination_every_seconds: 55-65
+server_termination_how: shutdown,kill,sigkill,sigstop!shutkill
 server_terminate_shutdown: $ENV{IMASTOPMANY} $ENV{_imatest_port_rel}
 server_terminate_kill: $ENV{IMAKILLMANY} $ENV{_imatest_port_rel}
 server_terminate_sigkill: $ENV{IMAHAKILLMANY} $ENV{_imatest_port_rel} KILL
@@ -45,28 +55,22 @@ txn_sleep_after_ms: 500-1000
 # todo: different load config per thread
 # database structure
 # database structure - schemas
-schemas: 2:1.0,2-3:0.5,7-9
+schemas: 1-3:0.5,7-9
 schema_name_format: ts%s,test_%s_schema,test_schema_longer_name_%09d
-#schema_name_format: s20240113%s
-tables_per_schema: 1-2:1.0,0-4:0.2,15-19:0.4,5-10
+tables_per_schema: 1-4:0.2,5-9:0.4,5-10
 table_name_format: tt%s,test_%s_table,test_table_longer_name_%09d
 # EMPTY means do not specify
 table_autoextend_size: 4M:0.2,8M:0.2,12M:0.2,16M:0.2,20M:0.1,EMPTY
 table_autoinc: 1-10:0.01,1000-2000:0.01,EMPTY
 table_compression: EMPTY:0.9,ZLIB:0.5,LZ4:0.5,NONE
-# EMPTY means do not specify
-# ! is cutoff
-table_row_format: EMPTY:0.5!DYNAMIC:0.5,COMPACT:0.5,REDUNDANT:0.1,COMPRESSED1:0.1,COMPRESSED2:0.1,COMPRESSED8:0.1,COMPRESSED16:0.1,COMPRESSED4
-# EMPTY means do not specify
+# ! is cutoff, everything after is ignored
+table_row_format: EMPTY:0.5,DYNAMIC:0.5,COMPACT:0.5,REDUNDANT:0.1,COMPRESSED1:0.1,COMPRESSED2:0.1,COMPRESSED8:0.1!COMPRESSED16:0.1,COMPRESSED4
 table_stats_auto_recalc: 0,1,EMPTY
-# EMPTY means do not specify
-# M will become -
 table_stats_persistent: 0:0.1,1:0.5,EMPTY
-# EMPTY means do not specify
-# M will become -
 table_stats_sample_pages: 1:0.1,5-40:0.3,999:0.1,EMPTY
 # only if we find an integer column. No floating autoincs!
 table_has_autoinc_p: 0.1
+# probability 0 to 1.0
 pk_autoinc_p: 0.8
 columns_pk: 1:0.5,2:0.5,3-12
 column_pk_name_format: pk%s,primary_key_column_%09d
@@ -74,36 +78,32 @@ columns_non_pk: 0:0.1,1:0.2,10-12:0.3,70-80:0.2,2-9:0.8,13-69
 column_non_pk_name_format: col%s,__col%s,test_%s_column_abc123defaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 pk_first_p: 0.8
 indexes_per_table: 0:0.2,1:0.5,2-5:0.1,63:0.1,1
-# ALL means include all columns in any index
+# ALL means include all columns in any index - todo
 columns_per_index: 1:0.5,2:0.5,3-16:0.2,ALL:0.1,1
 index_unique_p: 0.1
-# EMPTY means no prefix, M will become -, applies to datatypes where prefixes not supported, too
 index_prefix_len: 1-10,100-110,254-258,765-769,3070-3080,EMPTY
-# EMPTY means do not specify
 index_visibility: VISIBLE,INVISIBLE,EMPTY
 index_direction: EMPTY:0.7,DESC:0.6,ASC
-# todo
+# todo?
 fulltext_index_p: 0.05
 # NOT_NULL will become NOT NULL
 column_null: NOT_NULL:0.7,EMPTY:0.5,NULL
 column_unique_p: 0.1
-# EMPTY means do not specify
 column_default: VALUE,EXPR,EMPTY
-# EMPTY means do not specify
 column_virtuality: VIRTUAL:0.5,STORED:0.5,EMPTY
 virtual_columns_per_table: 0:0.8,1:0.5,2-4:0.5,5-100:0.1,0
-load_function_upper: F1A,F2AT
 virtual_expression_length: 2-3
 virtual_expression_depth: 1:1.0,1-3
-# todo
-# 0 includes columns
-load_sql_class: SELECT:1.0,UPDATE:0.1,INSERT:0.1,DELETE:0.1,INSEL:0.1,SELECTALL:0.1,ALTER
+load_sql_class: SELECT!UPDATE:0.1,INSERT:0.1,DELETE:0.1,INSEL:0.1,SELECTALL:0.1,ALTER
+# for F1A function_1A below is used
+load_function_upper: F1A,F2AT
 load_function_class: F0,F1N,F1D,F2NN,F2DI,F2DN,F2DT,F3ANN,FFN,F1A,F2AT,FFA,F3NNN,F2DA,F1T,F2AA,F3AAN,F3AAA,F3ANA
 # N+N
 load_expression_length: 1-3
+# E AND E
 load_logical_length: 2
 load_logical_depth: 2
-# (N+(N*N))/N also N+N*N
+# (N+(N*N))/N
 load_expression_depth: 1-2
 # postprocessed e.g. PLUS becomes + per operators_sql
 operators:  PLUS,MULT,DIV,MINUS,BITAND,RSHIFT,LSHIFT,NSEQ,MOD,BITXOR,AND
@@ -112,14 +112,16 @@ operators_isnull: ISNULL,ISNOTNULL
 operators_logical: AND,OR
 operators_nots: 0:0.9,1:0.8,2
 operators_sql: qw(PLUS:+ MULT:* DIV:/ MINUS:- BITAND:& RSHIFT:>> LSHIFT:<< AND:&& GT:> EQ:= GE:>= LT:< LE:<= NE:!= NSEQ:<=> MOD:% BITXOR:^ ISNULL:IS_NULL ISNOTNULL:IS_NOT_NULL) 
-# on lowest level function is with 0 arg
+# on lowest level function is with 0 arg e.g. PI()
 expression_term: CONSTANT:0.5,COLUMN:0.5,FUNCTION
-# no function for logical
+# no function when used to build  logical expressions
 expression_group: PARENTHESIS:0.5,FUNCTION
 prefer_right_type_p: 0.95
 function_arg: COLUMN,CONSTANT
 function_0: PI,CONNECTION_ID,CURDATE,CURTIME,CURRENT_ROLE,CURRENT_USER,CURRENT_TIMESTAMP,DATABASE,NOW,SYSDATE,UNIX_TIMESTAMP,UTC_DATE,UTC_TIME,RAND
+# todo make prohibited functions less probable
 function_0virtual: PI,CONNECTION_ID,CURDATE,CURTIME,CURRENT_ROLE,CURRENT_USER,CURRENT_TIMESTAMP,DATABASE,NOW,SYSDATE,UNIX_TIMESTAMP,UTC_DATE,UTC_TIME,RAND
+# A is Any, string or anything castable to string
 function_1A: ASCII,HEX,BIT_LENGTH,CHAR_LENGHT,COERCIBILITY,CHARSET,COLLATION,COMPRESS,CONCAT,CONCAT_WS,CRC32,LCASE,LENGTH,UPPER,ORD,QUOTE,REVERSE,RTRIM,SOUNDEX,TO_BASE64,TRIM,LTRIM,UNHEX,WEIGHT_STRING
 function_1D: DATE,WEEKDAY,DAY,DAYOFWEEK,DAYOFYEAR,LAST_DAY,MICROSECOND,MONTH,MONTHDATE,QUARTER,TIMESTAMP,TO_DAYS,TO_SECONDS,UNIX_TIMESTAMP,WEEK,WEEKDAY,WEEKOFYEAR,YEAR,YEARWEEK
 function_1N: EXP,ACOS,LN,SQRT,ATAN,TAN,ABS,ASIN,BIN,BIT_AND,BIT_COUNT,BIT_OR,BIT_XOR,CEIL,COS,COT,FROM_DAYS,FROM_UNIXTIME,SEC_TO_TIME,DEGREES,FLOOR,RADIANS,SIGN,SIN,OCT
@@ -133,10 +135,9 @@ function_3ANA: LPAD,RPAD
 function_3AAN: SUBSTRING_INDEX
 function_3ANN: SUBSTR
 function_3NNN: CONV,MAKETIME
-# DATE INTERVAL
+# I is INTERVAL
 function_2DI: ADDDATE,DATE_SUB
 function_2DA: DATE_FORMAT
-# DATE NUMERIC
 function_2DN: ADDDATE,DATE_SUB
 function_2DT: ADDTIME
 function_FA: COALESCE,FIELD
@@ -159,15 +160,13 @@ value_bigint: s:0.01,M100-100:0.5,10000-20000:0.5,9223372036854776000-9223372036
 datatype_decimal: DECIMAL:0.9,NUMERIC
 decimal_whole: 3-8:0.5,EMPTY:0.2,9-59:0.8,60-65
 decimal_whole_value: s:0.01,M2-2:0.2,M3-8:0.5,M9-59:0.8,60-70
-# for initial creation may be adjusted
 decimal_part: EMPTY:0.2,0-2:0.5,3-8:0.5,9-28:0.5,29-30
 decimal_part_value: s:0.01,M1:0.01,0:0.2,0-2:0.5,3-28:0.5,29-31
 datatype_floating: FLOAT,DOUBLE
-# base is DECIMAL above, EMPTY means no exponent
+# EMPTY means no exponent
 float_value_exp: s:0.01,EMPTY:0.2,0:0.1,1-10:0.5,M35-35:0.5,M40-M37:0.5,37-45
 double_value_exp: s:0.01,EMPTY:0.2,0:0.1,1-10:0.5,M35-35:0.5,M310-M305:0.5,305-310
 datatype_datetime: YEAR:0.1,DATETIME:0.2,DATE:0.3,TIMESTAMP:0.7,TIME:0.5,YEAR
-# for TIME, DATETIME, TIMESTAMP
 datetime_fractional: EMPTY:0.5,0:0.2,1-6
 datetime_fractional_illegal_p: 0.05
 datetime_year_value: s:0.01,M2100-M1900:0.01,1900-2100:0.5,900-10100:0.5,1890-1910:0.5,2150-2160
@@ -179,10 +178,8 @@ datetime_second_value: s:0.01,M2-62:0.5,0-59
 datetime_microsecond_value: s:0.01,0:0.5,999995-1000005:0.05,0-999999
 datatype_character: CHAR,VARCHAR
 character_set: EMPTY:0.5,utf8mb4:0.2,latin1
-# M will become -
 datatype_char_len: 0:0.01,1-10:0.8,11-250:0.05,251-255
 value_char_len: 0:0.1,1-10:0.8,11-250:0.05,251-260
-# M will become -
 datatype_varchar_len: 0:0.01,1-10:0.1,11-250:0.5,251-260:0.1,261-16383:0.1,100
 value_varchar_len: 0:0.1,1-10:0.1,11-250:0.5,251-260:0.1,261-5000:0.1,65000-70000
 datatype_binary: BINARY,VARBINARY
@@ -191,14 +188,11 @@ value_binary_len: 0:0.1,1-10:0.8,11-250:0.05,251-260
 datatype_varbinary_len: 0:0.01,1-10:0.1,11-250:0.5,251-260:0.1,261-5000:0.1,65000-65535
 value_varbinary_len: 0:0.1,1-10:0.1,11-250:0.5,251-260:0.1,261-5000:0.1,65000-70000
 datatype_lob: TINYBLOB,TINYTEXT,BLOB,TEXT,MEDIUMBLOB,MEDIUMTEXT,LONGBLOB,LONGTEXT
-# todo better
 datatype_lob_key_len: 1-255
-# values for TINY and regular are inherited from VAR, 
 value_mediumlob_len: 0:0.1,1-100:0.5,10000-20000:0.1,8388000-8389000:0.1,16777000-16778000:0.1,1-10
 value_longlob_len: 0:0.1,1-100:0.5,10000-20000:0.1,2147483000-2147484000:0.1,4294967000-4294968000:0.1,1-10
 repeat_len: 1-100:0.5,200-300:0.1,1000-2000:0.1,10-20
 datatype_enums: ENUM:0.9,SET
-# values for enum and set will be v1 ...
 datatype_enum_len: 1-10:0.5,11-250:0.5,251-260
 datatype_set_len: 1-10:0.8,11-60:0.5,61-64
 datatype_set_value_len: 1:0.2,2:0.5,1-10:0.8,11-60:0.5,61-70
@@ -219,16 +213,14 @@ ff_polygon_size: 1:0.8,2:0.5,3-8
 # for multiring
 ff_polygon_kind: RIGHT:0.7,SAME:0.7,STRANGE
 value_json_len: 0:0.1,1-100:0.2,100-1000:0.5,10000-20000:0.1,2147483000-2147484000:0.1,4294967000-4294968000:0.1,1000-1500
-threads: 1:1,2-3
-# todo substruct
-thread_kinds: rwl:1,rw:0.5,ro
-# alternatively to_check_inline:
+# todo substruct for SQL for load thread kind
+# ANY -> x_thread_any not mandatory
 # (re)creation, executed with system()
 create_create: $ENV{IMACREATEMANY} $ENV{_imatest_port_rel}
 # start many instances sequentially
 server_start: $ENV{IMASTARTMANY} $ENV{_imatest_port_rel}
+todo_test: |
+  line 1
+  line 2 last
 # teardown, executed with system()
 destroy_destroy: $ENV{IMADESTROYMANY} $ENV{_imatest_port_rel}
-# MySQL config, initial, todo: multiline
-# treated as Rseq
-#mycnf_innodb_buffer_pool_size: 64M,100M,128M,256M,NONE

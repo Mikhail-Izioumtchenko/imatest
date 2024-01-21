@@ -14,7 +14,7 @@ ima_say "$me : starting as $0 $@"
 
 pass=`$CAT "$IMAPAS"`
 
-com="$MYSQL --mx --port=$port --protocol=tcp --user=root --password=$pass --execute=shutdown"
+com="$MYSQL --port=$port --protocol=tcp --user=root --password=$pass --execute=shutdown"
 ima_say "$me : executing $com"
 $com
 rc="$?"
