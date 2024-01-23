@@ -1,6 +1,7 @@
 ---
 # todo: see imatest.pl, but some here
 # on values kinds and syntax see comments imatest_syntax.yaml
+# code rules over comments so when in doubt see code
 # atm one level deep, a sequence of name: value
 # general test parameters
 # loosely grouped, no requirements on order
@@ -15,46 +16,75 @@ to_check_file: imatest_syntax.yaml
 # Do we create test sandbox anew. It may already exist in which case it is NOT destroyed and recreated.
 create_server: False
 
-# create database, may run if something already exists
+# create database, may run generated SQL even if something already exists
 create_db: True
-# destroy e.g. sandbox, datadir and all
+
+# destroy sandbox, datadir and all
 teardown: False
+
+# test threads are killed by the driving thread. 
+# mysqld is left as is. todo: shutdown optionally
 test_duration_seconds: 300
+
 # general configuration
+
+# single, InnoDBCluster etc
 config: single
-# one for now, relative ports
+
+# single port for now, ports are relative.
 ports: 2
-# the port will be e.g. 4202, x protocol port 4302
+# ports are relative to this offset, 2 -> 4202
 portoffset: 4200
+# offset port -> x protocol port, 2 -> 4202 -> 4302
 xportoffset: 100
-# this and similar will be evaluated once at startup
+
+# this and similar will be evaluated once at startup, doeval in inatest_syntax.yaml
+# environment is set im imatest.sh in fact in imatest.dot
+# mysqlsh executable
 mysqlsh: $ENV{MYSQLSH}
+# user that runs test SQL, all of it
 user: $ENV{IMAROOT}
+# user that runs test SQL, all of it
 passfile: $ENV{IMAPAS}
 tmpdir: defined($ENV{IMATMPDIR})? $ENV{IMATMPDIR} : qw(/tmp)
-# prefer x protocol
+# try to use x protocol mostly
 usex: True
+
 # InnoDB configuration, for SET PERSIST
 # todo: flatten, make multiline
 innodb_buffer_pool_size: 100000000,200000000,300000000
+
 # test load
 # test load: shutdown or kill and restart
-server_terminate: Yes
+#server_terminate: Yes
+# will the test terminate mysqld every now and then
+server_terminate: No
+
 # see comments on Rseq in imatest_syntax.yaml
+# the test will terminate the server every about 60 seconds
+# this sleep is when the server is running
 server_termination_every_seconds: 55-65
+# terminate server like so. kill is mysqlsh builtin kill whatever that is. dba.killSandboxInstance
 server_termination_how: shutdown,kill,sigkill,sigstop!shutkill
+# this and similar is evaluated at server termination time
 server_terminate_shutdown: $ENV{IMASTOPMANY} $ENV{_imatest_port_rel}
 server_terminate_kill: $ENV{IMAKILLMANY} $ENV{_imatest_port_rel}
 server_terminate_sigkill: $ENV{IMAHAKILLMANY} $ENV{_imatest_port_rel} KILL
 server_terminate_sigstop: $ENV{IMAHAKILLMANY} $ENV{_imatest_port_rel} STOP
 server_terminate_unstop: $ENV{IMAHAKILLMANY} $ENV{_imatest_port_rel} CONT
+# sleep this much after server termination BEFORE restarting the server. So it is apart from server_termination_every_seconds
 server_termination_duration: 10-20
 server_termination_duration_on_sigstop: 60,10,20
-# duration includes wait
+
+# wait till server process diappears
 server_termination_wait: Yes
 server_termination_wait_timeout: 60
+
+# wait until the server becomes at least readonly
 server_start_control: Yes
-server_start_timeout: 300
+server_start_timeout: 60
+
+#here
 # test load: client threads
 client_threads: 2
 # qw(/dev/null) to get rid of this verbosity
@@ -64,9 +94,10 @@ txn_sleep_after_ms: 500-1000
 # todo: different load config per thread
 # database structure
 # database structure - schemas
-schemas: 1-3:0.5,7-9
-schema_name_format: ts%s,test_%s_schema,test_schema_longer_name_%09d
-tables_per_schema: 1-4:0.2,5-9:0.4,5-10
+schemas: 1!1-3:0.5,7-9
+#schema_name_format: ts%s,test_%s_schema,test_schema_longer_name_%09d
+schema_name_format: gts%s
+tables_per_schema: 8!1-4:0.2,5-9:0.4,5-10
 table_name_format: tt%s,test_%s_table,test_table_longer_name_%09d
 # EMPTY means do not specify
 table_autoextend_size: 4M:0.2,8M:0.2,12M:0.2,16M:0.2,20M:0.1,EMPTY
@@ -104,12 +135,13 @@ column_virtuality: VIRTUAL:0.5,STORED:0.5,EMPTY
 virtual_columns_per_table: 0:0.8,1:0.5,2-4:0.5,5-100:0.1,0
 virtual_expression_length: 2-3
 virtual_expression_depth: 1:1.0,1-3
-load_sql_class: SELECT!UPDATE:0.1,INSERT:0.1,DELETE:0.1,INSEL:0.1,SELECTALL:0.1,ALTER
+load_sql_class: INSERT!SELECT:0.5,UPDATE:0.1,DELETE:0.1,INSEL:0.1,SELECTALL:0.1,ALTER
 # for F1A function_1A below is used
 load_function_upper: F1A,F2AT
 load_function_class: F0,F1N,F1D,F2NN,F2DI,F2DN,F2DT,F3ANN,FFN,F1A,F2AT,FFA,F3NNN,F2DA,F1T,F2AA,F3AAN,F3AAA,F3ANA
 # N+N
 load_expression_length: 1-3
+load_where_all_p: 0.1
 # E AND E
 load_logical_length: 2
 load_logical_depth: 2
@@ -154,14 +186,19 @@ function_FA: COALESCE,FIELD
 function_FN: CHAR
 column_visibility: EMPTY:0.9,INVISIBLE:0.2,VISIBLE
 null_legitimate_p: 0.6
-null_illegitimate_p: 0.05
+null_illegitimate_p: 0.005
 autoinc_explicit_value_p: 0.01
-datatype_class: INTEGER,DECIMAL,FLOATING,DATETIME,CHARACTER,BINARY,LOB,ENUMS,JSON,SPATIAL
+
+# like many other values this is hardcoded inside imatest.pl
+datatype_class: INTEGER,DECIMAL,FLOATING,CHARACTER,BINARY,LOB,ENUMS,DATETIME,JSON,SPATIAL
+
 datatype_classes_numeric: INTEGER,DECIMAL,FLOATING
-datatype_integer: BIT,TINYINT,SMALLINT,MEDIUMINT,INT,BIGINT
+datatype_integer: TINYINT:0.01,SMALLINT:0.1,MEDIUMINT:0.01,BIGINT:0.5,INT:0.9,BIT
 integer_unsigned_p: 0.6
+integer_reverse_sign_legitimate_p: 0.2
+integer_reverse_sign_illegitimate_p: 0.001
 datatype_bit_len: EMPTY:0.5,1-60:0.8,61-63
-value_bit: s:0.01,0-4:0.5,5-60:0.8,61-70
+value_bit: s:0.001,0-4:0.5,5-60:0.8,61-70
 value_tinyint: s:0.01,M4-4:0.5,5-100:0.5,101-150:0.5,250-260
 value_smallint: s:0.01,M100-100:0.5,10000-20000:0.5,32700-32800:0.5,65000-66000
 value_mediumint: s:0.01,M100-100:0.5,10000-20000:0.5,8388000-8389000:0.5,16777000-16778000
@@ -169,13 +206,13 @@ value_int: s:0.01,M100-100:0.5,10000-20000:0.5,2147483000-2147484000:0.5,4294967
 value_bigint: s:0.01,M100-100:0.5,10000-20000:0.5,9223372036854776000-9223372036854776000:0.5,18446744073709551000-18446744073709552000
 datatype_decimal: DECIMAL:0.9,NUMERIC
 decimal_whole: 3-8:0.5,EMPTY:0.2,9-59:0.8,60-65
-decimal_whole_value: s:0.01,M2-2:0.2,M3-8:0.5,M9-59:0.8,60-70
 decimal_part: EMPTY:0.2,0-2:0.5,3-8:0.5,9-28:0.5,29-30
-decimal_part_value: s:0.01,M1:0.01,0:0.2,0-2:0.5,3-28:0.5,29-31
+# also applies to numeric. This is not what we insert. Rather it is 10 POW this * rand(). This may change, see code if matters.
+decimal_value: 1:0.01,0:0.2,0-2:0.5,3-6:0.8,7-28:0.5,29-70
 datatype_floating: FLOAT,DOUBLE
-# EMPTY means no exponent
-float_value_exp: s:0.01,EMPTY:0.2,0:0.1,1-10:0.5,M35-35:0.5,M40-M37:0.5,37-45
-double_value_exp: s:0.01,EMPTY:0.2,0:0.1,1-10:0.5,M35-35:0.5,M310-M305:0.5,305-310
+# EMPTY means no exponent, then we will use a decimal_value
+float_value_exp: EMPTY:0.2,0:0.1,1-10:0.5,M35-35:0.5,M40-M37:0.5,37-45
+double_value_exp: EMPTY:0.2,0:0.1,1-10:0.5,M35-35:0.5,M310-M305:0.5,305-310
 datatype_datetime: YEAR:0.1,DATETIME:0.2,DATE:0.3,TIMESTAMP:0.7,TIME:0.5,YEAR
 datetime_fractional: EMPTY:0.5,0:0.2,1-6
 datetime_fractional_illegal_p: 0.05
@@ -192,6 +229,8 @@ datatype_char_len: 0:0.01,1-10:0.8,11-250:0.05,251-255
 value_char_len: 0:0.1,1-10:0.8,11-250:0.05,251-260
 datatype_varchar_len: 0:0.01,1-10:0.1,11-250:0.5,251-260:0.1,261-16383:0.1,100
 value_varchar_len: 0:0.1,1-10:0.1,11-250:0.5,251-260:0.1,261-5000:0.1,65000-70000
+# adjust generated value to column length, applies to binary and blob as well
+value_kchar_length_adjust_p: 0.99
 datatype_binary: BINARY,VARBINARY
 datatype_binary_len: EMPTY:0.1,0:0.01,1-10:0.8,11-250:0.05,251-255
 value_binary_len: 0:0.1,1-10:0.8,11-250:0.05,251-260
@@ -199,11 +238,13 @@ datatype_varbinary_len: 0:0.01,1-10:0.1,11-250:0.5,251-260:0.1,261-5000:0.1,6500
 value_varbinary_len: 0:0.1,1-10:0.1,11-250:0.5,251-260:0.1,261-5000:0.1,65000-70000
 datatype_lob: TINYBLOB,TINYTEXT,BLOB,TEXT,MEDIUMBLOB,MEDIUMTEXT,LONGBLOB,LONGTEXT
 datatype_lob_key_len: 1-255
-value_mediumlob_len: 0:0.1,1-100:0.5,10000-20000:0.1,8388000-8389000:0.1,16777000-16778000:0.1,1-10
-value_longlob_len: 0:0.1,1-100:0.5,10000-20000:0.1,2147483000-2147484000:0.1,4294967000-4294968000:0.1,1-10
-repeat_len: 1-100:0.5,200-300:0.1,1000-2000:0.1,10-20
+# applies to both text and binary
+value_tinylob_len: 0:0.01,1-100:0.5,101-300
+value_lob_len: 0:0.01,1-100:0.5,10000-20000:0.1,25000-35000
+value_mediumlob_len: 0:0.01,1-100:0.5,10000-20000:0.1,8388000-8389000:0.1,16777000-16778000:0.1,1-10
+value_longlob_len: 0:0.01,1-100:0.5,10000-20000:0.1,2147483000-2147484000:0.1,4294967000-4294968000:0.1,1-10
 datatype_enums: ENUM:0.9,SET
-datatype_enum_len: 1-10:0.5,11-250:0.5,251-260
+datatype_enum_len: 1-10:0.5,11-250:0.5,251-260:0.5,300-70000
 datatype_set_len: 1-10:0.8,11-60:0.5,61-64
 datatype_set_value_len: 1:0.2,2:0.5,1-10:0.8,11-60:0.5,61-70
 # M will NOT become -

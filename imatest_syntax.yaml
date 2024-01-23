@@ -157,10 +157,13 @@ datatype_spatial:
   allowed: Rseq       
   mandatory: True
   only_values_allowed: GEOMETRY,POINT,LINESTRING,POLYGON,GEOMETRYCOLLECTION,MULTIPOINT,MULTILINESTRING,MULTIPOLYGON
+datatype_varbinary_len:
+  mandatory: True
+  allowed: Rseq
 datatype_varchar_len:
+  mandatory: True
   allowed: Rseq
   only_non_negative_integers: True
-  mandatory: True
 datetime_fractional:
   mandatory: True
   allowed: Rseq
@@ -191,13 +194,10 @@ datetime_year_value:
 decimal_part:
   mandatory: True
   allowed: Rseq
-decimal_part_value:
+decimal_value:
   mandatory: True
   allowed: Rseq
 decimal_whole:
-  mandatory: True
-  allowed: Rseq
-decimal_whole_value:
   mandatory: True
   allowed: Rseq
 destroy_destroy:
@@ -206,19 +206,45 @@ double_value_exp:
   mandatory: True
   allowed: Rseq
 expression_group:
-  allowed: Rseq       
   mandatory: True
+  allowed: Rseq       
   only_values_allowed: PARENTHESIS,FUNCTION
 expression_term:
-  allowed: Rseq       
   mandatory: True
+  allowed: Rseq       
   only_values_allowed: CONSTANT,COLUMN,FUNCTION
+ff_linestring_len:
+  mandatory: True
+  allowed: Rseq
+  only_non_negative_integers: True
+# vertices
+ff_multi_len:
+  mandatory: True
+  allowed: Rseq
+  only_positive_integers: True
+ff_point_val:
+  mandatory: True
+  allowed: Rseq
+# for multiring
+ff_polygon_kind:
+  mandatory: True
+  allowed: Rseq
+  only_values_allowed:
+ff_polygon_len:
+  mandatory: True
+  allowed: Rseq
+  only_non_negative_integers: True
+# rings
+ff_polygon_size:
+  mandatory: True
+  allowed: Rseq
+  only_positive_integers: True
 float_value_exp:
   mandatory: True
   allowed: Rseq
 fulltext_index_p:
-  allowed: probability
   mandatory: True
+  allowed: probability
 function_0:
   mandatory: True
   allowed: Rseq
@@ -298,36 +324,47 @@ function_3NNN:
   mandatory: True
   only_values_allowed: CONV,MAKETIME
 function_FN:
-  allowed: Rseq       
   mandatory: True
+  allowed: Rseq       
   only_values_allowed: CHAR
 function_FA:
-  allowed: Rseq       
   mandatory: True
+  allowed: Rseq       
   only_values_allowed: COALESCE,FIELD
 function_arg:
-  allowed: Rseq       
   mandatory: True
+  allowed: Rseq       
   only_values_allowed: COLUMN,CONSTANT
+geometry_kind:
+  mandatory: True
+  allowed: Rseq
+  only_values_allowed: POINT,LINESTRING,POLYGON
 index_prefix_len:
   allowed: Rseq       
   mandatory: True
 index_direction:
-  allowed: Rseq       
   mandatory: True
+  allowed: Rseq       
   only_values_allowed: ASC,DESC,EMPTY
 indexes_per_table:
-  allowed: Rseq       
   mandatory: True
+  allowed: Rseq       
   only_non_negative_integers: True
 index_visibility:
-  allowed: Rseq       
   mandatory: True
+  allowed: Rseq       
   only_values_allowed: VISIBLE,INVISIBLE,EMPTY
 innodb_buffer_pool_size:
   allowed: Rseq
   mandatory: True
+integer_reverse_sign_legitimate_p:
+  allowed: probability
+  mandatory: True
+integer_reverse_sign_illegitimate_p:
+  mandatory: True
+  allowed: probability
 integer_unsigned_p:
+  mandatory: True
   allowed: probability
 # (N+(N*N))/N is 2, F(N) is 1
 load_expression_depth:
@@ -359,7 +396,14 @@ load_sql_class:
   allowed: Rseq
   mandatory: True
   only_values_allowed: SELECT,UPDATE,INSERT,DELETE,INSEL,SELECTALL,ALTER
-  supported: SELECT
+  supported: SELECT,INSERT
+load_where_all_p:
+  allowed: probability
+  mandatory: True
+multigeometry_kind:
+  mandatory: True
+  allowed: Rseq
+  only_values_allowed: GEOMETRY,POINT,LINESTRING,POLYGON
 null_illegitimate_p:
   allowed: probability
   mandatory: True
@@ -392,12 +436,12 @@ operators_logical:
   mandatory: True
   only_values_allowed: AND,OR
 operators_nots:
-  allowed: Rseq
   mandatory: True
+  allowed: Rseq
   only_non_negative_integers: True
 operators_sql:
-  allowed: doeval_list
   mandatory: True
+  allowed: doeval_list
 schema_name_format:
   allowed: Rseq       
   mandatory: True
@@ -452,15 +496,18 @@ server_termination_wait:
 server_termination_wait_timeout:
   allowed: only_positive_integers
   mandatory: True
+spatial_srid:
+  mandatory: True
+  allowed: Rseq
 table_autoextend_size:
-  allowed: Rseq       
   mandatory: True
+  allowed: Rseq       
 table_autoinc:
-  allowed: Rseq       
   mandatory: True
+  allowed: Rseq       
 table_compression:
-  allowed: Rseq       
   mandatory: True
+  allowed: Rseq       
   only_values_allowed: ZLIB,LZ4,NONE,EMPTY
 table_has_autoinc_p:
   allowed: probability
@@ -518,40 +565,14 @@ value_char_len:
 value_int:
   mandatory: True
   allowed: Rseq
-value_mediumint:
-  mandatory: True
-  allowed: Rseq
-value_smallint:
-  mandatory: True
-  allowed: Rseq
-value_spatial_len:
-  allowed: Rseq       
-  mandatory: True
-  only_positive_integers: True
-value_tinyint:
-  mandatory: True
-  allowed: Rseq
-value_varchar_len:
+value_json_len:
   mandatory: True
   allowed: Rseq
   only_non_negative_integers: True
-virtual_expression_depth:
-  allowed: Rseq       
+value_kchar_length_adjust_p:
   mandatory: True
-  only_positive_integers: True
-virtual_expression_length:
-  allowed: Rseq       
-  mandatory: True
-  only_positive_integers: True
-#here
-datatype_varbinary_len:
-  mandatory: True
-  allowed: Rseq
-value_varbinary_len:
-  mandatory: True
-  allowed: Rseq
-  only_non_negative_integers: True
-value_mediumlob_len:
+  allowed: probability
+value_lob_len:
   mandatory: True
   allowed: Rseq
   only_non_negative_integers: True
@@ -559,51 +580,43 @@ value_longlob_len:
   mandatory: True
   allowed: Rseq
   only_non_negative_integers: True
-repeat_len:
+value_mediumint:
+  mandatory: True
+  allowed: Rseq
+value_mediumlob_len:
   mandatory: True
   allowed: Rseq
   only_non_negative_integers: True
-spatial_srid:
+value_smallint:
   mandatory: True
   allowed: Rseq
-geometry_kind:
+value_spatial_len:
+  allowed: Rseq       
   mandatory: True
-  allowed: Rseq
-  only_values_allowed: POINT,LINESTRING,POLYGON
-multigeometry_kind:
-  mandatory: True
-  allowed: Rseq
-  only_values_allowed: GEOMETRY,POINT,LINESTRING,POLYGON
-ff_point_val:
-  mandatory: True
-  allowed: Rseq
-ff_linestring_len:
-  mandatory: True
-  allowed: Rseq
-  only_non_negative_integers: True
-# vertices
-ff_polygon_len:
-  mandatory: True
-  allowed: Rseq
-  only_non_negative_integers: True
-ff_multi_len:
-  mandatory: True
-  allowed: Rseq
   only_positive_integers: True
-# rings
-ff_polygon_size:
+value_tinylob_len:
+  mandatory: True
+  allowed: Rseq       
+value_tinyint:
   mandatory: True
   allowed: Rseq
-  only_positive_integers: True
-# for multiring
-ff_polygon_kind:
-  mandatory: True
-  allowed: Rseq
-  only_values_allowed:
-value_json_len:
+value_varbinary_len:
   mandatory: True
   allowed: Rseq
   only_non_negative_integers: True
+value_varchar_len:
+  mandatory: True
+  allowed: Rseq
+  only_non_negative_integers: True
+virtual_expression_depth:
+  mandatory: True
+  allowed: Rseq       
+  only_positive_integers: True
+virtual_expression_length:
+  allowed: Rseq       
+  mandatory: True
+  only_positive_integers: True
+#here
 portoffset:
   mandatory: True
   allowed: only_positive_integers

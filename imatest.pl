@@ -4,10 +4,23 @@ use English;
 
 require 5.032;
 
+# style: flexible, mostly per perldoc perlstyle
+# M1. mandatory: no tabs, 4 blanks indentation
+# M2. mandatory: no case statement, no camelCase
+# 2. desirable: should look like C
+# 3. so postfix if and unless are discouraged. If specified, should be on the same line as statement, if|unless (condition)
+# 4. no postfix except for if and unless
+# 5. blocks in {} even where a single statement after while or similar is allowed
+# 6. desirable: single quotes unless string interpolation is used. So 'abc' not "abc".
+# 7. comments start with single #, ident with code if on separate line
+
 # todo
-# log miner, make perl
+# log miner, improve, make perl
+# optional server shutdown in the end
 # my.cnf config thgrough set persist, multiline yaml
-# INSERT
+# INSERT. fload/decimal unsigned is deprecated decimal(4,4) allowed, 4 digit total
+# inprove hardcoding e.g. generate_value_INTEGER() then eval call
+# WHERE 1=1
 # implement shutdown-and-kill
 # dry but less dry
 # database discovery
@@ -90,8 +103,8 @@ my $NEG_MARKER = 'M';
 my $ANY = 'ANY';
 my $CHECK_SUBKEYS = '_2levelkeys';
 my $CREATE_CREATE = 'create_create';
-my $SERVER_START = 'server_start';
 my $DESTROY_DESTROY = 'destroy_destroy';
+my $SERVER_START = 'server_start';
 my $EMPTY = 'EMPTY';
 my $INTEGER = 'INTEGER';
 my $MYSQLSH_BASE = 'mysqlsh_base';
@@ -118,6 +131,7 @@ my @LOPT = ("$DRYRUN!", "$HELP!", "$TESTYAML=s", "$SEE_ALSO=s", "$SEED=i", "$VER
 my %HDEFOPT = ("$DRYRUN" => 0, $HELP => 0, $VERBOSE => 0, $VERSION => 0);      # option defaults
 
 # globals of sorts
+my $gdosayoff = 2;
 my %ghasopt = ();      # resulting options values hash
 my %ghver = ();      # syntax checker hash
 my %ghtest = ();      # test script hash
@@ -131,7 +145,11 @@ my %ghst2needvcols = ();      # schema.table => number of virtual cols needed
 my %ghst2hasvcols = ();      # schema.table => number of virtual cols needed
 my %ghst2ncolsnp = ();      # schema.table => number of non pk cols
 my %ghst2cols = ();      # schema.table => ref array column names
-my %ghstc2dtclass = ();      # schema.table.column => datatype class
+my %ghst2nvcols = ();      # schema.table => ref array column names for non virtual columns
+my %ghstc2dt = ();      # schema.table.column => column datatype, uniqueness etc, otherwise not set
+my %ghstc2cannull = ();      # schema.table.column => column nullability
+my %ghstc2len = ();      # schema.table.column => column length if specified
+my %ghstc2unsigned = ();      # schema.table.column => column is unsigned
 my %ghst2mayautoinc = ();      # schema.table => may have autoinc column
 my %ghst2hasautoinc = ();      # schema.table => does have autoinc column
 my %ghst2pkautoinc = ();      # schema.table => does have autoinc column and it is PK
@@ -251,7 +269,7 @@ sub dosayif {
     my ($format, @largs) = @ARG;
     my $res = shortmess();
     my @l = split(/\n/,$res);
-    $res = $l[scalar(@l)-2];
+    $res = defined($l[$gdosayoff])? $l[$gdosayoff] : 'main';
     $res =~ s/\(.*//;
     $res =~ s/.*://;
     $res = 'main' if ($res eq 'dosayif');
@@ -312,6 +330,7 @@ sub process_rseq {
     my $verbose = $silent? $VERBOSE_NEVER : $VERBOSE_DEV;
     my $val = $ghtest{$skey};
     my $phverk = $ghver{$skey};
+    croak("$skey +$val+$skey+is not in test description file or not Rseq") if ($check and not defined($phverk));
     my $rc = $RC_OK;
     my ($only_positive_integers, $only_non_negative_integers, $only_names, $only_values_allowed) =
          $check ?
@@ -927,10 +946,14 @@ sub db_create {
             my %hcolcanind = ();
             my %hcolneedpref = ();
             my $srid = undef;
+            my @lnvcols = ();
             foreach my $cnam (@lcols) {
                 # each column in table
-                my $tclass = process_rseq('datatype_class');
                 my $colnam = "$tnam.$cnam";
+                $ghstc2cannull{$colnam} = $TRUE;
+                $ghstc2unsigned{$colnam} = $FALSE;
+                $ghstc2len{$colnam} = -1;
+                my $tclass = process_rseq('datatype_class');
                 my $canpk = $ghstcol2def{$colnam};      # can be part of PK unchanged e.g. CHAR but not TEXT
                 my $keylen = undef;
                 my $canunique = $canpk eq "$TRUE"? $FALSE : $TRUE;      # UNIQUE can be added to coldef
@@ -944,7 +967,6 @@ sub db_create {
                 }
                 # now we have final datatype class
                 $hcolcanind{$cnam} = $TRUE if ($tclass ne 'JSON');
-                $ghstc2dtclass{$cnam} = $tclass;
                 $hcolneedpref{$cnam} = $tclass eq 'LOB'? $TRUE : $FALSE;
                 my $dt = $tclass;
                 if ($tclass eq $INTEGER) {
@@ -952,11 +974,15 @@ sub db_create {
                     $dt = process_rseq('datatype_integer');
                     if ($dt eq 'BIT') {
                         my $len = process_rseq('datatype_bit_len');
-                        $dt .= "($len)" if ($len ne $EMPTY);
+                        if ($len ne $EMPTY) {
+                            $dt .= "($len)";
+                            $ghstc2len{$colnam} = $len;
+                        }
                     } else {
                         my $prob = rand();
                         if ($prob < $ghreal{'integer_unsigned_p'}) {
                             $dt .= " UNSIGNED";
+                            $ghstc2unsigned{$colnam} = $TRUE;
                         }
                         if ($ghst2mayautoinc{$tnam} and not $ghst2hasautoinc{$tnam} and rand() < $ghreal{table_has_autoinc_p}) {
                             $ghst2hasautoinc{$tnam} = $TRUE;
@@ -965,6 +991,7 @@ sub db_create {
                             if (rand() < $ghreal{'pk_autoinc_p'}) {
                                 $ghst2pkautoinc{$tnam} = $TRUE;
                                 $dt .= " PRIMARY KEY";
+                                $ghstc2cannull{$colnam} = $FALSE;
                             } else {
                                 # todo consider edge case of missing in any subsequent index/ autoinc_unique_p ?
                                 $dt .= " UNIQUE";
@@ -975,11 +1002,13 @@ sub db_create {
                     $dt = process_rseq('datatype_decimal');
                     my $whole = process_rseq('decimal_whole');
                     if ($whole ne 'EMPTY') {
+                        $ghstc2len{$colnam} = $whole;
                         $dt .= "($whole";
                         my $part = process_rseq('decimal_part');
                         if ($part ne $EMPTY) {
                             $part = $whole if ($part > $whole);
                             $dt .= ",$part";
+                            $ghstc2len{$colnam} = $whole - $part;      # digits BEFORE .
                         }
                         $dt .= ')';
                     }
@@ -996,6 +1025,7 @@ sub db_create {
                     my $len = $dt eq 'CHAR'? process_rseq('datatype_char_len') : process_rseq('datatype_varchar_len');
                     $len = $V3072 if ($canpk and $len > $V3072);
                     $dt .= "($len)";
+                    $ghstc2len{$colnam} = $len;
                     my $cs = process_rseq('character_set');
                     $dt .= " CHARACTER SET $cs" if ($cs ne $EMPTY);
                 } elsif ($tclass eq 'BINARY') {
@@ -1008,7 +1038,10 @@ sub db_create {
                         $len = process_rseq('datatype_varbinary_len');
                     }
                     $len = $V3072 if ($canpk and $len ne $EMPTY and $len > $V3072);
-                    $dt .= "($len)" if ($len ne $EMPTY);
+                    if ($len ne $EMPTY) {
+                        $dt .= "($len)";
+                        $ghstc2len{$colnam} = $len;
+                    }
                 } elsif ($tclass eq 'LOB') {
                     $canunique = $FALSE;
                     $dt = process_rseq('datatype_lob');
@@ -1018,6 +1051,7 @@ sub db_create {
                 } elsif ($tclass eq 'ENUMS') {
                     $dt = process_rseq('datatype_enums');
                     my $len = $dt eq 'ENUM'? process_rseq('datatype_enum_len') : process_rseq('datatype_set_len');
+                    $ghstc2len{$colnam} = $len;
                     my $vl = '';
                     for (my $n = 1; $n <= $len; ++$n) {
                         $vl .= ",'v$n'";
@@ -1034,7 +1068,9 @@ sub db_create {
                     my $expr = build_expression($tnam, $TRUE);
                     $dt .= " AS ($expr) $virt"; # todo better
                     ++$ghst2hasvcols{$tnam};
-                } 
+                } else {
+                    push(@lnvcols,$cnam);
+                }
                 if (defined($srid)) {
                     $dt .= " SRID $srid" if $srid ne $EMPTY;
                     $srid = undef;
@@ -1049,16 +1085,24 @@ sub db_create {
                 if ($canpk eq "$TRUE") {      # todo expr
                     $table_pk .= " , $cnam";
                     $table_pk .= "($keylen)" if (defined($keylen));
+                    $ghstc2cannull{$colnam} = $FALSE;
                 } else {
-                    $vis =  ($canpk or $ghstc2isautoinc{$colnam})? $EMPTY : process_rseq('column_null');
+                    if ($canpk or $ghstc2isautoinc{$colnam}) {
+                        $vis =  $EMPTY;
+                    } else {
+                        $vis = process_rseq('column_null');
+                        $ghstc2cannull{$colnam} = $vis eq 'NOT_NULL'? $FALSE : $TRUE;
+                    }
                     $vis =~ s/_/ /;
                     $dt .= " $vis" if ($vis ne $EMPTY);
                 }
                 my $coldef = "$cnam $dt";
+                $ghstc2dt{$colnam} = $dt;
                 # small chance there will be no keys after the last column
                 $coldef .= ',' unless ($ghst2pkautoinc{$tnam} and $needind == 0 and $cnam eq $lcols[scalar(@lcols)-1]);
                 push(@lsql, $coldef);
             }
+            $ghst2nvcols{$tnam} = \@lnvcols;
             $table_pk =~ s/^ *,+/ PRIMARY KEY(/;
             my $table_indexes = '';
             push(@lsql, "$table_pk)")
@@ -1124,8 +1168,17 @@ sub db_create {
                     delete($ghst2mayautoinc{$tnam});
                     delete($ghst2hasautoinc{$tnam});
                     delete($ghst2pkautoinc{$tnam});
-                    foreach my $cnam (keys(%ghstc2dtclass)) {
-                        delete($ghstc2dtclass{$cnam}) if ($cnam =~ /^$tnam\./);
+                    foreach my $cnam (keys(%ghstc2cannull)) {
+                        delete($ghstc2cannull{$cnam}) if ($cnam =~ /^$tnam\./);
+                    }
+                    foreach my $cnam (keys(%ghstc2len)) {
+                        delete($ghstc2len{$cnam}) if ($cnam =~ /^$tnam\./);
+                    }
+                    foreach my $cnam (keys(%ghstc2unsigned)) {
+                        delete($ghstc2unsigned{$cnam}) if ($cnam =~ /^$tnam\./);
+                    }
+                    foreach my $cnam (keys(%ghstc2dt)) {
+                        delete($ghstc2dt{$cnam}) if ($cnam =~ /^$tnam\./);
                     }
                     foreach my $cnam (keys(%ghstc2isautoinc)) {
                         delete($ghstc2isautoinc{$cnam}) if ($cnam =~ /^$tnam\./);
@@ -1247,6 +1300,460 @@ sub stmt_select_generate {
     return $stmt;
 }
 
+# 1: schema.table.column
+# returns: value as string suitable to add to VALUES
+sub value_generate_decimal {
+    my $col = $ARG[0];
+    my $value = rand()*(10.0**process_rseq('decimal_value'));
+    $value = -$value if (rand() < $ghreal{'integer_reverse_sign_legitimate_p'});
+    dosayif($VERBOSE_NEVER,'for %s %s returning: %s',$col,$value);
+    return $value;
+}
+#&value_generate_numeric = &value_generate_decimal;
+
+# 1: schema.table.column
+# returns: value as string suitable to add to VALUES
+sub value_generate_numeric {
+    return value_generate_decimal(@ARG);
+}
+
+# 1: schema.table.column
+# returns: value as string suitable to add to VALUES
+sub value_generate_int {
+    my $col = $ARG[0];
+    my $value = process_rseq('value_int');
+    if ($ghstc2unsigned{$col} == $TRUE) {
+        $value = -$value if (rand() < $ghreal{'integer_reverse_sign_illegitimate_p'});
+    } else {
+        $value = -$value if (rand() < $ghreal{'integer_reverse_sign_legitimate_p'});
+    }
+    dosayif($VERBOSE_NEVER,'for %s returning: %s',$col,$value);
+    return $value;
+}
+
+# 1: schema.table.column
+# returns: value as string suitable to add to VALUES
+sub value_generate_tinyint {
+# todo remember unsigned, null
+    my $col = $ARG[0];
+    my $value = process_rseq('value_tinyint');
+    if ($ghstc2unsigned{$col} == $TRUE) {
+        $value = -$value if (rand() < $ghreal{'integer_reverse_sign_illegitimate_p'});
+    } else {
+        $value = -$value if (rand() < $ghreal{'integer_reverse_sign_legitimate_p'});
+    }
+    dosayif($VERBOSE_NEVER,'for %s returning: %s',$col,$value);
+    return $value;
+}
+
+# 1: schema.table.column
+# returns: value as string suitable to add to VALUES
+sub value_generate_bigint {
+    my $col = $ARG[0];
+    my $value = process_rseq('value_bigint');
+    if ($ghstc2unsigned{$col} == $TRUE) {
+        $value = -$value if (rand() < $ghreal{'integer_reverse_sign_illegitimate_p'});
+    } else {
+        $value = -$value if (rand() < $ghreal{'integer_reverse_sign_legitimate_p'});
+    }
+    dosayif($VERBOSE_NEVER,'for %s returning: %s',$col,$value);
+    return $value;
+}
+
+# 1: schema.table.column
+# returns: value as string suitable to add to VALUES
+sub value_generate_bit {
+    my $col = $ARG[0];
+    my $value = process_rseq('value_bit');
+    dosayif($VERBOSE_NEVER,'for %s returning: %s',$col,$value);
+    return $value;
+}
+
+# 1: schema.table.column
+# returns: value as string suitable to add to VALUES
+sub value_generate_smallint {
+    my $col = $ARG[0];
+    my $value = process_rseq('value_smallint');
+    if ($ghstc2unsigned{$col} == $TRUE) {
+        $value = -$value if (rand() < $ghreal{'integer_reverse_sign_illegitimate_p'});
+    } else {
+        $value = -$value if (rand() < $ghreal{'integer_reverse_sign_legitimate_p'});
+    }
+    dosayif($VERBOSE_NEVER,'for %s returning: %s',$col,$value);
+    return $value;
+}
+
+# 1: schema.table.column
+# returns: value as string suitable to add to VALUES
+sub value_generate_mediumint {
+    my $col = $ARG[0];
+    my $value = process_rseq('value_mediumint');
+    if ($ghstc2unsigned{$col} == $TRUE) {
+        $value = -$value if (rand() < $ghreal{'integer_reverse_sign_illegitimate_p'});
+    } else {
+        $value = -$value if (rand() < $ghreal{'integer_reverse_sign_legitimate_p'});
+    }
+    dosayif($VERBOSE_NEVER,'for %s returning: %s',$col,$value);
+    return $value;
+}
+
+# 1: schema.table.column
+# returns: value as string suitable to add to VALUES
+sub value_generate_float {
+    my $col = $ARG[0];
+    my $exp = process_rseq('float_value_exp');
+    my $value = $exp eq $EMPTY? value_generate_decimal($col) : sprintf("%sE%s",rand(),$exp);
+    dosayif($VERBOSE_NEVER,'for %s returning: %s',$col,$value);
+    return $value;
+}
+
+# 1: schema.table.column
+# returns: value as string suitable to add to VALUES
+sub value_generate_double {
+    my $col = $ARG[0];
+    my $exp = process_rseq('double_value_exp');
+    my $value = $exp eq $EMPTY? value_generate_decimal($col) : sprintf("%sE%s",rand(),$exp);
+    dosayif($VERBOSE_NEVER,'for %s returning: %s',$col,$value);
+    return $value;
+}
+
+# 1: schema.table.column
+# returns: value as string suitable to add to VALUES
+sub value_generate_char {
+    my $col = $ARG[0];
+    my $len = $ghstc2len{$col};
+    my $valen = process_rseq('value_char_len');
+    $valen = $len if ($len >= 1 and $valen > $len and rand() < process_rseq('value_kchar_length_adjust_p'));
+    my $value = 'a' x $valen;
+    $value = "'$value'";
+    dosayif($VERBOSE_NEVER,'for %s(%s) returning: %s',$col,$len,$value);
+    return $value;
+}
+
+# 1: schema.table.column
+# returns: value as string suitable to add to VALUES
+sub value_generate_varbinary {
+    my $col = $ARG[0];
+    my $len = $ghstc2len{$col};
+    my $valen = process_rseq('value_varbinary_len');
+    $valen = $len if ($len >= 1 and $valen > $len and rand() < process_rseq('value_kchar_length_adjust_p'));
+    my $value = "REPEAT('a',$valen)";
+    dosayif($VERBOSE_NEVER,'for %s(%s) returning: %s',$col,$len,$value);
+    return $value;
+}
+
+# 1: schema.table.column
+# returns: value as string suitable to add to VALUES
+sub value_generate_binary {
+    my $col = $ARG[0];
+    my $len = $ghstc2len{$col};
+    my $valen = process_rseq('value_binary_len');
+    $valen = $len if ($len >= 1 and $valen > $len and rand() < process_rseq('value_kchar_length_adjust_p'));
+    my $value = "REPEAT('a',$valen)";
+    dosayif($VERBOSE_NEVER,'for %s(%s) returning: %s',$col,$len,$value);
+    return $value;
+}
+
+# 1: schema.table.column
+# returns: value as string suitable to add to VALUES
+sub value_generate_tinyblob {
+    my $col = $ARG[0];
+    my $len = $ghstc2len{$col};
+    my $valen = process_rseq('value_tinylob_len');
+    $valen = $len if ($len >= 1 and $valen > $len and rand() < process_rseq('value_kchar_length_adjust_p'));
+    my $value = "REPEAT('a',$valen)";
+    dosayif($VERBOSE_NEVER,'for %s(%s) returning: %s',$col,$len,$value);
+    return $value;
+}
+
+# 1: schema.table.column
+# returns: value as string suitable to add to VALUES
+sub value_generate_longblob {
+    my $col = $ARG[0];
+    my $len = $ghstc2len{$col};
+    my $valen = process_rseq('value_longlob_len');
+    $valen = $len if ($len >= 1 and $valen > $len and rand() < process_rseq('value_kchar_length_adjust_p'));
+    my $value = "REPEAT('a',$valen)";
+    dosayif($VERBOSE_NEVER,'for %s(%s) returning: %s',$col,$len,$value);
+    return $value;
+}
+
+# 1: schema.table.column
+# returns: value as string suitable to add to VALUES
+sub value_generate_datetime {
+    my $col = $ARG[0];
+    my $dt = $ghstc2dt{$col};
+    my $value = 'now()';
+    dosayif($VERBOSE_NEVER,'for %s %s returning: %s',$col,$dt,$value);
+    return $value;
+}
+
+# 1: schema.table.column
+# returns: value as string suitable to add to VALUES
+sub value_generate_time {
+    my $col = $ARG[0];
+    my $dt = $ghstc2dt{$col};
+    my $value = '"1:23:45"';
+    dosayif($VERBOSE_NEVER,'for %s %s returning: %s',$col,$dt,$value);
+    return $value;
+}
+
+# 1: schema.table.column
+# returns: value as string suitable to add to VALUES
+sub value_generate_date {
+    my $col = $ARG[0];
+    my $dt = $ghstc2dt{$col};
+    my $value = 'now()';
+    dosayif($VERBOSE_NEVER,'for %s %s returning: %s',$col,$dt,$value);
+    return $value;
+}
+
+# 1: schema.table.column
+# returns: value as string suitable to add to VALUES
+sub value_generate_timestamp {
+    my $col = $ARG[0];
+    my $dt = $ghstc2dt{$col};
+    my $value = 'now()';
+    dosayif($VERBOSE_NEVER,'for %s %s returning: %s',$col,$dt,$value);
+    return $value;
+}
+
+# 1: schema.table.column
+# returns: value as string suitable to add to VALUES
+sub value_generate_multipolygon {
+    my $col = $ARG[0];
+    my $dt = $ghstc2dt{$col};
+    my $value = 'NULL';
+    dosayif($VERBOSE_NEVER,'for %s %s returning: %s',$col,$dt,$value);
+    return $value;
+}
+
+# 1: schema.table.column
+# returns: value as string suitable to add to VALUES
+sub value_generate_multipoint {
+    my $col = $ARG[0];
+    my $dt = $ghstc2dt{$col};
+    my $value = 'NULL';
+    dosayif($VERBOSE_NEVER,'for %s %s returning: %s',$col,$dt,$value);
+    return $value;
+}
+
+# 1: schema.table.column
+# returns: value as string suitable to add to VALUES
+sub value_generate_polygon {
+    my $col = $ARG[0];
+    my $dt = $ghstc2dt{$col};
+    my $value = 'NULL';
+    dosayif($VERBOSE_NEVER,'for %s %s returning: %s',$col,$dt,$value);
+    return $value;
+}
+
+# 1: schema.table.column
+# returns: value as string suitable to add to VALUES
+sub value_generate_multilinestring {
+    my $col = $ARG[0];
+    my $dt = $ghstc2dt{$col};
+    my $value = 'NULL';
+    dosayif($VERBOSE_NEVER,'for %s %s returning: %s',$col,$dt,$value);
+    return $value;
+}
+
+# 1: schema.table.column
+# returns: value as string suitable to add to VALUES
+sub value_generate_linestring {
+    my $col = $ARG[0];
+    my $dt = $ghstc2dt{$col};
+    my $value = 'NULL';
+    dosayif($VERBOSE_NEVER,'for %s %s returning: %s',$col,$dt,$value);
+    return $value;
+}
+
+# 1: schema.table.column
+# returns: value as string suitable to add to VALUES
+sub value_generate_point {
+    my $col = $ARG[0];
+    my $dt = $ghstc2dt{$col};
+    my $value = 'NULL';
+    dosayif($VERBOSE_NEVER,'for %s %s returning: %s',$col,$dt,$value);
+    return $value;
+}
+
+# 1: schema.table.column
+# returns: value as string suitable to add to VALUES
+sub value_generate_geometrycollection {
+    my $col = $ARG[0];
+    my $dt = $ghstc2dt{$col};
+    my $value = 'NULL';
+    dosayif($VERBOSE_NEVER,'for %s %s returning: %s',$col,$dt,$value);
+    return $value;
+}
+
+# 1: schema.table.column
+# returns: value as string suitable to add to VALUES
+sub value_generate_geometry {
+    my $col = $ARG[0];
+    my $dt = $ghstc2dt{$col};
+    my $value = 'NULL';
+    dosayif($VERBOSE_NEVER,'for %s %s returning: %s',$col,$dt,$value);
+    return $value;
+}
+
+# 1: schema.table.column
+# returns: value as string suitable to add to VALUES
+sub value_generate_json {
+    my $col = $ARG[0];
+    my $dt = $ghstc2dt{$col};
+    my $value = 'NULL';
+    dosayif($VERBOSE_NEVER,'for %s %s returning: %s',$col,$dt,$value);
+    return $value;
+}
+
+# 1: schema.table.column
+# returns: value as string suitable to add to VALUES
+sub value_generate_year {
+    my $col = $ARG[0];
+    my $dt = $ghstc2dt{$col};
+    my $value = 1999;
+    dosayif($VERBOSE_NEVER,'for %s %s returning: %s',$col,$dt,$value);
+    return $value;
+}
+
+# 1: schema.table.column
+# returns: value as string suitable to add to VALUES
+sub value_generate_set {
+    my $col = $ARG[0];
+    my $len = process_rseq('datatype_set_value_len');
+    my $value = '';
+    foreach my $num (1..$len) {
+        $value .= ",v$num";
+    }
+    $value =~ s/^,//;
+    $value = "'$value'";
+    dosayif($VERBOSE_NEVER,'for %s %s returning: %s',$col,$len,$value);
+    return $value;
+}
+
+# 1: schema.table.column
+# returns: value as string suitable to add to VALUES
+sub value_generate_enum {
+    my $col = $ARG[0];
+    my $num = int(rand()*$ghstc2len{$col})+1;
+    my $value = '"v$num"';
+    dosayif($VERBOSE_NEVER,'for %s returning: %s',$col,$value);
+    return $value;
+}
+
+# 1: schema.table.column
+# returns: value as string suitable to add to VALUES
+sub value_generate_mediumtext {
+    my $col = $ARG[0];
+    return value_generate_mediumlob(@ARG);
+}
+
+# 1: schema.table.column
+# returns: value as string suitable to add to VALUES
+sub value_generate_mediumblob {
+    my $col = $ARG[0];
+    my $len = $ghstc2len{$col};
+    my $valen = process_rseq('value_mediumlob_len');
+    $valen = $len if ($len >= 1 and $valen > $len and rand() < process_rseq('value_kchar_length_adjust_p'));
+    my $value = "REPEAT('a',$valen)";
+    dosayif($VERBOSE_NEVER,'for %s(%s) returning: %s',$col,$len,$value);
+    return $value;
+}
+
+# 1: schema.table.column
+# returns: value as string suitable to add to VALUES
+sub value_generate_blob {
+    my $col = $ARG[0];
+    my $len = $ghstc2len{$col};
+    my $valen = process_rseq('value_lob_len');
+    $valen = $len if ($len >= 1 and $valen > $len and rand() < process_rseq('value_kchar_length_adjust_p'));
+    my $value = "REPEAT('a',$valen)";
+    dosayif($VERBOSE_NEVER,'for %s(%s) returning: %s',$col,$len,$value);
+    return $value;
+}
+
+# 1: schema.table.column
+# returns: value as string suitable to add to VALUES
+sub value_generate_longtext {
+    my $col = $ARG[0];
+    return value_generate_longblob(@ARG);
+}
+
+# 1: schema.table.column
+# returns: value as string suitable to add to VALUES
+sub value_generate_tinytext {
+    my $col = $ARG[0];
+    return value_generate_tonyblob(@ARG);
+}
+
+# 1: schema.table.column
+# returns: value as string suitable to add to VALUES
+sub value_generate_text {
+    my $col = $ARG[0];
+    return value_generate_blob @ARG;
+}
+
+# 1: schema.table.column
+# returns: value as string suitable to add to VALUES
+sub value_generate_varchar {
+    my $col = $ARG[0];
+    my $len = $ghstc2len{$col};
+    my $valen = process_rseq('value_varchar_len');
+    $valen = $len if ($len >= 1 and $valen > $len and rand() < process_rseq('value_kchar_length_adjust_p'));
+    my $value = "REPEAT('a',$valen)";
+    dosayif($VERBOSE_NEVER,'for %s(%s) returning: %s',$col,$len,$value);
+    return $value;
+}
+
+# 1: schema.table
+# returns "V1, V2, ... " string
+sub build_values {
+    my $tnam = $ARG[0];
+    my $values = '';
+    my @lcols = @{$ghst2nvcols{$tnam}};
+    # for each column in specified table
+    foreach my $col (@lcols) {
+        my $colnam = "$tnam.$col";
+        # consider NULL
+        if ($ghstc2cannull{$colnam} == $TRUE) {
+            if (rand() < $ghreal{'null_legitimate_p'}) {
+                $values .= ', NULL';
+                next;
+            }
+        } else {
+            if (rand() < $ghreal{'null_illegitimate_p'}) {
+                $values .= ', NULL';
+                next;
+            }
+        }
+        my $base = $ghstc2dt{$colnam};
+        my $subase = $base;
+        $subase =~ s/[( ].*//;
+        $subase = 'value_generate_'.lc($subase);
+        my $val = doeval("$subase('$tnam.$col')");
+        croak("$subase() is not defined") if (not defined($val));
+        $values .= ", $val";
+    }
+    $values =~ s/^, //;
+
+    dosayif($VERBOSE_NEVER,'for %s values are: %s',$tnam,$values);
+    return $values;
+}
+
+# returns statement
+sub stmt_insert_generate {
+    my $stmt = 'INSERT INTO ';
+    # determine schema.table
+    my $tnam = $glstables[int(rand()*$gntables)];
+    $stmt .= " $tnam (".join(',',@{$ghst2nvcols{$tnam}}).')';
+    my $values = build_values($tnam);
+    $stmt .= " VALUES ($values)";
+    #croak("#debug+$stmt+");
+    return $stmt;
+}
+
 # 1: thread number
 # 2: load kind
 sub server_load_thread {
@@ -1275,6 +1782,9 @@ sub server_load_thread {
         my $ksql = process_rseq('load_sql_class');
         if ($ksql eq 'SELECT') {
             $stmt = stmt_select_generate();
+        } elsif ($ksql eq 'INSERT') {
+            $stmt = stmt_insert_generate();
+    #croak("#debug+$stmt+");
         } else {
             croak("load_sql_class=$ksql is not supported yet");
         }
@@ -1301,6 +1811,7 @@ sub server_termination_thread {
     my $waittimeout = $ghreal{'server_termination_wait_timeout'};
     my $lasttime = $starttime + $howlong;
     my $ec = $EC_OK;
+    $gdosayoff = 2;
     dosayif($VERBOSE_ANY, " started at %s to run for %ss",$starttime,$howlong);
     my $stepnum = 0;
     while ($TRUE) {
