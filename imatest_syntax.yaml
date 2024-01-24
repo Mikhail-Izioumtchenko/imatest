@@ -20,24 +20,33 @@
 # M will NOT be converted to - for only_values_allowed
 _2levelkeys: [allowed, mandatory, needs_on_true, only_names, only_non_negative_integers, only_positive_integers, only_values_allowed, supported]
 strict:
+  mandatory: True
   allowed: [True, False]
   supported: [True, False]
-  mandatory: True
 # preferred alphabethical order from here on, _ before a, numbers before letters, shorter values first
 autoinc_explicit_value_p:
-  allowed: probability
   mandatory: True
+  allowed: probability
 character_set:
   mandatory: True
   allowed: Rseq
   only_names: True
+client_max_stmt:
+  mandatory: True
+  allowed: only_positive_integers
 client_thread_err:
   mandatory: True
 client_thread_out:
   mandatory: True
-client_threads:
-  allowed: only_positive_integers
+client_thread_sql:
   mandatory: True
+client_execute_sql:
+  mandatory: True
+  allowed: [Yes, No]
+  supported: [Yes, No]
+client_threads:
+  mandatory: True
+  allowed: only_positive_integers
 column_default:
   mandatory: True
   allowed: Rseq
@@ -416,6 +425,11 @@ pk_autoinc_p:
 pk_first_p:
   allowed: probability
   mandatory: True
+portoffset:
+  mandatory: True
+  allowed: only_positive_integers
+ports:
+  mandatory: True
 prefer_right_type_p:
   allowed: probability
   mandatory: True
@@ -442,20 +456,24 @@ operators_nots:
 operators_sql:
   mandatory: True
   allowed: doeval_list
-schema_name_format:
-  allowed: Rseq       
+schema_drop_first:
   mandatory: True
+  allowed: [Yes, No]
+  supported: [Yes, No]
+schema_name_format:
+  mandatory: True
+  allowed: Rseq       
   only_names: True
 schemas:
-  allowed: Rseq
   mandatory: True
+  allowed: Rseq
   only_positive_integers: True
 server_start:
   mandatory: True
 server_start_control:
+  mandatory: True
   allowed: [Yes, No]
   supported: [Yes, No]
-  mandatory: True
 server_start_timeout:
   allowed: only_positive_integers
   mandatory: True
@@ -613,18 +631,13 @@ virtual_expression_depth:
   allowed: Rseq       
   only_positive_integers: True
 virtual_expression_length:
+  mandatory: True
   allowed: Rseq       
-  mandatory: True
   only_positive_integers: True
-#here
-portoffset:
-  mandatory: True
-  allowed: only_positive_integers
-ports:
-  mandatory: True
 xportoffset:
   mandatory: True
   allowed: only_positive_integers
+#here
 mysqlsh:
   mandatory: True
   allowed: doeval

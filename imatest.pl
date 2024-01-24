@@ -12,7 +12,8 @@ require 5.032;
 # 4. no postfix except for if and unless
 # 5. blocks in {} even where a single statement after while or similar is allowed
 # 6. desirable: single quotes unless string interpolation is used. So 'abc' not "abc".
-# 7. comments start with single #, ident with code if on separate line
+# 7. comments start with single #, indent with code if on separate line
+# 8. do avoid OO
 
 # todo
 # log miner, improve, make perl
@@ -107,6 +108,7 @@ my $DESTROY_DESTROY = 'destroy_destroy';
 my $SERVER_START = 'server_start';
 my $EMPTY = 'EMPTY';
 my $INTEGER = 'INTEGER';
+my $JSON = 'JSON';
 my $MYSQLSH_BASE = 'mysqlsh_base';
 my $MYSQLSH_EXEC = 'mysqlsh_exec';
 my $MYSQLSH_RUN_FILE = 'mysqlsh_run_file';
@@ -119,6 +121,7 @@ my $ONLY_POSITIVE_INTEGERS = 'only_positive_integers';
 my $ONLY_VALUES_ALLOWED = 'only_values_allowed';
 my $PARENTHESIS = 'parenthesis';
 my $RSEED = 'rseed';
+my $SPATIAL = 'SPATIAL';
 my $STRING_TRUE = 'True';
 my $SUPPORTED = 'supported';
 my $TEARDOWN = 'teardown';
@@ -861,7 +864,8 @@ sub db_create {
     foreach my $sn (1..$nschemas) {
         process_rseq('schema_name_format');
         my $nam = sprintf($ghreal{'schema_name_format'},$sn);
-        $ghcreate_schemas{$nam} = "CREATE SCHEMA $nam";
+        my $drop = $ghreal{'schema_drop_first'} eq $YES? "DROP SCHEMA $nam; " : '';
+        $ghcreate_schemas{$nam} = "${drop}CREATE SCHEMA $nam";
         $ghs2pltables{$nam} = [];
     }
     dosayif($VERBOSE_NEVER,"schema creation SQL follows:\nn",Dumper(\%ghcreate_schemas));
@@ -950,6 +954,7 @@ sub db_create {
             foreach my $cnam (@lcols) {
                 # each column in table
                 my $colnam = "$tnam.$cnam";
+                $ghstc2isautoinc{$colnam} = $FALSE;
                 $ghstc2cannull{$colnam} = $TRUE;
                 $ghstc2unsigned{$colnam} = $FALSE;
                 $ghstc2len{$colnam} = -1;
@@ -958,7 +963,7 @@ sub db_create {
                 my $keylen = undef;
                 my $canunique = $canpk eq "$TRUE"? $FALSE : $TRUE;      # UNIQUE can be added to coldef
                 # sink for PK
-                if ($tclass eq 'SPATIAL' or $tclass eq 'JSON') {
+                if ($tclass eq $SPATIAL or $tclass eq $JSON) {
                     $tclass = $INTEGER if ($ghstcol2def{$colnam} eq "$TRUE");
                     $canunique = $FALSE;
                 }
@@ -966,7 +971,7 @@ sub db_create {
                     $tclass = $INTEGER;
                 }
                 # now we have final datatype class
-                $hcolcanind{$cnam} = $TRUE if ($tclass ne 'JSON');
+                $hcolcanind{$cnam} = $TRUE if ($tclass ne $JSON);
                 $hcolneedpref{$cnam} = $tclass eq 'LOB'? $TRUE : $FALSE;
                 my $dt = $tclass;
                 if ($tclass eq $INTEGER) {
@@ -1058,7 +1063,7 @@ sub db_create {
                     }
                     $vl =~ s/^.//;
                     $dt .= "($vl)";
-                } elsif ($tclass eq 'SPATIAL') {
+                } elsif ($tclass eq $SPATIAL) {
                     $dt = process_rseq('datatype_spatial');
                     $srid = process_rseq('spatial_srid');
                 }
@@ -1087,7 +1092,7 @@ sub db_create {
                     $table_pk .= "($keylen)" if (defined($keylen));
                     $ghstc2cannull{$colnam} = $FALSE;
                 } else {
-                    if ($canpk or $ghstc2isautoinc{$colnam}) {
+                    if ($canpk or $ghstc2isautoinc{$colnam} or $tclass eq $SPATIAL or $tclass eq $JSON) {
                         $vis =  $EMPTY;
                     } else {
                         $vis = process_rseq('column_null');
@@ -1638,7 +1643,7 @@ sub value_generate_set {
 sub value_generate_enum {
     my $col = $ARG[0];
     my $num = int(rand()*$ghstc2len{$col})+1;
-    my $value = '"v$num"';
+    my $value = "\"v$num\"";
     dosayif($VERBOSE_NEVER,'for %s returning: %s',$col,$value);
     return $value;
 }
@@ -1647,7 +1652,7 @@ sub value_generate_enum {
 # returns: value as string suitable to add to VALUES
 sub value_generate_mediumtext {
     my $col = $ARG[0];
-    return value_generate_mediumlob(@ARG);
+    return value_generate_mediumblob(@ARG);
 }
 
 # 1: schema.table.column
@@ -1685,14 +1690,14 @@ sub value_generate_longtext {
 # returns: value as string suitable to add to VALUES
 sub value_generate_tinytext {
     my $col = $ARG[0];
-    return value_generate_tonyblob(@ARG);
+    return value_generate_tinyblob(@ARG);
 }
 
 # 1: schema.table.column
 # returns: value as string suitable to add to VALUES
 sub value_generate_text {
     my $col = $ARG[0];
-    return value_generate_blob @ARG;
+    return value_generate_blob(@ARG);
 }
 
 # 1: schema.table.column
@@ -1717,6 +1722,12 @@ sub build_values {
     foreach my $col (@lcols) {
         my $colnam = "$tnam.$col";
         # consider NULL
+        if ($ghstc2isautoinc{$colnam} == $TRUE) {
+            if (rand() >= $ghreal{'autoinc_explicit_value_p'}) {
+                $values .= ', NULL';
+                next;
+            }
+        }
         if ($ghstc2cannull{$colnam} == $TRUE) {
             if (rand() < $ghreal{'null_legitimate_p'}) {
                 $values .= ', NULL';
@@ -1761,6 +1772,7 @@ sub server_load_thread {
     my $klod = $ARG[1];
     my $starttime = time();
     my $howlong = $ghreal{$TEST_DURATION};
+    my $maxcount = $ghreal{'client_max_stmt'};
     my $lasttime = $starttime + $howlong;
     my $ec = $EC_OK;
     dosayif($VERBOSE_ANY, " started at %s %s load thread %s to run for %ss",$starttime,$klod,$tnum,$howlong);
@@ -1768,15 +1780,20 @@ sub server_load_thread {
     $ENV{_imatest_client_filebase} = "client_thread_$tnum";
     my $outto = doeval($ghreal{'client_thread_out'});
     my $errto = doeval($ghreal{'client_thread_err'});
+    my $sqlto = doeval($ghreal{'client_thread_sql'});
+    my $dosql = ($ghreal{'client_execute_sql'} eq $YES);
     dosayif($VERBOSE_ANY, " see also %s and %s",$outto,$errto);
-    my $shel = "$ghmisc{$MYSQLSH_BASE} --interactive --force >$outto 2>$errto";
+    open(my $msql, ">$sqlto") or croak("failed to open $sqlto: $ERRNO");
+    my $shel = "$ghmisc{$MYSQLSH_BASE} --verbose=1 --force >$outto 2>$errto";
     my $wspid = open2(my $msout, my $msh, $shel);
     $msh->autoflush();
     my $snum = 0;
     while ($TRUE) {
         my $thistime = time();
         last if ($thistime >= $lasttime);
+        last if ($snum >= $maxcount);
         ++$snum;
+
         # now generate statement
         my $stmt = '';
         my $ksql = process_rseq('load_sql_class');
@@ -1790,13 +1807,15 @@ sub server_load_thread {
         }
         # now execute statement
         dosayif($VERBOSE_NEVER, "sending to execute: %s",$stmt);
-        printf($msh "%s;\n", $stmt);
+        printf($msql "%s;\n", $stmt);
+        printf($msh "%s;\n", $stmt) if ($dosql);
         dosayif($VERBOSE_ANY, "sent to execute stmt #%s",$snum) if ($snum % 100 == 0);
         # now sleep after txn
         my $ms = process_rseq('txn_sleep_after_ms',$TRUE);
         dosleepms($ms);
     }
     close $msh;
+    close $msql;
     dosayif($VERBOSE_ANY, " %s load thread %s exiting at %s with exit code %s after executing %s statements",$klod,$tnum,time(),$ec,$snum);
     dosayif($VERBOSE_ANY, " see also %s and %s",$outto,$errto);
     exit $ec;
