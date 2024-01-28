@@ -36,6 +36,8 @@ client_max_stmt:
   allowed: only_positive_integers
 client_thread_err:
   mandatory: True
+client_thread_mshlog:
+  mandatory: True
 client_thread_out:
   mandatory: True
 client_thread_sql:
@@ -154,6 +156,9 @@ datatype_lob:
   allowed: Rseq       
   mandatory: True
   only_values_allowed: TINYBLOB,TINYTEXT,BLOB,TEXT,MEDIUMBLOB,MEDIUMTEXT,LONGBLOB,LONGTEXT
+datatype_lob_key_len:
+  mandatory: True
+  allowed: Rseq
 datatype_set_len:
   allowed: Rseq
   only_non_negative_integers: True
@@ -222,27 +227,12 @@ expression_term:
   mandatory: True
   allowed: Rseq       
   only_values_allowed: CONSTANT,COLUMN,FUNCTION
-ff_linestring_len:
-  mandatory: True
-  allowed: Rseq
-  only_non_negative_integers: True
 # vertices
 ff_multi_len:
   mandatory: True
   allowed: Rseq
   only_positive_integers: True
-ff_point_val:
-  mandatory: True
-  allowed: Rseq
-# for multiring
-ff_polygon_kind:
-  mandatory: True
-  allowed: Rseq
   only_values_allowed:
-ff_polygon_len:
-  mandatory: True
-  allowed: Rseq
-  only_non_negative_integers: True
 # rings
 ff_polygon_size:
   mandatory: True
@@ -254,14 +244,28 @@ float_value_exp:
 fulltext_index_p:
   mandatory: True
   allowed: probability
-function_0:
+# can be converted to CHAR or similar
+function_0C:
   mandatory: True
   allowed: Rseq
-  only_values_allowed: PI,CONNECTION_ID,CURDATE,CURTIME,CURRENT_ROLE,CURRENT_USER,CURRENT_TIMESTAMP,DATABASE,NOW,SYSDATE,UNIX_TIMESTAMP,UTC_DATE,UTC_TIME,UTC_TIMESTAMP,RAND
-function_0virtual:
+  only_values_allowed: PI,CONNECTION_ID,CURDATE,CURTIME,CURRENT_ROLE,CURRENT_USER,CURRENT_TIMESTAMP,DATABASE,NOW,SYSDATE,UNIX_TIMESTAMP,UTC_DATE,UTC_TIME,RAND
+# can be converted to TIMESTAMP or similar
+function_0D:
   mandatory: True
   allowed: Rseq
-  only_values_allowed: PI,CONNECTION_ID,CURDATE,CURTIME,CURRENT_ROLE,CURRENT_USER,CURRENT_TIMESTAMP,DATABASE,NOW,SYSDATE,UNIX_TIMESTAMP,UTC_DATE,UTC_TIME,UTC_TIMESTAMP,RAND
+  only_values_allowed: CURDATE,CURTIME,CURRENT_TIMESTAMP,NOW,SYSDATE,UNIX_TIMESTAMP,UTC_DATE,UTC_TIME
+# can be converted to INT and similar
+function_0N:
+  mandatory: True
+  allowed: Rseq
+  only_values_allowed: PI,RAND,CONNECTION_ID
+function_0_as_constant_p:
+  allowed: probability
+  mandatory: True
+function_0_virtual:
+  mandatory: True
+  allowed: Rseq
+  only_values_allowed: PI
 function_1A:
   allowed: Rseq       
   mandatory: True
@@ -348,9 +352,6 @@ geometry_kind:
   mandatory: True
   allowed: Rseq
   only_values_allowed: POINT,LINESTRING,POLYGON
-index_prefix_len:
-  allowed: Rseq       
-  mandatory: True
 index_direction:
   mandatory: True
   allowed: Rseq       
@@ -359,6 +360,12 @@ indexes_per_table:
   mandatory: True
   allowed: Rseq       
   only_non_negative_integers: True
+index_prefix_len:
+  allowed: Rseq       
+  mandatory: True
+index_unique_p:
+  mandatory: True
+  allowed: probability
 index_visibility:
   mandatory: True
   allowed: Rseq       
@@ -394,60 +401,69 @@ load_function_upper:
   allowed: Rseq
   only_values_allowed: F1A,F2AT
 load_logical_length:
-  allowed: Rseq
   mandatory: True
+  allowed: Rseq
   only_non_negative_integers: True
 load_logical_depth:
-  allowed: Rseq
   mandatory: True
+  allowed: Rseq
   only_non_negative_integers: True
 load_sql_class:
-  allowed: Rseq
   mandatory: True
+  allowed: Rseq
   only_values_allowed: SELECT,UPDATE,INSERT,DELETE,INSEL,SELECTALL,ALTER
   supported: SELECT,INSERT
 load_where_all_p:
-  allowed: probability
   mandatory: True
+  allowed: probability
+mshlog_remove_before:
+  allowed: [Yes, No]
+  supported: [Yes, No]
 multigeometry_kind:
   mandatory: True
   allowed: Rseq
   only_values_allowed: GEOMETRY,POINT,LINESTRING,POLYGON
+mysqlsh:
+  mandatory: True
+  allowed: doeval
 null_illegitimate_p:
-  allowed: probability
   mandatory: True
+  allowed: probability
 null_legitimate_p:
-  allowed: probability
   mandatory: True
+  allowed: probability
+passfile:
+  mandatory: True
+  allowed: doeval
 pk_autoinc_p:
-  allowed: probability
   mandatory: True
+  allowed: probability
 pk_first_p:
-  allowed: probability
   mandatory: True
+  allowed: probability
 portoffset:
   mandatory: True
   allowed: only_positive_integers
 ports:
   mandatory: True
 prefer_right_type_p:
+  mandatory: True
   allowed: probability
-  mandatory: True
 operators:
-  allowed: Rseq
   mandatory: True
+  allowed: Rseq
   only_values_allowed: PLUS,MULT,DIV,MINUS,BITAND,RSHIFT,LSHIFT,NSEQ,MOD,BITXOR,AND
 operators_isnull:
-  allowed: Rseq
   mandatory: True
+  allowed: Rseq
   only_values_allowed: ISNULL,ISNOTNULL
 operators_compare:
-  allowed: Rseq
   mandatory: True
+  allowed: Rseq
   only_values_allowed: GT,EQ,GE,LT,LE,NE,ISNULL,ISNOTNULL,NSEQ
 operators_logical:
-  allowed: Rseq
   mandatory: True
+  allowed: Rseq
   only_values_allowed: AND,OR
 operators_nots:
   mandatory: True
@@ -547,28 +563,48 @@ table_stats_persistent:
 table_stats_sample_pages:
   allowed: Rseq       
   mandatory: True
+tables_create_sql:
+  mandatory: True
 tables_per_schema:
   allowed: Rseq       
   mandatory: True
   only_non_negative_integers: True
 teardown:
+  mandatory: True
   allowed: [True, False]
   supported: [True, False]
   needs_on_true: [destroy_destroy]
-  mandatory: True
 test_duration_seconds:
+  mandatory: True
   allowed: only_positive_integers
+time_hour_value:
   mandatory: True
+  allowed: Rseq
+timestamp_year_value:
+  mandatory: True
+  allowed: Rseq
+tmpdir:
+  mandatory: True
+  allowed: doeval
 to_check_file:
-  allowed: Rseq       
   mandatory: True
+  allowed: Rseq       
 txn_sleep_after_ms:
-  allowed: Rseq       
   mandatory: True
+  allowed: Rseq       
   allowed: only_non_negative_integers
+user:
+  mandatory: True
+  allowed: doeval
+usex:
+  allowed: [True, False]
+  supported: [True, False]
+  mandatory: True
+  needs_on_true: [xportoffset]
 value_bigint:
   mandatory: True
   allowed: Rseq
+  only_non_negative_integers: True
 value_bit:
   mandatory: True
   allowed: Rseq
@@ -582,6 +618,7 @@ value_char_len:
   only_non_negative_integers: True
 value_int:
   mandatory: True
+  only_non_negative_integers: True
   allowed: Rseq
 value_json_len:
   mandatory: True
@@ -590,6 +627,10 @@ value_json_len:
 value_kchar_length_adjust_p:
   mandatory: True
   allowed: probability
+value_linestring_len:
+  mandatory: True
+  allowed: Rseq
+  only_non_negative_integers: True
 value_lob_len:
   mandatory: True
   allowed: Rseq
@@ -601,13 +642,41 @@ value_longlob_len:
 value_mediumint:
   mandatory: True
   allowed: Rseq
+  only_non_negative_integers: True
 value_mediumlob_len:
+  mandatory: True
+  allowed: Rseq
+  only_non_negative_integers: True
+value_multigeometry_len:
+  allowed: Rseq       
+  mandatory: True
+  only_positive_integers: True
+value_multilinestring_len:
+  allowed: Rseq       
+  mandatory: True
+  only_positive_integers: True
+value_multipoint_len:
+  allowed: Rseq       
+  mandatory: True
+  only_positive_integers: True
+value_multipolygon_len:
+  allowed: Rseq       
+  mandatory: True
+  only_positive_integers: True
+value_point_x:
+  mandatory: True
+  allowed: Rseq
+value_point_y:
+  mandatory: True
+  allowed: Rseq
+value_polygon_len:
   mandatory: True
   allowed: Rseq
   only_non_negative_integers: True
 value_smallint:
   mandatory: True
   allowed: Rseq
+  only_non_negative_integers: True
 value_spatial_len:
   allowed: Rseq       
   mandatory: True
@@ -618,6 +687,7 @@ value_tinylob_len:
 value_tinyint:
   mandatory: True
   allowed: Rseq
+  only_non_negative_integers: True
 value_varbinary_len:
   mandatory: True
   allowed: Rseq
@@ -626,6 +696,9 @@ value_varchar_len:
   mandatory: True
   allowed: Rseq
   only_non_negative_integers: True
+virtual_columns_per_table:
+  mandatory: True
+  allowed: Rseq
 virtual_expression_depth:
   mandatory: True
   allowed: Rseq       
@@ -637,30 +710,6 @@ virtual_expression_length:
 xportoffset:
   mandatory: True
   allowed: only_positive_integers
-#here
-mysqlsh:
-  mandatory: True
-  allowed: doeval
-user:
-  mandatory: True
-  allowed: doeval
-passfile:
-  mandatory: True
-  allowed: doeval
-tmpdir:
-  mandatory: True
-  allowed: doeval
-usex:
-  allowed: [True, False]
-  supported: [True, False]
-  mandatory: True
-  needs_on_true: [xportoffset]
-datatype_lob_key_len:
-  mandatory: True
-  allowed: Rseq
-index_unique_p:
-  mandatory: True
-  allowed: probability
-virtual_columns_per_table:
+year_value:
   mandatory: True
   allowed: Rseq

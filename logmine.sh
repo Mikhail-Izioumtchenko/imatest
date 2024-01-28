@@ -3,11 +3,12 @@
 
 . `pwd`/imavars.dot
 
-efiles="/tmp/imatest.pl.out /tmp/1.tmp /tmp/client_thread_*.*"
+efiles="/tmp/imatest.pl.out /tmp/1.tmp /tmp/client_thread_*.* /tmp/master_thread.log"
 myfiles="/root/mysql-sandboxes/4202/*/error.log"
 
 out=`$CAT $efiles $myfiles |
-  $GREP 'ERROR|Warning|System' |
+#  $GREP 'ERROR|Warning|System' |
+  $GREP 'ERROR' |
     $SED 's/[^[]*\[/[/' |
       $SED 's/\[//' |
         $SED 's/\[/:/g' |
@@ -37,6 +38,8 @@ $ECHO "\n===\n"
 $ECHO "$mor" |
   $GREP -v ' 1 '
 
+$ECHO "\n=== signals\n"
+$GREP 'got signal' $efiles $myfiles
 $ECHO "\n===\n"
 $ECHO "looked at $efiles"
 $ECHO "and looked at $myfiles"
