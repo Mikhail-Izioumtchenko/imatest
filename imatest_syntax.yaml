@@ -214,6 +214,14 @@ decimal_value:
 decimal_whole:
   mandatory: True
   allowed: Rseq
+default_expression_depth:
+  mandatory: True
+  allowed: Rseq       
+  only_positive_integers: True
+default_expression_length:
+  mandatory: True
+  allowed: Rseq       
+  only_positive_integers: True
 destroy_destroy:
   mandatory: True
 double_value_exp:
@@ -227,17 +235,6 @@ expression_term:
   mandatory: True
   allowed: Rseq       
   only_values_allowed: CONSTANT,COLUMN,FUNCTION
-# vertices
-ff_multi_len:
-  mandatory: True
-  allowed: Rseq
-  only_positive_integers: True
-  only_values_allowed:
-# rings
-ff_polygon_size:
-  mandatory: True
-  allowed: Rseq
-  only_positive_integers: True
 float_value_exp:
   mandatory: True
   allowed: Rseq
@@ -266,88 +263,120 @@ function_0_virtual:
   mandatory: True
   allowed: Rseq
   only_values_allowed: PI
-function_1A:
-  allowed: Rseq       
-  mandatory: True
-  only_values_allowed: ASCII,HEX,BIT_LENGTH,CHAR_LENGHT,COERCIBILITY,CHARSET,COLLATION,COMPRESS,CONCAT,CONCAT_WS,CRC32,LCASE,LENGTH,UPPER,ORD,QUOTE,REVERSE,RTRIM,SOUNDEX,TO_BASE64,TRIM,LTRIM,UNHEX,WEIGHT_STRING
-function_1D:
-  allowed: Rseq       
-  mandatory: True
-  only_values_allowed: DATE,WEEKDAY,DAY,DAYOFWEEK,DAYOFYEAR,LAST_DAY,MICROSECOND,MONTH,MONTHDATE,QUARTER,TIMESTAMP,TO_DAYS,TO_SECONDS,UNIX_TIMESTAMP,WEEK,WEEKDAY,WEEKOFYEAR,YEAR,YEARWEEK
-function_1N:
-  allowed: Rseq       
-  mandatory: True
-  only_values_allowed: EXP,ACOS,LN,SQRT,ATAN,TAN,ABS,ASIN,BIN,BIT_AND,BIT_COUNT,BIT_OR,BIT_XOR,CEIL,COS,COT,FROM_DAYS,FROM_UNIXTIME,SEC_TO_TIME,DEGREES,FLOOR,RADIANS,SIGN,SIN,OCT
-function_1T:
-  allowed: Rseq       
-  mandatory: True
-  only_values_allowed: HOUR,MINUTE,SECOND,TIME_TO_SEC
-function_2AA:
-  allowed: Rseq       
-  mandatory: True
-  only_values_allowed: FIND_IN_SET,INSTR,LOCATE
-function_2AN:
-  allowed: Rseq       
-  mandatory: True
-  only_values_allowed: FIND_IN_SET,INSTR,LEFT,REPEAT,RIGHT,SUBSTR
-function_2AT:
-  allowed: Rseq       
-  mandatory: True
-  only_values_allowed: CONVERT
-function_2DA:
-  allowed: Rseq       
-  mandatory: True
-  only_values_allowed: DATE_FORMAT
-# DATE INTERVAL
-function_2DI:
-  allowed: Rseq       
-  mandatory: True
-  only_values_allowed: ADDDATE,DATE_SUB
-function_2NN:
-  allowed: Rseq       
-  mandatory: True
-  only_values_allowed: LOG,MOD,POW,MAKEDATE,PERIOD_ADD,PERIOD_DIFF,ROUND,TRUNCATE
-# DATE NUMERIC
-function_2DN:
-  allowed: Rseq       
-  mandatory: True
-  only_values_allowed: ADDDATE,DATE_SUB
-function_2DT:
-  allowed: Rseq       
-  mandatory: True
-  only_values_allowed: ADDTIME
-function_3AAA:
-  allowed: Rseq       
-  mandatory: True
-  only_values_allowed: REPLACE
-function_3AAN:
-  allowed: Rseq       
-  mandatory: True
-  only_values_allowed: SUBSTRING_INDEX
-function_3ANA:
-  allowed: Rseq       
-  mandatory: True
-  only_values_allowed: LPAD,RPAD
-function_3ANN:
-  allowed: Rseq       
-  mandatory: True
-  only_values_allowed: SUBSTR
-function_3NNN:
-  allowed: Rseq       
-  mandatory: True
-  only_values_allowed: CONV,MAKETIME
-function_FN:
-  mandatory: True
-  allowed: Rseq       
-  only_values_allowed: CHAR
-function_FA:
-  mandatory: True
-  allowed: Rseq       
-  only_values_allowed: COALESCE,FIELD
 function_arg:
   mandatory: True
   allowed: Rseq       
-  only_values_allowed: COLUMN,CONSTANT
+function_todo:
+  mandatory: True
+  allowed: Rseq       
+function_C1C:
+  mandatory: True
+  allowed: Rseq       
+  only_values_allowed: ASCII,HEX,BIT_LENGTH,CHAR_LENGTH,COERCIBILITY,CHARSET,COLLATION,COMPRESS,CONCAT,CRC32,LCASE,LENGTH,UPPER,ORD,QUOTE,REVERSE,RTRIM,SOUNDEX,TO_BASE64,TRIM,LTRIM,UNHEX,WEIGHT_STRING
+function_C1N:
+  mandatory: True
+  allowed: Rseq       
+  only_values_allowed: ASCII,BIT_LENGTH,CHAR_LENGTH
+function_CC2C:
+  mandatory: True
+  allowed: Rseq       
+  only_values_allowed: CONCAT,CONCAT_WS,FIELD,FIND_IN_SET
+function_CC2N:
+  mandatory: True
+  allowed: Rseq       
+  only_values_allowed: FIELD,FIND_IN_SET
+function_D1C:
+  mandatory: True
+  allowed: Rseq       
+  only_values_allowed: DATE,DAY,DAYNAME,DAYOFMONTH,DAYOFWEEK,DAYOFYEAR,HOUR,LAST_DAY,MICROSECOND,MINUTE,MONTH,MONTHNAME,QUARTER,SECOND,TIME,TIMESTAMP,TIME_TO_SEC,TO_DAYS,TO_SECONDS,WEEK,WEEKDAY,WEEKOFYEAR,YEAR,YEARWEEK
+function_D1D:
+  mandatory: True
+  allowed: Rseq       
+  only_values_allowed: DATE,LAST_DAY,TIMESTAMP
+function_D1N:
+  mandatory: True
+  allowed: Rseq       
+  only_values_allowed: DAY,DAYOFMONTH,DAYOFWEEK,DAYOFYEAR,HOUR,MICROSECOND,MINUTE,MONTH,QUARTER,SECOND,TIME_TO_SEC,TO_DAYS,TO_SECONDS,WEEK,WEEKDAY,WEEKOFYEAR,YEAR,YEARWEEK
+function_DD2C:
+  mandatory: True
+  allowed: Rseq       
+  only_values_allowed: TIMEDIFF
+function_DD2T:
+  mandatory: True
+  allowed: Rseq       
+  only_values_allowed: TIMEDIFF
+function_DN2C:
+  mandatory: True
+  allowed: Rseq       
+  only_values_allowed: ADDDATE,SUBDATE
+function_DN2D:
+  mandatory: True
+  allowed: Rseq       
+  only_values_allowed: ADDDATE,SUBDATE
+function_DN2N:
+  mandatory: True
+  allowed: Rseq       
+  only_values_allowed: DATEDIFF
+function_DT2C:
+  mandatory: True
+  allowed: Rseq       
+  only_values_allowed: ADDTIME,SUBTIME
+function_DT2D:
+  mandatory: True
+  allowed: Rseq       
+  only_values_allowed: ADDTIME,SUBTIME
+function_INFC9C:
+  mandatory: True
+  allowed: Rseq       
+  only_values_allowed: CONCAT,CONCAT_WS,FIELD
+function_INFC9N:
+  mandatory: True
+  allowed: Rseq       
+  only_values_allowed: FIELD
+function_INFN9C:
+  mandatory: True
+  allowed: Rseq       
+  only_values_allowed: CHAR
+function_N1C:
+  mandatory: True
+  allowed: Rseq       
+  only_values_allowed: EXP,ACOS,LN,SQRT,ATAN,TAN,ABS,ASIN,CEIL,COS,COT,DEGREES,FLOOR,RADIANS,SIGN,SIN,FROM_DAYS,FROM_UNIXTIME,SEC_TO_TIME,BIN,CHAR
+function_N1D:
+  mandatory: True
+  allowed: Rseq       
+  only_values_allowed: FROM_DAYS,FROM_UNIXTIME
+function_N1N:
+  mandatory: True
+  allowed: Rseq       
+  only_values_allowed: EXP,ACOS,LN,SQRT,ATAN,TAN,ABS,ASIN,BIN,BIT_AND,BIT_COUNT,BIT_OR,BIT_XOR,CEIL,COS,COT,FROM_DAYS,FROM_UNIXTIME,SEC_TO_TIME,DEGREES,FLOOR,RADIANS,SIGN,SIN,OCT,ROUND
+function_N1T:
+  mandatory: True
+  allowed: Rseq       
+  only_values_allowed: SEC_TO_TIME
+function_NC2C:
+  mandatory: True
+  allowed: Rseq       
+  only_values_allowed: ELT
+function_NN2C:
+  mandatory: True
+  allowed: Rseq       
+  only_values_allowed: MOD,DIV,POWER,ROUND,TRUNCATE,FORMAT
+function_NN2D:
+  mandatory: True
+  allowed: Rseq       
+  only_values_allowed: MAKEDATE
+function_NN2N:
+  mandatory: True
+  allowed: Rseq       
+  only_values_allowed: MOD,DIV,POWER,ROUND,TRUNCATE
+function_NNN3C:
+  mandatory: True
+  allowed: Rseq       
+  only_values_allowed: MAKETIME,CHAR
+function_NNN3T:
+  mandatory: True
+  allowed: Rseq       
+  only_values_allowed: MAKETIME
 geometry_kind:
   mandatory: True
   allowed: Rseq
@@ -370,9 +399,6 @@ index_visibility:
   mandatory: True
   allowed: Rseq       
   only_values_allowed: VISIBLE,INVISIBLE,EMPTY
-innodb_buffer_pool_size:
-  allowed: Rseq
-  mandatory: True
 integer_reverse_sign_legitimate_p:
   allowed: probability
   mandatory: True
@@ -382,16 +408,6 @@ integer_reverse_sign_illegitimate_p:
 integer_unsigned_p:
   mandatory: True
   allowed: probability
-# (N+(N*N))/N is 2, F(N) is 1
-load_expression_depth:
-  allowed: Rseq
-  mandatory: True
-  only_non_negative_integers: True
-# N+N*N is 3
-load_expression_length:
-  allowed: Rseq
-  mandatory: True
-  only_non_negative_integers: True
 load_function_class:
   allowed: Rseq
   mandatory: True
@@ -400,22 +416,11 @@ load_function_upper:
   mandatory: True
   allowed: Rseq
   only_values_allowed: F1A,F2AT
-load_logical_length:
-  mandatory: True
-  allowed: Rseq
-  only_non_negative_integers: True
-load_logical_depth:
-  mandatory: True
-  allowed: Rseq
-  only_non_negative_integers: True
 load_sql_class:
   mandatory: True
   allowed: Rseq
-  only_values_allowed: SELECT,UPDATE,INSERT,DELETE,INSEL,SELECTALL,ALTER
+  only_values_allowed: SELECT,UPDATE,INSERT,DELETE,INSEL,ALTER
   supported: SELECT,INSERT
-load_where_all_p:
-  mandatory: True
-  allowed: probability
 mshlog_remove_before:
   allowed: [Yes, No]
   supported: [Yes, No]
@@ -423,6 +428,8 @@ multigeometry_kind:
   mandatory: True
   allowed: Rseq
   only_values_allowed: GEOMETRY,POINT,LINESTRING,POLYGON
+mysql_initial_cnf:
+  mandatory: True
 mysqlsh:
   mandatory: True
   allowed: doeval
@@ -484,6 +491,18 @@ schemas:
   mandatory: True
   allowed: Rseq
   only_positive_integers: True
+select_column_p:
+  mandatory: True
+  allowed: probability
+select_count_star_p:
+  mandatory: True
+  allowed: probability
+select_star_p:
+  mandatory: True
+  allowed: probability
+select_where_all_p:
+  mandatory: True
+  allowed: probability
 server_start:
   mandatory: True
 server_start_control:
@@ -669,10 +688,19 @@ value_point_x:
 value_point_y:
   mandatory: True
   allowed: Rseq
+value_polygon_kind:
+  mandatory: True
+  allowed: Rseq
+  only_values_allowed: RIGHT,SAME,MIRROR,STRANGE
 value_polygon_len:
   mandatory: True
   allowed: Rseq
   only_non_negative_integers: True
+# rings
+value_polygon_size:
+  mandatory: True
+  allowed: Rseq
+  only_positive_integers: True
 value_smallint:
   mandatory: True
   allowed: Rseq
@@ -707,6 +735,28 @@ virtual_expression_length:
   mandatory: True
   allowed: Rseq       
   only_positive_integers: True
+where_datatype:
+  mandatory: True
+  allowed: Rseq       
+  only_values_allowed: bigint,binary,bit,blob,char,date,datetime,decimal,double,enum,float,geometry,geometrycollection,int,json,linestring,longblob,longtext,mediumblob,mediumint,mediumtext,multilinestring,multipoint,multipolygon,numeric,point,polygon,set,smallint,text,time,timestamp,tinyblob,tinyint,tinytext,varbinary,varchar,year
+# (N+(N*N))/N is 2, F(N) is 1
+where_expression_depth:
+  allowed: Rseq
+  mandatory: True
+  only_non_negative_integers: True
+# N+N*N is 3
+where_expression_length:
+  allowed: Rseq
+  mandatory: True
+  only_non_negative_integers: True
+where_logical_depth:
+  mandatory: True
+  allowed: Rseq
+  only_non_negative_integers: True
+where_logical_length:
+  mandatory: True
+  allowed: Rseq
+  only_non_negative_integers: True
 xportoffset:
   mandatory: True
   allowed: only_positive_integers

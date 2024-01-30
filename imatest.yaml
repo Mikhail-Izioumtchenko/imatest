@@ -50,6 +50,11 @@ tmpdir: defined($ENV{IMATMPDIR})? $ENV{IMATMPDIR} : qw(/tmp)
 # try to use x protocol mostly
 usex: True
 
+# MySQL configuration, for SET PERSIST_ONLY then restart
+mysql_initial_cnf: |
+  innodb_buffer_pool_size=50000000
+  innodb_buffer_pool_in_core_file=OFF
+
 # test load
 # test load: shutdown or kill and restart
 #server_terminate: Yes
@@ -85,7 +90,7 @@ client_thread_err: qw(/dev/null)
 client_thread_sql: $ENV{_imatest_tmpdir}.'/'.$ENV{_imatest_client_filebase}.'.sql'
 client_thread_mshlog: $ENV{_imatest_tmpdir}.'/'.$ENV{_imatest_client_filebase}.'.log'
 mshlog_remove_before: Yes
-client_execute_sql: Yes
+client_execute_sql: No
 # mostly for internal use e.g. self test. 0 means unlimited.
 client_max_stmt: 100
 
@@ -111,13 +116,13 @@ tables_create_sql: $ENV{_imatest_tmpdir}.'/create_tables.sql'
 table_autoextend_size: 4M:0.2,8M:0.2,12M:0.2,16M:0.2,20M:0.1,EMPTY
 table_autoinc: 1-10:0.01,1000-2000:0.01,EMPTY
 table_compression: EMPTY:0.9,ZLIB:0.5,LZ4:0.5,NONE
-table_row_format: EMPTY:0.5,DYNAMIC:0.5,COMPACT:0.5,REDUNDANT:0.1,COMPRESSED1:0.1,COMPRESSED2:0.1,COMPRESSED8:0.1!COMPRESSED16:0.1,COMPRESSED4
+table_row_format: EMPTY:0.5,DYNAMIC:0.5,COMPACT:0.5,REDUNDANT:0.1,COMPRESSED1:0.1,COMPRESSED2:0.1,COMPRESSED8:0.1,COMPRESSED16:0.1,COMPRESSED4
 table_stats_auto_recalc: 0,1,EMPTY
 table_stats_persistent: 0:0.1,1:0.5,EMPTY
 table_stats_sample_pages: 1:0.1,5-40:0.3,999:0.1,EMPTY
 
 # table columns and indexes
-# only if we find an integer column. No floating autoincs!
+# only if we find an integer column. No floating autoincs
 # probability 0 to 1.0
 table_has_autoinc_p: 0.6
 pk_autoinc_p: 0.8
@@ -143,21 +148,28 @@ column_unique_p: 0.1
 column_default: VALUE,EXPR,EMPTY
 column_virtuality: VIRTUAL:0.5,STORED:0.5,EMPTY
 # counted separately from pk and non pk
-virtual_columns_per_table: 0:0.8,1:0.5,2-4:0.5!5-100:0.1,0
+virtual_columns_per_table: 0:0.8,1:0.5,2-4:0.5,5-100:0.1,0
 virtual_expression_length: 1-3
-virtual_expression_depth: 1-2
-load_sql_class: INSERT!SELECT:0.5,UPDATE:0.1,DELETE:0.1,INSEL:0.1,SELECTALL:0.1,ALTER
+virtual_expression_depth: 1!1-2
+default_expression_length: 1-3
+default_expression_depth: 1-2
+load_sql_class: INSERT:0.5,SELECT!UPDATE:0.1,DELETE:0.1,INSEL:0.1,ALTER
 # for F1A function_1A below is used
 load_function_upper: F1A,F2AT
 load_function_class: F0,F1N,F1D,F2NN,F2DI,F2DN,F2DT,F3ANN,FFN,F1A,F2AT,FFA,F3NNN,F2DA,F1T,F2AA,F3AAN,F3AAA,F3ANA
-# N+N
-load_expression_length: 1-3
-load_where_all_p: 0.01
+select_where_all_p: 0.1
+select_count_star_p: 0.5
+select_star_p: 0.5
+select_column_p: 0.2
 # E AND E
-load_logical_length: 2
-load_logical_depth: 2
+# for WHERE
+where_logical_length: 2-4
+where_logical_depth: 1-2
 # (N+(N*N))/N
-load_expression_depth: 1-2
+where_expression_depth: 1-2
+# N+N
+where_expression_length: 2-4
+where_datatype: bigint,binary,bit,blob,char,date,datetime,decimal,double,enum,float!geometry,geometrycollection,int,json,linestring,longblob,longtext,mediumblob,mediumint,mediumtext,multilinestring,multipoint,multipolygon,numeric,point,polygon,set,smallint,text,time,timestamp,tinyblob,tinyint,tinytext,varbinary,varchar,year
 # postprocessed e.g. PLUS becomes + per operators_sql
 operators:  PLUS,MULT,DIV,MINUS,BITAND,RSHIFT,LSHIFT,NSEQ,MOD,BITXOR,AND
 operators_compare: GT,EQ,GE,LT,LE,NE,ISNULL,ISNOTNULL,NSEQ
@@ -166,11 +178,12 @@ operators_logical: AND,OR
 operators_nots: 0:0.9,1:0.8,2
 operators_sql: qw(PLUS:+ MULT:* DIV:/ MINUS:- BITAND:& RSHIFT:>> LSHIFT:<< AND:&& GT:> EQ:= GE:>= LT:< LE:<= NE:!= NSEQ:<=> MOD:% BITXOR:^ ISNULL:IS_NULL ISNOTNULL:IS_NOT_NULL) 
 # on lowest level function is with 0 arg e.g. PI()
-expression_term: CONSTANT:0.5,COLUMN:0.5,FUNCTION
+expression_term: CONSTANT:0.1,COLUMN:0.5,FUNCTION
 # no function when used to build  logical expressions
 expression_group: PARENTHESIS:0.5,FUNCTION
 prefer_right_type_p: 0.95
 function_arg: COLUMN,CONSTANT
+# 0 is 0 arguments
 # can be converted to CHAR or similar
 function_0C: PI,CONNECTION_ID,CURDATE,CURTIME,CURRENT_ROLE,CURRENT_USER,CURRENT_TIMESTAMP,DATABASE,NOW,SYSDATE,UNIX_TIMESTAMP,UTC_DATE,UTC_TIME,RAND
 # can be converted to TIMESTAMP or similar
@@ -179,34 +192,72 @@ function_0D: CURDATE,CURTIME,CURRENT_TIMESTAMP,NOW,SYSDATE,UNIX_TIMESTAMP,UTC_DA
 function_0N: PI,RAND,CONNECTION_ID
 function_0_as_constant_p: 0.8
 function_0_virtual: PI
-# A is Any, string or anything castable to string
-function_1A: ASCII,HEX,BIT_LENGTH,CHAR_LENGHT,COERCIBILITY,CHARSET,COLLATION,COMPRESS,CONCAT,CONCAT_WS,CRC32,LCASE,LENGTH,UPPER,ORD,QUOTE,REVERSE,RTRIM,SOUNDEX,TO_BASE64,TRIM,LTRIM,UNHEX,WEIGHT_STRING
-function_1D: DATE,WEEKDAY,DAY,DAYOFWEEK,DAYOFYEAR,LAST_DAY,MICROSECOND,MONTH,MONTHDATE,QUARTER,TIMESTAMP,TO_DAYS,TO_SECONDS,UNIX_TIMESTAMP,WEEK,WEEKDAY,WEEKOFYEAR,YEAR,YEARWEEK
-function_1N: EXP,ACOS,LN,SQRT,ATAN,TAN,ABS,ASIN,BIN,BIT_AND,BIT_COUNT,BIT_OR,BIT_XOR,CEIL,COS,COT,FROM_DAYS,FROM_UNIXTIME,SEC_TO_TIME,DEGREES,FLOOR,RADIANS,SIGN,SIN,OCT
-function_1T: HOUR,MINUTE,SECOND,TIME_TO_SEC
-function_2AA: FIND_IN_SET,INSTR,LOCATE
-function_2AN: LEFT,REPEAT,RIGHT,SUBSTR
-function_2AT: CONVERT
-function_2NN: LOG,MOD,POW,MAKEDATE,PERIOD_ADD,PERIOD_DIFF,ROUND,TRUNCATE
-function_3AAA: REPLACE
-function_3ANA: LPAD,RPAD
-function_3AAN: SUBSTRING_INDEX
-function_3ANN: SUBSTR
-function_3NNN: CONV,MAKETIME
-# I is INTERVAL
-function_2DI: ADDDATE,DATE_SUB
-function_2DA: DATE_FORMAT
-function_2DN: ADDDATE,DATE_SUB
-function_2DT: ADDTIME
-function_FA: COALESCE,FIELD
-function_FN: CHAR
+function_todo: CONV,ADDATE_INTERVAL,CONVERT_TZ,DATE_ADD,DATE_SUB,GET_FORMAT,PERIOD_ADD,PERIOD_DIFF,STR_TO_DATE,SUBDATE_INTERVAL,TIMESTAMPADD,TIMESTAMPDIFF,EXPORT_SET,FROM_BASE64,UNHEX,FULLTEXT
+# char -> char
+function_C1C: ASCII,HEX,BIT_LENGTH,CHAR_LENGTH,COERCIBILITY,CHARSET,COLLATION,COMPRESS,CONCAT,CRC32,LCASE,LENGTH,UPPER,ORD,QUOTE,REVERSE,RTRIM,SOUNDEX,TO_BASE64,TRIM,LTRIM,UNHEX,WEIGHT_STRING
+# char -> n
+function_C1N: ASCII,BIT_LENGTH,CHAR_LENGTH
+# n -> c
+function_N1C: EXP,ACOS,LN,SQRT,ATAN,TAN,ABS,ASIN,CEIL,COS,COT,DEGREES,FLOOR,RADIANS,SIGN,SIN,FROM_DAYS,FROM_UNIXTIME,SEC_TO_TIME,BIN,CHAR
+# n -> date
+function_N1D: FROM_DAYS,FROM_UNIXTIME
+# n -> time
+function_N1T: SEC_TO_TIME
+# n -> n
+function_N1N: EXP,ACOS,LN,SQRT,ATAN,TAN,ABS,ASIN,BIN,BIT_AND,BIT_COUNT,BIT_OR,BIT_XOR,CEIL,COS,COT,FROM_DAYS,FROM_UNIXTIME,SEC_TO_TIME,DEGREES,FLOOR,RADIANS,SIGN,SIN,OCT,ROUND
+# 1 date argument, C (castable to char) return value
+function_D1C: DATE,DAY,DAYNAME,DAYOFMONTH,DAYOFWEEK,DAYOFYEAR,HOUR,LAST_DAY,MICROSECOND,MINUTE,MONTH,MONTHNAME,QUARTER,SECOND,TIME,TIMESTAMP,TIME_TO_SEC,TO_DAYS,TO_SECONDS,WEEK,WEEKDAY,WEEKOFYEAR,YEAR,YEARWEEK
+# 1 date argument, date return value
+function_D1D: DATE,LAST_DAY,TIMESTAMP
+# date -> number
+function_D1N: DAY,DAYOFMONTH,DAYOFWEEK,DAYOFYEAR,HOUR,MICROSECOND,MINUTE,MONTH,QUARTER,SECOND,TIME_TO_SEC,TO_DAYS,TO_SECONDS,WEEK,WEEKDAY,WEEKOFYEAR,YEAR,YEARWEEK
+# n,c -> c
+function_NC2C: ELT
+# c,c -> n
+function_CC2N: FIELD,FIND_IN_SET
+# n,n -> c
+function_CC2C: CONCAT,CONCAT_WS,FIELD,FIND_IN_SET
+# n,n -> c
+function_NN2C: MOD,DIV,POWER,ROUND,TRUNCATE,FORMAT
+# n,n -> n
+function_NN2N: MOD,DIV,POWER,ROUND,TRUNCATE
+# n,n -> char
+function_NN2C: MAKEDATE,CHAR
+# n,n -> date
+function_NN2D: MAKEDATE
+# date, date -> char
+function_DD2C: TIMEDIFF
+# date, date -> time
+function_DD2T: TIMEDIFF
+# date, time -> date
+function_DT2C: ADDTIME,SUBTIME
+# date, time -> date
+function_DT2D: ADDTIME,SUBTIME
+# date,number -> char
+function_DN2C: ADDDATE,SUBDATE
+# date,number -> date
+function_DN2D: ADDDATE,SUBDATE
+# date,date -> n
+function_DN2N: DATEDIFF
+# date,number -> char
+function_DN2C: DATEDIFF
+# n,n,n -> char
+function_NNN3C: MAKETIME,CHAR
+# n,n,n -> time
+function_NNN3T: MAKETIME
+# c...c -> n
+function_INFC9N: FIELD
+# c...c -> c
+function_INFC9C: CONCAT,CONCAT_WS,FIELD
+# n...n -> char
+function_INFN9C: CHAR
 column_visibility: EMPTY:0.9,INVISIBLE:0.2,VISIBLE
 null_legitimate_p: 0.6
 null_illegitimate_p: 0
 autoinc_explicit_value_p: 0.001
 
 # like many other values this is hardcoded inside imatest.pl
-datatype_class: INTEGER,DECIMAL,FLOATING,CHARACTER,BINARY,LOB,ENUMS,DATETIME,JSON,SPATIAL
+datatype_class: INTEGER,SPATIAL,DECIMAL,FLOATING,CHARACTER,BINARY,LOB,ENUMS,DATETIME,JSON
 
 datatype_classes_numeric: INTEGER,DECIMAL,FLOATING
 datatype_integer: TINYINT:0.01,SMALLINT:0.1,MEDIUMINT:0.01,BIGINT:0.5,INT:0.9,BIT
@@ -271,14 +322,14 @@ datatype_enum_len: 1-10:0.5,11-25:0.9,25-26:0.9,27-65000
 datatype_set_len: 1-10:0.8,11-60:0.5,61-64
 datatype_set_value_len: 1:0.2,2:0.5,1-10:0.8,11-60:0.5,61-70
 # M will NOT become -
-datatype_spatial: GEOMETRYCOLLECTION,POINT,MULTIPOLYGON,MULTILINESTRING,MULTIPOINT,GEOMETRY,POLYGON,LINESTRING
+datatype_spatial: POLYGON,MULTIPOLYGON,GEOMETRYCOLLECTION,POINT,MULTILINESTRING,MULTIPOINT,GEOMETRY,LINESTRING
 geometry_kind: POINT,LINESTRING,POLYGON
 multigeometry_kind: POINT,LINESTRING,POLYGON
 # WKT, allowed max chars when we build the value
 value_spatial_len: 100-1000:0.5,10000-20000:0.1,8388000-8389000:0.1,16777000-16778000:0.1,100-200
 spatial_srid: 4326:0.5,0:0.5,32761:0.5,EMPTY
-value_point_x: 0:0.1,M90-90:0.8!M1000-1000
-value_point_y: 0:0.1,M180-180:0.8!M1000-1000
+value_point_x: M90-90
+value_point_y: M180-180
 value_linestring_len: 2:0.2,3-8:0.5,2-300:0.1,2-8
 value_multilinestring_len: 1-2:0.2,3-8:0.5,2-300:0.1,2-8
 value_multipolygon_len: 1-2:0.2,3-8:0.5,2-300:0.1,2-8
@@ -286,9 +337,9 @@ value_multipoint_len: 1-2:0.2,3-8:0.5,2-300:0.1,2-8
 value_multigeometry_len: 1-2:0.2,3-8:0.5,2-300:0.1,2-8
 # vertices
 value_polygon_len: 3:0.2,3-8:0.5,3-300:0.1,4-6
-ff_multi_len: 1:0.1,2:0.5,3-8:0.5,100-300:0.1,4-6
 # rings
-ff_polygon_size: 1:0.8,2:0.5,3-8
+value_polygon_size: 1:0.8,2:0.5,3-8
+value_polygon_kind: RIGHT,SAME,MIRROR,STRANGE
 value_json_len: 0:0.1,1-100:0.2,100-1000:0.5,10000-20000:0.1,2147483000-2147484000:0.1,4294967000-4294968000:0.1,1000-1500
 # todo substruct for SQL for load thread kind
 # ANY -> x_thread_any not mandatory
@@ -296,11 +347,3 @@ value_json_len: 0:0.1,1-100:0.2,100-1000:0.5,10000-20000:0.1,2147483000-21474840
 create_create: $ENV{IMACREATEMANY} $ENV{_imatest_port_rel}
 # start many instances sequentially
 server_start: $ENV{IMASTARTMANY} $ENV{_imatest_port_rel}
-#todo_test: |
-#  line 1
-#  line 2 last
-
-# InnoDB configuration, for SET PERSIST
-# todo: flatten, make multiline
-innodb_buffer_pool_size: 100000000,200000000,300000000
-

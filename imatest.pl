@@ -27,7 +27,7 @@ require 5.032;
 # log miner, improve, make perl
 # optional server shutdown in the end
 # my.cnf config thgrough set persist, multiline yaml
-# INSERT. fload/decimal unsigned is deprecated decimal(4,4) allowed, 4 digit total
+# INSERT. float/decimal unsigned is deprecated decimal(4,4) allowed, 4 digit total
 # inprove hardcoding e.g. generate_value_INTEGER() then eval call
 # WHERE 1=1
 # implement shutdown-and-kill
@@ -135,6 +135,7 @@ my $ONLY_VALUES_ALLOWED = 'only_values_allowed';
 my $INTEGER_REVERSE_SIGN_LEGITIMATE_P = 'integer_reverse_sign_legitimate_p';
 my $INTEGER_REVERSE_SIGN_ILLEGITIMATE_P = 'integer_reverse_sign_illegitimate_p';
 my $RSEED = 'rseed';
+my $SELECT_COLUMN_P = 'select_column_p';
 my $SPATIAL = 'SPATIAL';
 my $STRING_TRUE = 'True';
 my $SUPPORTED = 'supported';
@@ -787,93 +788,110 @@ sub db_discover {
 }
 
 # 1: schema.table
-# 2: virtual if true
+# 2: kind: virtual default where
 # 3: schema.table.column from caller
 # returns column name
 sub build_expr_column {
-    my ($tnam, $isvirtual, $colnam) = @ARG;
+    my ($tnam, $kind, $colnam) = @ARG;
     my $rc = '';
-    dosayif($VERBOSE_NEVER,"called with tnam=s isvirtual=%s col=%s",$tnam,$isvirtual,$colnam);
-    my @lgoodcols = grep {$isvirtual and "$tnam.$_" ne $colnam and not $ghstc2isautoinc{"$tnam.$_"}} @{$ghst2cols{$tnam}};
+    dosayif($VERBOSE_NEVER,"called with tnam=s kind=%s col=%s",$tnam,$kind,$colnam);
+    my @lgoodcols = grep {($kind eq 'where') or ("$tnam.$_" ne $colnam and not $ghstc2isautoinc{"$tnam.$_"})} @{$ghst2cols{$tnam}};
     my $con = scalar(@lgoodcols);
     $rc = $con == 0? '0' : $lgoodcols[int(rand()*$con)];      # 0 is last resort
     dosayif($VERBOSE_NEVER,'%s: returning "%s" for "%s"',$rc,"@ARG");
     return $rc;
 }
 
-# 1: virtual if true
+# 1: kind: virtual default where
+# 2: schema.table.column
 # returns function name e.g. ABS 
+# 1 arg function is selected
 sub build_expr_function {
-    my ($isvirtual) = @ARG;
-    my $rc = '';
-    dosayif($VERBOSE_DEV," called with isvirtual=%s datatype=%s",$isvirtual);
-    $rc = 'HEX'; # todo better
-    dosayif($VERBOSE_DEV,' returning "%s"',$rc);
+    my ($kind,$colnam) = @ARG;
+    my $cl = $ghstc2class{$colnam};
+    my $dt = $ghstc2just{$colnam};
+    dosayif($VERBOSE_NEVER," called for '%s' with kind=%s",$colnam,$kind);
+    # 1 arg function, we need function_.1SUF
+    my $suf = 'X';
+    if ($dt eq 'TIME') {
+        $suf = 'T';
+    } elsif ($cl eq 'DATETIME') {
+        $suf = 'D';
+    } elsif ($cl eq 'INTEGER' or $cl eq 'DECIMAL' or $cl eq 'FLOAT') {
+        $suf = 'N';
+    } else {
+        $suf = 'C';
+    }
+    my $sp = "function_.1$suf";
+    my @lfs = grep {$_ =~ /^$sp/} keys(%ghreal);
+    croak("failed to find function matching $sp") if (scalar(@lfs) == 0);
+    my $fclass = $lfs[int(rand()*scalar(@lfs))];
+    my $rc = process_rseq($fclass);
+    dosayif($VERBOSE_NEVER,' returning "%s"',$rc);
     return $rc;
 }
 
-# 1: virtual if true
+# 1: kind: virtual default where
 # 2: schema.table.column from caller
 # returns constant e.g. 42 '42a'
 sub build_expr_constant {
-    my ($isvirtual, $colname) = @ARG;
-    dosayif($VERBOSE_NEVER," called for %s with isvirtual=%s",$colname,$isvirtual);
+    my ($kind, $colname) = @ARG;
+    dosayif($VERBOSE_NEVER," called for %s with kind=%s",$colname,$kind);
     my $rc = value_generate($colname);
-    $rc = 'PI()' if ($isvirtual and $rc =~ /[(][)]/);      # will do
+    $rc = 'PI()' if ($kind eq 'virtual' and $rc =~ /[(][)]/);      # will do
     dosayif($VERBOSE_NEVER,' returning "%s"',$rc);
     return $rc;
 }
 
 # 1: schema.table
-# 2: virtual if true
-# 3: for virtual, schema.table.column, or undef
+# 2: kind: virtual default where
+# 3: schema.table.column, or datatype for where
 # returns expr
 sub build_expr_term {
-    my ($tnam, $isvirtual, $colname) = @ARG;
-    dosayif($VERBOSE_DEV," called with isvirtual=%s",$isvirtual);
+    my ($tnam, $kind, $colname) = @ARG;
+    croak("called with empty column name for table $tnam and kind '$kind'") if ($colname eq '');
+    dosayif($VERBOSE_NEVER," called for '%s' kind=%s",$colname,$kind);
     my $expr = '';
-    my $pref = $isvirtual? $VIRTUAL : 'load';
-    my $kind = process_rseq('expression_term');
-    if ($kind eq 'CONSTANT') {
-         $expr = build_expr_constant($isvirtual, $colname);
-    } else {      # COLUMN
-         $expr = build_expr_column($tnam, $isvirtual, $colname);
+    my $termkind = process_rseq('expression_term');
+    if ($termkind eq 'CONSTANT') {
+         $expr = build_expr_constant($kind, $colname);
+    } else {      # COLUMN/FUNCTION
+         $expr = build_expr_column($tnam, $kind, $colname);
     }
-    dosayif($VERBOSE_DEV," returns '%s'",$expr);
-    return $expr; #todo
+    dosayif($VERBOSE_NEVER," returns '%s'",$expr);
+    return $expr;
 }
 
 # 1: level
-# 2: virtual if true
+# 2: kind: virtual default where
+# 3: schema.table.column for which we are building
 # returns (expr, # of terms)
-sub build_exp_level {
-    my ($level,$isvirtual) = @ARG;
-    dosayif($VERBOSE_DEV,"%s: called with level=%s isvirtual=%s",$level,$isvirtual);
+sub build_expr_level {
+    my ($level,$kind,$colnam) = @ARG;
+    dosayif($VERBOSE_NEVER,"%s: called with level=%s kind=%s column %s",$level,$kind,$colnam);
     my $expr = '';
-    my $pref = $isvirtual? $VIRTUAL : 'load';
-    my $elen = process_rseq("${pref}_expression_length");
+    my $elen = process_rseq("${kind}_expression_length");
     for my $enum (1..$elen) {
         my $item = "E$level";
         my $grp = process_rseq('expression_group');
-        $item = $grp eq $PARENTHESIS? "($item)" : build_expr_function($isvirtual)."($item)"; #todo functions
+        $item = $grp eq $PARENTHESIS? "($item)" : build_expr_function($kind,$colnam)."($item)"; #todo functions
         $expr .= $item;
         next if ($enum == $elen);
         my $oper = process_rseq('operators');
         $expr .= " $ghopsql{$oper} ";
     }
-    dosayif($VERBOSE_DEV," '%s' with %s terms",$expr,$elen);
+    dosayif($VERBOSE_NEVER," returning '%s' with %s terms",$expr,$elen);
     return ($expr,$elen);
 }
 
 # 1: table name
-# 2: VIRTUAL if TRUE
-# 3: schema.table.name of the column we are building
+# 2: kind: virtual default where
+# 3: schema.table.name of the column we are building, for virtual
 sub build_expression {
-    my ($tnam, $virtual, $colnam) = @ARG;
-    dosayif($VERBOSE_NEVER, " called for table %s and virtual=%s",  $tnam, $virtual);
+    my ($tnam, $kind, $colnam) = @ARG;
+    dosayif($VERBOSE_NEVER, " called for table %s column %s and kind=%s",  $tnam, $colnam, $kind);
     my $expr = '';
-    my $pref = $virtual? $VIRTUAL : 'load';
-    my $dep = process_rseq("${pref}_expression_depth");
+    my $dep = process_rseq("${kind}_expression_depth");
     dosayif($VERBOSE_NEVER, " depth is %s", $dep);
     # from top down
     
@@ -884,7 +902,7 @@ sub build_expression {
         #               (E3) + (E3) * F(E3)
         my $add = '';
         if ($level == $dep and $dep != 1) {
-            ($add, $hom) = build_exp_level($level,$virtual);
+            ($add, $hom) = build_expr_level($level,$kind,$colnam);
             $expr .= $add;
             next;
         }
@@ -893,7 +911,7 @@ sub build_expression {
             my $torepl = "E".($level+1);
             my $addhom = 0;
             foreach my $item (1..$hom) {
-                ($add, my $subhom) = build_exp_level($level,$virtual);
+                ($add, my $subhom) = build_expr_level($level,$kind,$colnam);
                 $expr =~ s/$torepl/$add/;
                 $addhom += $subhom;
             }
@@ -902,10 +920,10 @@ sub build_expression {
         }
         # last level E1 E1 become Column or Constant or (0) function like PI()
         if ($dep == 1) {
-            ($expr, $hom) = build_exp_level(2, $virtual);
+            ($expr, $hom) = build_expr_level(2, $kind, $colnam);
         }
         for my $item (1..$hom) {
-            $add = build_expr_term($tnam, $virtual, $colnam);
+            $add = build_expr_term($tnam, $kind, $colnam);
             $expr =~ s/E2/$add/;
         }
     }
@@ -1200,7 +1218,7 @@ sub db_create {
             foreach my $col (@lcols) {
                 my $colnam = "$tnam.$col";
                 next if (not $ghstc2virtual{$colnam});
-                my $expr = build_expression($tnam,$TRUE,$colnam);
+                my $expr = build_expression($tnam,'virtual',$colnam);
                 foreach my $sql (@ltabsql) {
                     $sql =~ /$TO_BUILD/ or next;
                     $sql =~ s/$TO_BUILD/$expr/;
@@ -1346,13 +1364,13 @@ sub build_where_level {
     my $level = $ARG[0];
     dosayif($VERBOSE_DEV,"%s: called with level=%s",$level);#todo NEVER
     my $expr = '';
-    my $elen = process_rseq('load_logical_length');
+    my $elen = process_rseq('where_logical_length');
     my $usecomp = $TRUE;
     for my $enum (1..$elen) {
         my $item = "E$level";
         my $dop = process_rseq('expression_group');
         $item = " ($item) " if ($dop eq $PARENTHESIS);
-        $expr .= $item;
+        $expr .= $item; # todo function
         last if ($enum == $elen);
         my $oper;
         if ($usecomp) {
@@ -1384,7 +1402,7 @@ sub build_where {
     my $tnam = $ARG[0];
     dosayif($VERBOSE_DEV, " called for table %s",  $tnam);
     my $expr = '';
-    my $dep = process_rseq('load_logical_depth');
+    my $dep = process_rseq('where_logical_depth');
     dosayif($VERBOSE_DEV, " depth is %s", $dep);
     # from top down
     
@@ -1415,7 +1433,7 @@ sub build_where {
             ($expr, $hom) = build_where_level(2);
         }
         for my $item (1..$hom) {
-            $add = build_expr_term($tnam, $FALSE, undef);
+            $add = build_expr_term($tnam, 'where', process_rseq('where_datatype'));
             $expr =~ s/E2/$add/;
         }
     }
@@ -1423,14 +1441,29 @@ sub build_where {
     return $expr;
 }
 
+# 1: schema.table
+# 2: test parameter to use for selection
+sub table_columns_subset {
+    my ($tnam, $parm) = @ARG;
+    dosayif($VERBOSE_NEVER,"called for table %s and %s",$tnam, $parm);
+    my @lcall = shuffle(@{$ghst2cols{$tnam}});
+    my @lc = grep {rand() < $ghreal{$parm}} @lcall;
+    push(@lc,$lcall[0]) if (scalar(@lc) == 0);
+    my $rc = join(',',@lc);
+    dosayif($VERBOSE_NEVER,"returning %s",$rc);
+    return $rc;
+}
+
 # returns statement
 sub stmt_select_generate {
     my $stmt = 'SELECT';
     # determine schema.table
     my $tnam = $glstables[int(rand()*$gntables)];
-    $stmt .= " * FROM $tnam";
-    my $expr = build_where($tnam);
-    $stmt .= " WHERE $expr IS NULL"; #todo better
+    my $tosel = rand() < process_rseq('select_star_p')? '*' : table_columns_subset($tnam,$SELECT_COLUMN_P);
+    $stmt .= " $tosel FROM $tnam";
+    my $expr = rand() < process_rseq('select_where_all_p')? '(1 = 1)' : build_where($tnam);
+    $stmt .= " WHERE $expr";
+    dosayif($VERBOSE_NEVER,"returning %s",$stmt);
     return $stmt;
 }
 
@@ -1444,14 +1477,13 @@ sub value_generate_decimal {
         return $value;
     }
     my $bas = process_rseq('decimal_value');
-    my $mas = $ghstc2len{$col};
+    my $mas = defined($ghstc2len{$col})? $ghstc2len{$col} : $bas;
     $bas = $mas if ($bas > $mas and rand() < process_rseq('value_kchar_length_adjust_p'));
     my $value = rand()*(10.0**$bas);
     $value = -$value if (rand() < $ghreal{$INTEGER_REVERSE_SIGN_LEGITIMATE_P});
     dosayif($VERBOSE_NEVER,'for %s %s returning: %s',$col,$value);
     return $value;
 }
-#&value_generate_numeric = &value_generate_decimal;
 
 # 1: schema.table.column
 # returns: value as string suitable to add to VALUES
@@ -1469,7 +1501,7 @@ sub value_generate_int {
         return $value;
     }
     my $value = process_rseq('value_int');
-    if ($ghstc2unsigned{$col} == $TRUE) {
+    if (not defined($ghstc2unsigned{$col}) or $ghstc2unsigned{$col} == $TRUE) { #todo consider
         $value = -$value if (rand() < $ghreal{$INTEGER_REVERSE_SIGN_ILLEGITIMATE_P});
     } else {
         $value = -$value if (rand() < $ghreal{$INTEGER_REVERSE_SIGN_LEGITIMATE_P});
@@ -1488,7 +1520,7 @@ sub value_generate_tinyint {
         return $value;
     }
     my $value = process_rseq('value_tinyint');
-    if ($ghstc2unsigned{$col} == $TRUE) {
+    if (not defined($ghstc2unsigned{$col}) or $ghstc2unsigned{$col} == $TRUE) { #todo consider
         $value = -$value if (rand() < $ghreal{$INTEGER_REVERSE_SIGN_ILLEGITIMATE_P});
     } else {
         $value = -$value if (rand() < $ghreal{$INTEGER_REVERSE_SIGN_LEGITIMATE_P});
@@ -1507,7 +1539,7 @@ sub value_generate_bigint {
         return $value;
     }
     my $value = process_rseq('value_bigint');
-    if ($ghstc2unsigned{$col} == $TRUE) {
+    if (not defined($ghstc2unsigned{$col}) or $ghstc2unsigned{$col} == $TRUE) { #todo consider
         $value = -$value if (rand() < $ghreal{$INTEGER_REVERSE_SIGN_ILLEGITIMATE_P});
     } else {
         $value = -$value if (rand() < $ghreal{$INTEGER_REVERSE_SIGN_LEGITIMATE_P});
@@ -1521,7 +1553,7 @@ sub value_generate_bigint {
 sub value_generate_bit {
     my $col = $ARG[0];
     my $value = process_rseq('value_bit');
-    my $valmax = 2**$ghstc2len{$col}-1;
+    my $valmax = defined($ghstc2len{$col})? 2**$ghstc2len{$col}-1 : $value;
     $value = $valmax if ($value > $valmax and rand() < process_rseq('value_kchar_length_adjust_p'));
     $value = abs($value); #todo workaround need bugfix
     dosayif($VERBOSE_NEVER,'for %s returning: %s',$col,$value);
@@ -1538,7 +1570,7 @@ sub value_generate_smallint {
         return $value;
     }
     my $value = process_rseq('value_smallint');
-    if ($ghstc2unsigned{$col} == $TRUE) {
+    if (not defined($ghstc2unsigned{$col}) or $ghstc2unsigned{$col} == $TRUE) { #todo consider
         $value = -$value if (rand() < $ghreal{$INTEGER_REVERSE_SIGN_ILLEGITIMATE_P});
     } else {
         $value = -$value if (rand() < $ghreal{$INTEGER_REVERSE_SIGN_LEGITIMATE_P});
@@ -1557,7 +1589,7 @@ sub value_generate_mediumint {
         dosayif($VERBOSE_NEVER,'for %s %s returning: %s',$col,$value);
         return $value;
     }
-    if ($ghstc2unsigned{$col} == $TRUE) {
+    if (not defined($ghstc2unsigned{$col}) or $ghstc2unsigned{$col} == $TRUE) { #todo consider
         $value = -$value if (rand() < $ghreal{$INTEGER_REVERSE_SIGN_ILLEGITIMATE_P});
     } else {
         $value = -$value if (rand() < $ghreal{$INTEGER_REVERSE_SIGN_LEGITIMATE_P});
@@ -1605,8 +1637,8 @@ sub value_generate_char {
         dosayif($VERBOSE_NEVER,'for %s %s returning: %s',$col,$value);
         return $value;
     }
-    my $len = $ghstc2len{$col};
     my $valen = process_rseq('value_char_len');
+    my $len = defined($ghstc2len{$col})? $ghstc2len{$col} : 0;
     $valen = $len if ($len >= 1 and $valen > $len and rand() < process_rseq('value_kchar_length_adjust_p'));
     my $value = 'a' x $valen;
     $value = "'$value'";
@@ -1623,8 +1655,8 @@ sub value_generate_varbinary {
         dosayif($VERBOSE_NEVER,'for %s %s returning: %s',$col,$value);
         return $value;
     }
-    my $len = $ghstc2len{$col};
     my $valen = process_rseq('value_varbinary_len');
+    my $len = defined($ghstc2len{$col})? $ghstc2len{$col} : 0;
     $valen = $len if ($len >= 1 and $valen > $len and rand() < process_rseq('value_kchar_length_adjust_p'));
     my $value = "REPEAT('a',$valen)";
     dosayif($VERBOSE_NEVER,'for %s(%s) returning: %s',$col,$len,$value);
@@ -1640,8 +1672,8 @@ sub value_generate_binary {
         dosayif($VERBOSE_NEVER,'for %s %s returning: %s',$col,$value);
         return $value;
     }
-    my $len = $ghstc2len{$col};
     my $valen = process_rseq('value_binary_len');
+    my $len = defined($ghstc2len{$col})? $ghstc2len{$col} : 0;
     $valen = $len if ($len >= 1 and $valen > $len and rand() < process_rseq('value_kchar_length_adjust_p'));
     my $value = "REPEAT('a',$valen)";
     dosayif($VERBOSE_NEVER,'for %s(%s) returning: %s',$col,$len,$value);
@@ -1657,8 +1689,8 @@ sub value_generate_tinyblob {
         dosayif($VERBOSE_NEVER,'for %s %s returning: %s',$col,$value);
         return $value;
     }
-    my $len = $ghstc2len{$col};
     my $valen = process_rseq('value_tinylob_len');
+    my $len = defined($ghstc2len{$col})? $ghstc2len{$col} : 0;
     $valen = $len if ($len >= 1 and $valen > $len and rand() < process_rseq('value_kchar_length_adjust_p'));
     my $value = "REPEAT('a',$valen)";
     dosayif($VERBOSE_NEVER,'for %s(%s) returning: %s',$col,$len,$value);
@@ -1674,8 +1706,8 @@ sub value_generate_longblob {
         dosayif($VERBOSE_NEVER,'for %s %s returning: %s',$col,$value);
         return $value;
     }
-    my $len = $ghstc2len{$col};
     my $valen = process_rseq('value_longlob_len');
+    my $len = defined($ghstc2len{$col})? $ghstc2len{$col} : 0;
     $valen = $len if ($len >= 1 and $valen > $len and rand() < process_rseq('value_kchar_length_adjust_p'));
     my $value = "REPEAT('a',$valen)";
     dosayif($VERBOSE_NEVER,'for %s(%s) returning: %s',$col,$len,$value);
@@ -1778,7 +1810,8 @@ sub value_generate_multipolygon {
         $value .= ','.value_generate_polygon($col,$TRUE);
     }
     $value =~ s/^,//;
-    $value = sprintf("ST_MPolyFromText('MULTIPOLYGON(%s)',%s)",$value,$ghstc2srid{$col});
+    my $srid = defined($ghstc2srid{$col})? $ghstc2srid{$col} : 4326; #todo const
+    $value = sprintf("ST_MPolyFromText('MULTIPOLYGON(%s)',%s)",$value,$srid);
     dosayif($VERBOSE_NEVER,'for %s returning: %s',$col,$value);
     return $value;
 }
@@ -1793,7 +1826,8 @@ sub value_generate_multipoint {
         $value .= sprintf(", %s %s",process_rseq($VALUE_POINT_X),process_rseq($VALUE_POINT_Y));
     }
     $value =~ s/^,//;
-    $value = sprintf("ST_MPointFromText('MULTIPOINT(%s)',%s)",$value,$ghstc2srid{$col});
+    my $srid = defined($ghstc2srid{$col})? $ghstc2srid{$col} : 4326; #todo const
+    $value = sprintf("ST_MPointFromText('MULTIPOINT(%s)',%s)",$value,$srid);
     dosayif($VERBOSE_NEVER,'for %s returning: %s',$col,$value);
     return $value;
 }
@@ -1804,16 +1838,50 @@ sub value_generate_polygon {
     my $col = $ARG[0];
     my $raw = (defined($ARG[1]) and $ARG[1]);
     my $value = '';
+    my $dep = process_rseq('value_polygon_size');
+    my $kind = $dep == 1? '' : process_rseq('value_polygon_kind');
+    my @lp1 = ();
     my $len = process_rseq('value_polygon_len');
     my $p1;
     for my $n (1..$len) {
-        my $point .= sprintf(", %s %s",process_rseq($VALUE_POINT_X),process_rseq($VALUE_POINT_Y));
+        my $xx = process_rseq($VALUE_POINT_X);
+        my $yy = process_rseq($VALUE_POINT_Y);
+        my $point .= sprintf(", %s %s",$xx,$yy);
+        push(@lp1,[$xx,$yy]);
         $p1 = $point if ($n == 1);
         $value .= $point;
     }
+    push(@lp1,$lp1[0]);
     $value .= $p1;
     $value =~ s/^,//;
-    $value = $raw? "(($value))" : sprintf("ST_PolyFromText('POLYGON((%s))',%s)",$value,$ghstc2srid{$col});
+    $value = "($value)";
+    foreach my $np (2..$dep) {
+        my @lpnext = @lp1;
+        my $subp = '';
+        my $sublen = process_rseq('value_polygon_len');
+        if ($kind eq 'STRANGE') {
+            @lpnext = ();
+        } else {
+            $sublen = $len if ($sublen > $len);
+        }
+        foreach my $vn (0..$sublen-1) {
+            if ($kind eq 'STRANGE') {
+                push(@lpnext,[process_rseq($VALUE_POINT_X),process_rseq($VALUE_POINT_Y)]);
+            } elsif ($kind eq 'RIGHT') {
+                $lpnext[$vn]->[0] /= "$np.0";
+                $lpnext[$vn]->[1] /= "$np.0";
+            } elsif ($kind eq 'MIRROR') {
+                $lpnext[$vn]->[0] *= -1;
+                $lpnext[$vn]->[1] *= -1;
+            }
+            $subp .= sprintf(", %s %s",$lpnext[$vn]->[0],$lpnext[$vn]->[1]);
+        }
+        $subp .= sprintf(", %s %s",$lpnext[0]->[0],$lpnext[0]->[1]);
+        $subp =~ s/^,//;
+        $value .= ", ($subp)";
+    }
+    my $srid = defined($ghstc2srid{$col})? $ghstc2srid{$col} : 4326; #todo const
+    $value = $raw? "($value)" : sprintf("ST_PolyFromText('POLYGON(%s)',%s)",$value,$srid);
     dosayif($VERBOSE_NEVER,'for %s %s returning: %s',$col,$value);
     return $value;
 }
@@ -1828,7 +1896,8 @@ sub value_generate_multilinestring {
         $value .= ','.value_generate_linestring($col,$TRUE);
     }
     $value =~ s/^,//;
-    $value = sprintf("ST_MLineFromText('MULTILINESTRING(%s)',%s)",$value,$ghstc2srid{$col});
+    my $srid = defined($ghstc2srid{$col})? $ghstc2srid{$col} : 4326; #todo const
+    $value = sprintf("ST_MLineFromText('MULTILINESTRING(%s)',%s)",$value,$srid);
     dosayif($VERBOSE_NEVER,'for %s returning: %s',$col,$value);
     return $value;
 }
@@ -1844,7 +1913,8 @@ sub value_generate_linestring {
         $value .= sprintf(", %s %s",process_rseq($VALUE_POINT_X),process_rseq($VALUE_POINT_Y));
     }
     $value =~ s/^,//;
-    $value = $raw? "($value)" : sprintf("ST_LineFromText('LINESTRING(%s)',%s)",$value,$ghstc2srid{$col});
+    my $srid = defined($ghstc2srid{$col})? $ghstc2srid{$col} : 4326; #todo const
+    $value = $raw? "($value)" : sprintf("ST_LineFromText('LINESTRING(%s)',%s)",$value,$srid);
     dosayif($VERBOSE_NEVER,'for %s %s returning: %s',$col,$value);
     return $value;
 }
@@ -1855,7 +1925,8 @@ sub value_generate_point {
     my $col = $ARG[0];
     my $raw = (defined($ARG[1]) and $ARG[1]);
     my $value = sprintf("%s %s",process_rseq($VALUE_POINT_X),process_rseq($VALUE_POINT_Y));
-    $value = $raw? "($value)" : sprintf("ST_PointFromText('POINT (%s)',%s)",$value,$ghstc2srid{$col});
+    my $srid = defined($ghstc2srid{$col})? $ghstc2srid{$col} : 4326; #todo const
+    $value = $raw? "($value)" : sprintf("ST_PointFromText('POINT (%s)',%s)",$value,$srid);
     dosayif($VERBOSE_NEVER,'for %s %s returning: %s',$col,$value);
     return $value;
 }
@@ -1873,7 +1944,8 @@ sub value_generate_geometrycollection {
         $value .= ", $kind$subval";
     }
     $value =~ s/^,//;
-    $value = sprintf("ST_GeomCollFromText('GEOMETRYCOLLECTION(%s)',%s)",$value,$ghstc2srid{$col});
+    my $srid = defined($ghstc2srid{$col})? $ghstc2srid{$col} : 4326; #todo const
+    $value = sprintf("ST_GeomCollFromText('GEOMETRYCOLLECTION(%s)',%s)",$value,$srid);
     dosayif($VERBOSE_NEVER,'for %s returning: %s',$col,$value);
     return $value;
 }
@@ -1943,7 +2015,7 @@ sub value_generate_year {
 sub value_generate_set {
     my $col = $ARG[0];
     my $len = process_rseq('datatype_set_value_len');
-    $len = $ghstc2len{$col} if ($len > $ghstc2len{$col} and rand() < process_rseq('value_kchar_length_adjust_p'));
+    $len = $ghstc2len{$col} if (defined($ghstc2len{$col}) and $len > $ghstc2len{$col} and rand() < process_rseq('value_kchar_length_adjust_p'));
     my $value = '';
     foreach my $num (1..$len) {
         $value .= ",v$num";
@@ -1958,7 +2030,8 @@ sub value_generate_set {
 # returns: value as string suitable to add to VALUES
 sub value_generate_enum {
     my $col = $ARG[0];
-    my $num = int(rand()*$ghstc2len{$col})+1;
+    my $len = defined($ghstc2len{$col})? $ghstc2len{$col} : 3; #todo consider
+    my $num = int(rand()*$len)+1;
     my $value = "\"v$num\"";
     dosayif($VERBOSE_NEVER,'for %s returning: %s',$col,$value);
     return $value;
@@ -1979,8 +2052,8 @@ sub value_generate_mediumblob {
         dosayif($VERBOSE_NEVER,'for %s %s returning: %s',$col,$value);
         return $value;
     }
-    my $len = $ghstc2len{$col};
     my $valen = process_rseq('value_mediumlob_len');
+    my $len = defined($ghstc2len{$col})? $ghstc2len{$col} : 0;
     $valen = $len if ($len >= 1 and $valen > $len and rand() < process_rseq('value_kchar_length_adjust_p'));
     my $value = "REPEAT('a',$valen)";
     dosayif($VERBOSE_NEVER,'for %s(%s) returning: %s',$col,$len,$value);
@@ -1996,8 +2069,8 @@ sub value_generate_blob {
         dosayif($VERBOSE_NEVER,'for %s %s returning: %s',$col,$value);
         return $value;
     }
-    my $len = $ghstc2len{$col};
     my $valen = process_rseq('value_lob_len');
+    my $len = defined($ghstc2len{$col})? $ghstc2len{$col} : 0;
     $valen = $len if ($len >= 1 and $valen > $len and rand() < process_rseq('value_kchar_length_adjust_p'));
     my $value = "REPEAT('a',$valen)";
     dosayif($VERBOSE_NEVER,'for %s(%s) returning: %s',$col,$len,$value);
@@ -2031,19 +2104,18 @@ sub value_generate_varchar {
         dosayif($VERBOSE_NEVER,'for %s %s returning: %s',$col,$value);
         return $value;
     }
-    my $len = $ghstc2len{$col};
     my $valen = process_rseq('value_varchar_len');
+    my $len = defined($ghstc2len{$col})? $ghstc2len{$col} : 0;
     $valen = $len if ($len >= 1 and $valen > $len and rand() < process_rseq('value_kchar_length_adjust_p'));
     my $value = "REPEAT('a',$valen)";
     dosayif($VERBOSE_NEVER,'for %s(%s) returning: %s',$col,$len,$value);
     return $value;
 }
 
-# 1: schema.table.column
-# 2: is it for virtual column definition
+# 1: schema.table.column or datatype e.g. INTEGER
 sub value_generate {
     my $colnam = $ARG[0];
-    my $subase = 'value_generate_'.lc($ghstc2just{$colnam});
+    my $subase = $colnam =~ /\./? 'value_generate_'.lc($ghstc2just{$colnam}) : 'value_generate_'.lc($colnam);
     my $rc = doeval("$subase('$colnam')");
     croak("$subase() is not defined") if (not defined($rc));
     return $rc;
@@ -2093,12 +2165,10 @@ sub stmt_insert_generate {
     $stmt .= " $tnam (".join(',',@{$ghst2nvcols{$tnam}}).')';
     my $values = build_values($tnam);
     $stmt .= " VALUES ($values)";
-    #croak("#debug+$stmt+");
     return $stmt;
 }
 
 # 1: thread number
-# 2: load kind
 sub server_load_thread {
     my $tnum = $ARG[0];
     my $starttime = time();
@@ -2133,7 +2203,6 @@ sub server_load_thread {
             $stmt = stmt_select_generate();
         } elsif ($ksql eq 'INSERT') {
             $stmt = stmt_insert_generate();
-    #croak("#debug+$stmt+");
         } else {
             croak("load_sql_class=$ksql is not supported yet");
         }
@@ -2246,6 +2315,19 @@ sub init_db {
     my $subrc;
     dosayif($VERBOSE_ANY,"invoked");
     $rc = $RC_ZERO if $ghasopt{$DRYRUN};
+
+    my @lcnf = map {"SET PERSIST_ONLY $_;"} split("\n",$ghreal{'mysql_initial_cnf'});
+    foreach my $sets (@lcnf) {
+        my $com = "$ghmisc{$MYSQLSH_EXEC} '$sets'";
+        my ($ec, $pljson) = readexec($com);
+        dosayif($VERBOSE_ANY,"exit code %s for %s, details: %s",$ec,$com,($ec == $EC_OK? 'none' : Dumper($pljson)));
+    }
+    if (scalar(@lcnf) > 0) {
+        my $com = sprintf("%s wait %s", $ghreal{"server_terminate_shutdown"}, $ghreal{'server_termination_wait_timeout'});
+        my $ec = doeval("system(\"$com\")");
+        $ec <<= 8;
+        dosayif($VERBOSE_ANY,"exit code %s for %s",$ec,$com);
+    }
 
     my $subec = $ghasopt{$DRYRUN}? 0 : doeval("system(\"$ghreal{$SERVER_START} wait $ghreal{'server_start_timeout'}\")");
     dosayif($VERBOSE_ANY,"execution (--%s=%s of %s of '%s' resulted in exit code %s",
