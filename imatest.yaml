@@ -50,6 +50,10 @@ tmpdir: defined($ENV{IMATMPDIR})? $ENV{IMATMPDIR} : qw(/tmp)
 # try to use x protocol mostly
 usex: True
 
+# MySQL configuration, static for sandbox creation
+mysql_static_cnf: |
+  core_file
+
 # MySQL configuration, for SET PERSIST_ONLY then restart
 mysql_initial_cnf: |
   innodb_buffer_pool_size=50000000
@@ -90,7 +94,7 @@ client_thread_err: qw(/dev/null)
 client_thread_sql: $ENV{_imatest_tmpdir}.'/'.$ENV{_imatest_client_filebase}.'.sql'
 client_thread_mshlog: $ENV{_imatest_tmpdir}.'/'.$ENV{_imatest_client_filebase}.'.log'
 mshlog_remove_before: Yes
-client_execute_sql: No
+client_execute_sql: Yes
 # mostly for internal use e.g. self test. 0 means unlimited.
 client_max_stmt: 100
 
@@ -153,14 +157,17 @@ virtual_expression_length: 1-3
 virtual_expression_depth: 1!1-2
 default_expression_length: 1-3
 default_expression_depth: 1-2
-load_sql_class: INSERT:0.5,SELECT!UPDATE:0.1,DELETE:0.1,INSEL:0.1,ALTER
+load_sql_class: DELETE:0.1,UPDATE:0.2,INSERT:0.8,SELECT!INSEL:0.1,ALTER
 # for F1A function_1A below is used
 load_function_upper: F1A,F2AT
 load_function_class: F0,F1N,F1D,F2NN,F2DI,F2DN,F2DT,F3ANN,FFN,F1A,F2AT,FFA,F3NNN,F2DA,F1T,F2AA,F3AAN,F3AAA,F3ANA
 select_where_all_p: 0.1
+update_where_all_p: 0.1
+delete_where_all_p: 0.1
 select_count_star_p: 0.5
 select_star_p: 0.5
 select_column_p: 0.2
+update_column_p: 0.5
 # E AND E
 # for WHERE
 where_logical_length: 2-4
@@ -344,6 +351,6 @@ value_json_len: 0:0.1,1-100:0.2,100-1000:0.5,10000-20000:0.1,2147483000-21474840
 # todo substruct for SQL for load thread kind
 # ANY -> x_thread_any not mandatory
 # (re)creation, executed with system()
-create_create: $ENV{IMACREATEMANY} $ENV{_imatest_port_rel}
+create_create: $ENV{IMACREATEMANY} $ENV{_imatest_port_rel} $ENV{_imatest_mysql_static_cnf}
 # start many instances sequentially
 server_start: $ENV{IMASTARTMANY} $ENV{_imatest_port_rel}

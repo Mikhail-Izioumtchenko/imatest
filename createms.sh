@@ -1,9 +1,12 @@
 #!/bin/sh
 ### create multiple sandboxes
 ### 1: mandatory comma delimited list of relative ports or ranges
+### 2...: optional mysqldOptions list 
 ### port base is IMAPORTBASE
 ### x port base is IMAPORTBAXX
 portst="$1"
+shift
+more="$*"
 
 . `pwd`/imavars.dot
 me="`$BASENAME $0`"
@@ -17,7 +20,7 @@ rc='0'
 for port in $portlist ; do
   taport="$(($port + $base))"
   portex="$(($port + $baseex))"
-  com="$IMACREATEONE $taport $portex"
+  com="$IMACREATEONE $taport $portex $more"
   ima_say "$me : executing $com"
   $com
   subrc="$?"

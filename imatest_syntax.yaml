@@ -222,6 +222,9 @@ default_expression_length:
   mandatory: True
   allowed: Rseq       
   only_positive_integers: True
+delete_where_all_p:
+  mandatory: True
+  allowed: probability
 destroy_destroy:
   mandatory: True
 double_value_exp:
@@ -420,7 +423,6 @@ load_sql_class:
   mandatory: True
   allowed: Rseq
   only_values_allowed: SELECT,UPDATE,INSERT,DELETE,INSEL,ALTER
-  supported: SELECT,INSERT
 mshlog_remove_before:
   allowed: [Yes, No]
   supported: [Yes, No]
@@ -429,6 +431,8 @@ multigeometry_kind:
   allowed: Rseq
   only_values_allowed: GEOMETRY,POINT,LINESTRING,POLYGON
 mysql_initial_cnf:
+  mandatory: True
+mysql_static_cnf:
   mandatory: True
 mysqlsh:
   mandatory: True
@@ -612,6 +616,12 @@ txn_sleep_after_ms:
   mandatory: True
   allowed: Rseq       
   allowed: only_non_negative_integers
+update_column_p:
+  mandatory: True
+  allowed: probability
+update_where_all_p:
+  mandatory: True
+  allowed: probability
 user:
   mandatory: True
   allowed: doeval
