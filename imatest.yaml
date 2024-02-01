@@ -63,15 +63,16 @@ mysql_initial_cnf: |
 # test load: shutdown or kill and restart
 #server_terminate: Yes
 # will the test terminate mysqld every now and then
-server_terminate: No
+server_terminate: Yes
 # see comments on Rseq in imatest_syntax.yaml
 # the test will terminate the server every about 60 seconds
 # this sleep is when the server is running
 server_termination_every_seconds: 55-65
 # terminate server like so. kill is mysqlsh builtin kill whatever that is. dba.killSandboxInstance
-server_termination_how: shutdown,kill,sigkill,sigstop!shutkill
+server_termination_how: shutkill,shutdown,kill,sigkill,sigstop
 # this and similar is evaluated at server termination time
 server_terminate_shutdown: $ENV{IMASTOPMANY} $ENV{_imatest_port_rel}
+server_terminate_shutkill_before: 1-3,0-10
 server_terminate_kill: $ENV{IMAKILLMANY} $ENV{_imatest_port_rel}
 server_terminate_sigkill: $ENV{IMAHAKILLMANY} $ENV{_imatest_port_rel} KILL
 server_terminate_sigstop: $ENV{IMAHAKILLMANY} $ENV{_imatest_port_rel} STOP
@@ -96,10 +97,21 @@ client_thread_mshlog: $ENV{_imatest_tmpdir}.'/'.$ENV{_imatest_client_filebase}.'
 mshlog_remove_before: Yes
 client_execute_sql: Yes
 # mostly for internal use e.g. self test. 0 means unlimited.
-client_max_stmt: 100
+client_max_stmt: 0
+report_every_stmt: 200
 
+txn_use: Yes
 # milliseconds, sleep after txn end
-txn_sleep_after_ms: 20-40
+txn_sleep_after_ms: 0-1:0.8,2-4:0.8,5-20:0.8,21-100
+txn_sleep_in_ms: 0-1:0.8,2-4:0.8,5-100
+# when not in txn
+txn_begin_p: 0.8
+# anytime
+txn_commit_p: 0.1
+txn_rollback_p: 0.1
+# length is checked simultaneously
+txn_maxlength_ms: 100-200:0.1,1000-2000:0.5,3000-100000
+txn_maxlength_stmt: 1-2:0.1,1-10:0.5,1-100
 
 # todo: different load config per thread
 # database structure
@@ -149,21 +161,23 @@ fulltext_index_p: 0.05
 # NOT_NULL will become NOT NULL
 column_null: NOT_NULL:0.7,EMPTY:0.5,NULL
 column_unique_p: 0.1
-column_default: VALUE,EXPR,EMPTY
 column_virtuality: VIRTUAL:0.5,STORED:0.5,EMPTY
 # counted separately from pk and non pk
 virtual_columns_per_table: 0:0.8,1:0.5,2-4:0.5,5-100:0.1,0
 virtual_expression_length: 1-3
 virtual_expression_depth: 1!1-2
-default_expression_length: 1-3
-default_expression_depth: 1-2
-load_sql_class: DELETE:0.1,UPDATE:0.2,INSERT:0.8,SELECT!INSEL:0.1,ALTER
+default_expression_length: 2-3
+default_expression_depth: 1
+default_expression_term: CONSTANT:0.9,COLUMN:0.5,FUNCTION
+column_default_p: 0.5
+load_sql_class: DELETE:0.1,UPDATE:0.2,INSERT:0.8,CHECK:0.1,SELECT!INSEL:0.1,ALTER
 # for F1A function_1A below is used
 load_function_upper: F1A,F2AT
 load_function_class: F0,F1N,F1D,F2NN,F2DI,F2DN,F2DT,F3ANN,FFN,F1A,F2AT,FFA,F3NNN,F2DA,F1T,F2AA,F3AAN,F3AAA,F3ANA
-select_where_all_p: 0.1
-update_where_all_p: 0.1
-delete_where_all_p: 0.1
+select_where_all_p: 0.5
+update_where_all_p: 0.2
+delete_where_all_p: 0.01
+where_all_by_no_where_p: 0.2
 select_count_star_p: 0.5
 select_star_p: 0.5
 select_column_p: 0.2

@@ -24,25 +24,14 @@ require 5.032;
 # 16. max source code line length is 143
 
 # todo
-# log miner, improve, make perl
 # optional server shutdown in the end
-# my.cnf config thgrough set persist, multiline yaml
-# INSERT. float/decimal unsigned is deprecated decimal(4,4) allowed, 4 digit total
-# inprove hardcoding e.g. generate_value_INTEGER() then eval call
-# WHERE 1=1
-# implement shutdown-and-kill
 # dry but less dry
 # database discovery
-# better SELECT
 # check 'x' for constants
-# how enum set
 # how group by
 # implement sleep in txn
 # implement txn
-# review rseq reporting
-# two way coms with load thread
-# style and more comments
-# db_discovery
+# more robust values esp. update 
 
 use Carp qw(croak shortmess);
 use Data::Dumper qw(Dumper);
@@ -61,7 +50,7 @@ use YAML qw(LoadFile);
 STDOUT->autoflush();
 STDERR->autoflush();
 
-my $version = 2.1;
+my $version = '2.31';
 
 $Data::Dumper::Sortkeys = 1;
 
@@ -125,9 +114,12 @@ my $EMPTY = 'EMPTY';
 my $EXPRESSION_GROUP = 'expression_group';
 my $F0CP = 'function_0_as_constant_p';
 my $INTEGER = 'INTEGER';
+my $INTEGER_REVERSE_SIGN_LEGITIMATE_P = 'integer_reverse_sign_legitimate_p';
+my $INTEGER_REVERSE_SIGN_ILLEGITIMATE_P = 'integer_reverse_sign_illegitimate_p';
 my $IMATEST_MSH_LOG = '_imatest_msh_log';
 my $JSON = 'JSON';
 my $LOB = 'LOB';
+my $MSHLOG_REMOVE_BEFORE = 'mshlog_remove_before';
 my $MYSQLSH_BASE = 'mysqlsh_base';
 my $MYSQLSH_EXEC = 'mysqlsh_exec';
 my $MYSQLSH_RUN_FILE = 'mysqlsh_run_file';
@@ -138,26 +130,35 @@ my $ONLY_NAMES = 'only_names';
 my $ONLY_NON_NEGATIVE_INTEGERS = 'only_non_negative_integers';
 my $ONLY_POSITIVE_INTEGERS = 'only_positive_integers';
 my $ONLY_VALUES_ALLOWED = 'only_values_allowed';
+my $OPERATORS_LOGICAL = 'operators_logical';
+my $OPERATORS_NOTS = 'operators_nots';
+my $OPERATORS_SQL = 'operators_sql';
 my $PARENTHESIS = 'parenthesis';
 my $RAND = 'rand';
 my $RECREATE = 'create_server';
 my $SERVER_START = 'server_start';
-my $INTEGER_REVERSE_SIGN_LEGITIMATE_P = 'integer_reverse_sign_legitimate_p';
-my $INTEGER_REVERSE_SIGN_ILLEGITIMATE_P = 'integer_reverse_sign_illegitimate_p';
 my $RSEED = 'rseed';
 my $SELECT_COLUMN_P = 'select_column_p';
+my $SERVER_TERMINATION_WAIT_TIMEOUT = 'server_termination_wait_timeout';
+my $SHUTKILL = 'shutkill';
+my $SIGSTOP = 'sigstop';
 my $SPATIAL = 'SPATIAL';
+my $STRANGE = 'STRANGE';
 my $STRING_TRUE = 'True';
 my $SUPPORTED = 'supported';
 my $TEARDOWN = 'teardown';
 my $TEST_DURATION = 'test_duration_seconds';
 my $TO_BUILD = 'to_build';
+my $UPDATE = 'UPDATE';
 my $UPDATE_COLUMN_P = 'update_column_p';
 my $V3072 = 3072;
 my $VALUE_POINT_X = 'value_point_x';
 my $VALUE_POINT_Y = 'value_point_y';
+my $VALUE_POLYGON_LEN = 'value_polygon_len';
 my $VIRTUAL = 'virtual';
+my $VKCHAR = 'value_kchar_length_adjust_p';
 my $VVFUN = 'function_0_virtual';
+my $WHERE = 'where';
 my $YES = 'Yes';
 
 my @LOPT = ("$DRYRUN!", "$HELP!", "$TESTYAML=s", "$SEE_ALSO=s", "$SEED=i", "$VERBOSE=i", "$VERSION!");
@@ -171,14 +172,32 @@ my %ghtest = ();      # test script hash
 my %ghreal = ();      # test script hash with Rseq and similar processed e.g. 1-7 becomes e.g. 4
 my $gntables = 0;         # number of tables successfully create or discovered in all schemas
 my @glstables = ();         # list of all schema.table
-my %ghcreate_schemas = ();      # schema name => create test schema SQL
+my %ghcreate_schemas = ();      # schema name => create test schema SQL, may contain DROP
 my %ghs2ntables = ();      # schema name => number of tables
+my %ghs2pltables = ();      # schema name => ref array table names
+# start schema.table hashes
 my %ghst2ncolspk = ();      # schema.table => number of pk cols
 my %ghst2needvcols = ();      # schema.table => number of virtual cols needed
 my %ghst2hasvcols = ();      # schema.table => number of virtual cols needed
 my %ghst2ncolsnp = ();      # schema.table => number of non pk cols
 my %ghst2cols = ();      # schema.table => ref array column names
 my %ghst2nvcols = ();      # schema.table => ref array column names for non virtual columns
+my %ghst2mayautoinc = ();      # schema.table => may have autoinc column
+my %ghst2hasautoinc = ();      # schema.table => does have autoinc column
+my %ghst2pkautoinc = ();      # schema.table => does have autoinc column and it is PK
+my @ghstlist = (
+\%ghst2ncolspk,
+\%ghst2needvcols,
+\%ghst2hasvcols,
+\%ghst2ncolsnp,
+\%ghst2cols,
+\%ghst2nvcols,
+\%ghst2mayautoinc,
+\%ghst2hasautoinc,
+\%ghst2pkautoinc
+               );
+# end schema.table hashes
+# start schema.table.column hashes
 my %ghstc2class = ();      # schema.table.column => column datatype class
 my %ghstc2dt = ();      # schema.table.column => column datatype, uniqueness etc
 my %ghstc2just = ();      # schema.table.column => column datatype, uniqueness etc
@@ -188,12 +207,22 @@ my %ghstc2canfull = ();      # schema.table.column => can be part of fulltext in
 my %ghstc2len = ();      # schema.table.column => column length if specified
 my %ghstc2virtual = ();      # schema.table.column => column is virtual
 my %ghstc2unsigned = ();      # schema.table.column => column is unsigned
-my %ghst2mayautoinc = ();      # schema.table => may have autoinc column
-my %ghst2hasautoinc = ();      # schema.table => does have autoinc column
-my %ghst2pkautoinc = ();      # schema.table => does have autoinc column and it is PK
 my %ghstc2isautoinc = ();      # schema.table.column => is autoinc
 my %ghstcol2def = ();      # schema.table.column => column definition
-my %ghs2pltables = ();      # schema name => ref array table names
+my @ghstcolist = (
+\%ghstc2class,
+\%ghstc2dt,
+\%ghstc2just,
+\%ghstc2srid,
+\%ghstc2cannull,
+\%ghstc2canfull,
+\%ghstc2len,
+\%ghstc2virtual,
+\%ghstc2unsigned,
+\%ghstc2isautoinc,
+\%ghstcol2def
+                 );
+# end schema.table.column hashes
 my %ghmisc = ();         # e.g. mysqlsh_exec => invocation line prefix
 my %ghopsql = ();         # operators_sql PLUS => +
 my @glpids;      # process ids of load threads
@@ -235,7 +264,7 @@ my %gh2json = (
 $RAND => 0
 );
 
-$ghmisc{'version'} = $version;
+$ghmisc{$VERSION} = $version;
 
 # parameters: usage message
 # exits with USAGE_ERROR_EC
@@ -421,7 +450,8 @@ sub process_rseq {
     my $rc = $RC_OK;
     my ($only_positive_integers, $only_non_negative_integers, $only_names, $only_values_allowed) =
          $check ?
-           ($phverk->{$ONLY_POSITIVE_INTEGERS}, $phverk->{'only_non_negative_integers'}, $phverk->{$ONLY_NAMES}, $phverk->{$ONLY_VALUES_ALLOWED}) :
+           ($phverk->{$ONLY_POSITIVE_INTEGERS}, $phverk->{$ONLY_NON_NEGATIVE_INTEGERS}, $phverk->{$ONLY_NAMES},
+            $phverk->{$ONLY_VALUES_ALLOWED}) :
            ($FALSE, $FALSE, $FALSE, $phverk->{$ONLY_VALUES_ALLOWED});
 
     # proactive values check
@@ -429,7 +459,7 @@ sub process_rseq {
         if (defined($only_values_allowed)) {
             # Rule9: value list
             my @lal = split(/,/,$only_values_allowed);
-            my @lsup = defined($phverk->{'supported'})? split(/,/,$phverk->{$SUPPORTED}) : @lal;
+            my @lsup = defined($phverk->{$SUPPORTED})? split(/,/,$phverk->{$SUPPORTED}) : @lal;
             my $clval = $val;
             $clval =~ s/:[0-9.]*([,!])/$1/g;
             my @lhave = split(/[,!]/,$clval);
@@ -641,7 +671,7 @@ sub checkscript {
         my $vcheck = $phcheck->{'allowed'};
         if (ref($vcheck) eq 'ARRAY') {
             scalar(grep{$val eq $_} @$vcheck) > 0 or usage("$skey cannot be $val but rather one of: @{$vcheck}");
-            my $vsup = $phcheck->{'supported'};
+            my $vsup = $phcheck->{$SUPPORTED};
             scalar(grep{$val eq $_} @$vsup) > 0 or usage("$skey of $val is not supported yet. Supported values are @{$vsup}");
             next;
         }
@@ -683,12 +713,10 @@ sub checkscript {
             next;
         }
     }
-    if (defined($ghreal{'operators_sql'})) {
-        my $pl = $ghreal{'operators_sql'};
-        foreach my $op (@$pl) {
-            my @l2 = split(/:/,$op);
-            $ghopsql{$l2[0]} = $l2[1];
-        }
+    my $pl = $ghreal{$OPERATORS_SQL};
+    foreach my $op (@$pl) {
+        my @l2 = split(/:/,$op);
+        $ghopsql{$l2[0]} = $l2[1];
     }
 
     dosayif($VERBOSE_ANY, "Test script %s is syntactically correct", $ghasopt{$TESTYAML});
@@ -807,7 +835,7 @@ sub build_expr_column {
     my ($tnam, $kind, $colnam) = @ARG;
     my $rc = '';
     dosayif($VERBOSE_NEVER,"called with tnam=s kind=%s col=%s",$tnam,$kind,$colnam);
-    my @lgoodcols = grep {($kind eq 'where') or ("$tnam.$_" ne $colnam and not $ghstc2isautoinc{"$tnam.$_"})} @{$ghst2cols{$tnam}};
+    my @lgoodcols = grep {($kind eq $WHERE) or ("$tnam.$_" ne $colnam and not $ghstc2isautoinc{"$tnam.$_"})} @{$ghst2cols{$tnam}};
     my $con = scalar(@lgoodcols);
     $rc = $con == 0? '0' : $lgoodcols[int(rand()*$con)];      # 0 is last resort
     dosayif($VERBOSE_NEVER,'%s: returning "%s" for "%s"',$rc,"@ARG");
@@ -839,7 +867,7 @@ sub build_expr_function {
     croak("failed to find function matching $sp") if (scalar(@lfs) == 0);
     my $fclass = $lfs[int(rand()*scalar(@lfs))];
     my $rc = process_rseq($fclass);
-    dosayif($VERBOSE_NEVER,' returning "%s"',$rc);
+    dosayif($VERBOSE_NEVER," returning '%s'",$rc);
     return $rc;
 }
 
@@ -850,8 +878,8 @@ sub build_expr_constant {
     my ($kind, $colname) = @ARG;
     dosayif($VERBOSE_NEVER," called for %s with kind=%s",$colname,$kind);
     my $rc = value_generate($colname);
-    $rc = 'PI()' if ($kind eq 'virtual' and $rc =~ /[(][)]/);      # will do
-    dosayif($VERBOSE_NEVER,' returning "%s"',$rc);
+    $rc = 'PI()' if ($kind eq $VIRTUAL and $rc =~ /[(][)]/);      # will do
+    dosayif($VERBOSE_NEVER," returning '%s'",$rc);
     return $rc;
 }
 
@@ -864,7 +892,7 @@ sub build_expr_term {
     croak("called with empty column name for table $tnam and kind '$kind'") if ($colname eq '');
     dosayif($VERBOSE_NEVER," called for '%s' kind=%s",$colname,$kind);
     my $expr = '';
-    my $termkind = process_rseq('expression_term');
+    my $termkind = $kind eq 'default'? process_rseq('default_expression_term') : process_rseq('expression_term');
     if ($termkind eq 'CONSTANT') {
          $expr = build_expr_constant($kind, $colname);
     } else {      # COLUMN/FUNCTION
@@ -1220,6 +1248,12 @@ sub db_create {
                     $vis =~ s/_/ /;
                     $dt .= " $vis" if ($vis ne $EMPTY);
                 }
+                if (not $ghstc2virtual{$colnam} and not $ghstc2isautoinc{$colnam} and rand() < $ghreal{'column_default_p'}) {
+                    #my $expr = build_expr_term($tnam,'default',$colnam);
+                    my ($expr, $plvalues) = build_values($tnam,[$cnam]);
+                    $dt .= " DEFAULT ($expr)";
+    #croak("#debug+$expr+");
+                }
                 my $coldef = "$cnam $dt";
                 $ghstc2dt{$colnam} = $dt;
                 # small chance there will be no keys after the last column
@@ -1230,7 +1264,7 @@ sub db_create {
             foreach my $col (@lcols) {
                 my $colnam = "$tnam.$col";
                 next if (not $ghstc2virtual{$colnam});
-                my $expr = build_expression($tnam,'virtual',$colnam);
+                my $expr = build_expression($tnam,$VIRTUAL,$colnam);
                 foreach my $sql (@ltabsql) {
                     $sql =~ /$TO_BUILD/ or next;
                     $sql =~ s/$TO_BUILD/$expr/;
@@ -1276,7 +1310,7 @@ sub db_create {
                         my $lenp = process_rseq('index_prefix_len');
                         $lenp = $ghstc2len{$coname}
                           if ($ghstc2len{$coname} > 0 and $lenp > $ghstc2len{$coname}
-                              and rand() < process_rseq('value_kchar_length_adjust_p'));
+                              and rand() < process_rseq($VKCHAR));
                         $iline .= "($lenp)" if ($lenp ne $EMPTY);
                     }
                 }
@@ -1311,44 +1345,10 @@ sub db_create {
                     ++$badtables;
                     dosayif($VERBOSE_SOME," table %s does not exist, forgetting it",$tnam);
                     ++$hblist{$tnam};
-                    delete($ghst2cols{$tnam});
-                    delete($ghst2ncolspk{$tnam});
-                    delete($ghst2needvcols{$tnam});
-                    delete($ghst2hasvcols{$tnam});
-                    delete($ghst2ncolsnp{$tnam});
-                    delete($ghst2mayautoinc{$tnam});
-                    delete($ghst2hasautoinc{$tnam});
-                    delete($ghst2pkautoinc{$tnam});
-                    # todo refactor
-                    foreach my $cnam (keys(%ghstc2just)) {
-                        delete($ghstc2just{$cnam}) if ($cnam =~ /^$tnam\./);
-                    }
-                    foreach my $cnam (keys(%ghstc2srid)) {
-                        delete($ghstc2srid{$cnam}) if ($cnam =~ /^$tnam\./);
-                    }
-                    foreach my $cnam (keys(%ghstc2canfull)) {
-                        delete($ghstc2canfull{$cnam}) if ($cnam =~ /^$tnam\./);
-                    }
-                    foreach my $cnam (keys(%ghstc2virtual)) {
-                        delete($ghstc2virtual{$cnam}) if ($cnam =~ /^$tnam\./);
-                    }
-                    foreach my $cnam (keys(%ghstc2cannull)) {
-                        delete($ghstc2cannull{$cnam}) if ($cnam =~ /^$tnam\./);
-                    }
-                    foreach my $cnam (keys(%ghstc2len)) {
-                        delete($ghstc2len{$cnam}) if ($cnam =~ /^$tnam\./);
-                    }
-                    foreach my $cnam (keys(%ghstc2unsigned)) {
-                        delete($ghstc2unsigned{$cnam}) if ($cnam =~ /^$tnam\./);
-                    }
-                    foreach my $cnam (keys(%ghstc2dt)) {
-                        delete($ghstc2dt{$cnam}) if ($cnam =~ /^$tnam\./);
-                    }
-                    foreach my $cnam (keys(%ghstc2isautoinc)) {
-                        delete($ghstc2isautoinc{$cnam}) if ($cnam =~ /^$tnam\./);
-                    }
-                    foreach my $cnam (keys(%ghstcol2def)) {
-                        delete($ghstcol2def{$cnam}) if ($cnam =~ /^$tnam\./);
+                    foreach my $pha (@ghstlist) {
+                        foreach my $cnam (keys(%$pha)) {
+                            delete($pha->{$cnam}) if ($cnam =~ /^$tnam\./);
+                        }
                     }
                     foreach my $snam (keys(%ghs2pltables)) {
                         my @lgood = ();
@@ -1390,15 +1390,15 @@ sub build_where_level {
             $oper = $ghopsql{$oper};
             if ($oper =~ /NULL/) {
                 $oper =~ s/_/ /g;
-                my $aor = process_rseq('operators_logical');
-                my $anot = process_rseq('operators_nots');
+                my $aor = process_rseq($OPERATORS_LOGICAL);
+                my $anot = process_rseq($OPERATORS_NOTS);
                 $oper .= (" $aor " . ('NOT ' x $anot));
             } else {
                 $usecomp = $FALSE;
             }
         } else {
-            $oper = process_rseq('operators_logical');
-            my $anot = process_rseq('operators_nots');
+            $oper = process_rseq($OPERATORS_LOGICAL);
+            my $anot = process_rseq($OPERATORS_NOTS);
             $oper .= (' NOT ' x $anot);
             $usecomp = $TRUE;
         }
@@ -1409,10 +1409,17 @@ sub build_where_level {
 }
 
 # 1: schema.table
-# returns WHERE clause
+# 2: parameter name for no where
+# returns WHERE clause with WHERE
 sub build_where {
-    my $tnam = $ARG[0];
-    dosayif($VERBOSE_DEV, " called for table %s",  $tnam);
+    my ($tnam,$parm) = @ARG;
+    dosayif($VERBOSE_NEVER, " called for table %s and %s", $tnam, $parm);
+    if (rand() < $ghreal{$parm}) {
+        my $rc = rand() < $ghreal{'where_all_by_no_where_p'}? '' : 'WHERE (1 = 1)';
+        dosayif($VERBOSE_NEVER, "%s: returning %s", $rc);
+        return $rc
+    }
+
     my $expr = '';
     my $dep = process_rseq('where_logical_depth');
     dosayif($VERBOSE_DEV, " depth is %s", $dep);
@@ -1445,25 +1452,26 @@ sub build_where {
             ($expr, $hom) = build_where_level(2);
         }
         for my $item (1..$hom) {
-            $add = build_expr_term($tnam, 'where', process_rseq('where_datatype'));
+            $add = build_expr_term($tnam, $WHERE, process_rseq('where_datatype'));
             $expr =~ s/E2/$add/;
         }
     }
-    dosayif($VERBOSE_DEV, "%s: returning %s", $expr);
+    $expr = "WHERE $expr";
+    dosayif($VERBOSE_NEVER, "%s: returning %s", $expr);
     return $expr;
 }
 
 # 1: schema.table
 # 2: test parameter to use for selection
 # 3: kind: if not 'SELECT', do not use virtual columns
-#          if 'UPDATE", return ref array
+#          if UPDATE, return ref array
 sub table_columns_subset {
     my ($tnam, $parm, $kind) = @ARG;
     dosayif($VERBOSE_NEVER,"called for table %s and %s",$tnam, $parm);
     my @lcall = $kind eq 'SELECT'? shuffle(@{$ghst2cols{$tnam}}) : shuffle(@{$ghst2nvcols{$tnam}});
     my @lc = grep {rand() < $ghreal{$parm}} @lcall;
     push(@lc,$lcall[0]) if (scalar(@lc) == 0);
-    my $rc = $kind eq 'UPDATE'? \@lc : join(',',@lc);
+    my $rc = $kind eq $UPDATE? \@lc : join(',',@lc);
     dosayif($VERBOSE_NEVER,"returning %s",Dumper($rc));
     return $rc;
 }
@@ -1475,8 +1483,8 @@ sub stmt_select_generate {
     my $tnam = $glstables[int(rand()*$gntables)];
     my $tosel = rand() < process_rseq('select_star_p')? '*' : table_columns_subset($tnam,$SELECT_COLUMN_P,'SELECT');
     $stmt .= " $tosel FROM $tnam";
-    my $expr = rand() < process_rseq('select_where_all_p')? '(1 = 1)' : build_where($tnam);
-    $stmt .= " WHERE $expr";
+    my $wher = build_where($tnam,'select_where_all_p');
+    $stmt .= " $wher";
     dosayif($VERBOSE_NEVER,"returning %s",$stmt);
     return $stmt;
 }
@@ -1492,7 +1500,7 @@ sub value_generate_decimal {
     }
     my $bas = process_rseq('decimal_value');
     my $mas = defined($ghstc2len{$col})? $ghstc2len{$col} : $bas;
-    $bas = $mas if ($bas > $mas and rand() < process_rseq('value_kchar_length_adjust_p'));
+    $bas = $mas if ($bas > $mas and rand() < process_rseq($VKCHAR));
     my $value = rand()*(10.0**$bas);
     $value = -$value if (rand() < $ghreal{$INTEGER_REVERSE_SIGN_LEGITIMATE_P});
     dosayif($VERBOSE_NEVER,"for %s %s returning: %s",$col,$value);
@@ -1568,7 +1576,7 @@ sub value_generate_bit {
     my $col = $ARG[0];
     my $value = process_rseq('value_bit');
     my $valmax = defined($ghstc2len{$col})? 2**$ghstc2len{$col}-1 : $value;
-    $value = $valmax if ($value > $valmax and rand() < process_rseq('value_kchar_length_adjust_p'));
+    $value = $valmax if ($value > $valmax and rand() < process_rseq($VKCHAR));
     $value = abs($value); #todo workaround need bugfix
     dosayif($VERBOSE_NEVER,"for %s returning: %s",$col,$value);
     return $value;
@@ -1653,7 +1661,7 @@ sub value_generate_char {
     }
     my $valen = process_rseq('value_char_len');
     my $len = defined($ghstc2len{$col})? $ghstc2len{$col} : 0;
-    $valen = $len if ($len >= 1 and $valen > $len and rand() < process_rseq('value_kchar_length_adjust_p'));
+    $valen = $len if ($len >= 1 and $valen > $len and rand() < process_rseq($VKCHAR));
     my $value = 'a' x $valen;
     $value = "'$value'";
     dosayif($VERBOSE_NEVER,"for %s(%s) returning: %s",$col,$len,$value);
@@ -1671,7 +1679,7 @@ sub value_generate_varbinary {
     }
     my $valen = process_rseq('value_varbinary_len');
     my $len = defined($ghstc2len{$col})? $ghstc2len{$col} : 0;
-    $valen = $len if ($len >= 1 and $valen > $len and rand() < process_rseq('value_kchar_length_adjust_p'));
+    $valen = $len if ($len >= 1 and $valen > $len and rand() < process_rseq($VKCHAR));
     my $value = "REPEAT('a',$valen)";
     dosayif($VERBOSE_NEVER,"for %s(%s) returning: %s",$col,$len,$value);
     return $value;
@@ -1688,7 +1696,7 @@ sub value_generate_binary {
     }
     my $valen = process_rseq('value_binary_len');
     my $len = defined($ghstc2len{$col})? $ghstc2len{$col} : 0;
-    $valen = $len if ($len >= 1 and $valen > $len and rand() < process_rseq('value_kchar_length_adjust_p'));
+    $valen = $len if ($len >= 1 and $valen > $len and rand() < process_rseq($VKCHAR));
     my $value = "REPEAT('a',$valen)";
     dosayif($VERBOSE_NEVER,"for %s(%s) returning: %s",$col,$len,$value);
     return $value;
@@ -1705,7 +1713,7 @@ sub value_generate_tinyblob {
     }
     my $valen = process_rseq('value_tinylob_len');
     my $len = defined($ghstc2len{$col})? $ghstc2len{$col} : 0;
-    $valen = $len if ($len >= 1 and $valen > $len and rand() < process_rseq('value_kchar_length_adjust_p'));
+    $valen = $len if ($len >= 1 and $valen > $len and rand() < process_rseq($VKCHAR));
     my $value = "REPEAT('a',$valen)";
     dosayif($VERBOSE_NEVER,"for %s(%s) returning: %s",$col,$len,$value);
     return $value;
@@ -1722,7 +1730,7 @@ sub value_generate_longblob {
     }
     my $valen = process_rseq('value_longlob_len');
     my $len = defined($ghstc2len{$col})? $ghstc2len{$col} : 0;
-    $valen = $len if ($len >= 1 and $valen > $len and rand() < process_rseq('value_kchar_length_adjust_p'));
+    $valen = $len if ($len >= 1 and $valen > $len and rand() < process_rseq($VKCHAR));
     my $value = "REPEAT('a',$valen)";
     dosayif($VERBOSE_NEVER,"for %s(%s) returning: %s",$col,$len,$value);
     return $value;
@@ -1855,7 +1863,7 @@ sub value_generate_polygon {
     my $dep = process_rseq('value_polygon_size');
     my $kind = $dep == 1? '' : process_rseq('value_polygon_kind');
     my @lp1 = ();
-    my $len = process_rseq('value_polygon_len');
+    my $len = process_rseq($VALUE_POLYGON_LEN);
     my $p1;
     for my $n (1..$len) {
         my $xx = process_rseq($VALUE_POINT_X);
@@ -1872,14 +1880,14 @@ sub value_generate_polygon {
     foreach my $np (2..$dep) {
         my @lpnext = @lp1;
         my $subp = '';
-        my $sublen = process_rseq('value_polygon_len');
-        if ($kind eq 'STRANGE') {
+        my $sublen = process_rseq($VALUE_POLYGON_LEN);
+        if ($kind eq $STRANGE) {
             @lpnext = ();
         } else {
             $sublen = $len if ($sublen > $len);
         }
         foreach my $vn (0..$sublen-1) {
-            if ($kind eq 'STRANGE') {
+            if ($kind eq $STRANGE) {
                 push(@lpnext,[process_rseq($VALUE_POINT_X),process_rseq($VALUE_POINT_Y)]);
             } elsif ($kind eq 'RIGHT') {
                 $lpnext[$vn]->[0] /= "$np.0";
@@ -2029,7 +2037,7 @@ sub value_generate_year {
 sub value_generate_set {
     my $col = $ARG[0];
     my $len = process_rseq('datatype_set_value_len');
-    $len = $ghstc2len{$col} if (defined($ghstc2len{$col}) and $len > $ghstc2len{$col} and rand() < process_rseq('value_kchar_length_adjust_p'));
+    $len = $ghstc2len{$col} if (defined($ghstc2len{$col}) and $len > $ghstc2len{$col} and rand() < process_rseq($VKCHAR));
     my $value = '';
     foreach my $num (1..$len) {
         $value .= ",v$num";
@@ -2068,7 +2076,7 @@ sub value_generate_mediumblob {
     }
     my $valen = process_rseq('value_mediumlob_len');
     my $len = defined($ghstc2len{$col})? $ghstc2len{$col} : 0;
-    $valen = $len if ($len >= 1 and $valen > $len and rand() < process_rseq('value_kchar_length_adjust_p'));
+    $valen = $len if ($len >= 1 and $valen > $len and rand() < process_rseq($VKCHAR));
     my $value = "REPEAT('a',$valen)";
     dosayif($VERBOSE_NEVER,"for %s(%s) returning: %s",$col,$len,$value);
     return $value;
@@ -2085,7 +2093,7 @@ sub value_generate_blob {
     }
     my $valen = process_rseq('value_lob_len');
     my $len = defined($ghstc2len{$col})? $ghstc2len{$col} : 0;
-    $valen = $len if ($len >= 1 and $valen > $len and rand() < process_rseq('value_kchar_length_adjust_p'));
+    $valen = $len if ($len >= 1 and $valen > $len and rand() < process_rseq($VKCHAR));
     my $value = "REPEAT('a',$valen)";
     dosayif($VERBOSE_NEVER,"for %s(%s) returning: %s",$col,$len,$value);
     return $value;
@@ -2120,7 +2128,7 @@ sub value_generate_varchar {
     }
     my $valen = process_rseq('value_varchar_len');
     my $len = defined($ghstc2len{$col})? $ghstc2len{$col} : 0;
-    $valen = $len if ($len >= 1 and $valen > $len and rand() < process_rseq('value_kchar_length_adjust_p'));
+    $valen = $len if ($len >= 1 and $valen > $len and rand() < process_rseq($VKCHAR));
     my $value = "REPEAT('a',$valen)";
     dosayif($VERBOSE_NEVER,"for %s(%s) returning: %s",$col,$len,$value);
     return $value;
@@ -2181,8 +2189,8 @@ sub stmt_delete_generate {
     my $stmt = '';
     # determine schema.table
     my $tnam = $glstables[int(rand()*$gntables)];
-    my $wher = rand() < process_rseq('delete_where_all_p')? '(1 = 1)' : build_where($tnam);
-    $stmt = "DELETE FROM $tnam WHERE ".build_where($tnam);
+    my $wher = build_where($tnam,'delete_where_all_p');
+    $stmt = "DELETE FROM $tnam $wher";
     dosayif($VERBOSE_NEVER,"returning %s",$stmt);
     return $stmt;
 }
@@ -2191,15 +2199,15 @@ sub stmt_update_generate {
     my $stmt = '';
     # determine schema.table
     my $tnam = $glstables[int(rand()*$gntables)];
-    my $plcols = table_columns_subset($tnam,$UPDATE_COLUMN_P,'UPDATE');
+    my $plcols = table_columns_subset($tnam,$UPDATE_COLUMN_P,$UPDATE);
     my ($dummy, $plvalues) = build_values($tnam,$plcols);
     my $n = 0;
     foreach my $col (@$plcols) {
         $stmt .= ", $col = $plvalues->[$n]";
     }
     $stmt =~ s/^,//;
-    my $wher = rand() < process_rseq('update_where_all_p')? '(1 = 1)' : build_where($tnam);
-    $stmt = "UPDATE $tnam SET $stmt WHERE ".build_where($tnam);
+    my $wher = build_where($tnam,'update_where_all_p');
+    $stmt = "UPDATE $tnam SET $stmt $wher";
     dosayif($VERBOSE_NEVER,"returning %s",$stmt);
     return $stmt;
 }
@@ -2231,7 +2239,7 @@ sub server_load_thread {
     my $errto = doeval($ghreal{'client_thread_err'});
     my $sqlto = doeval($ghreal{'client_thread_sql'});
     $ENV{$IMATEST_MSH_LOG} = doeval($ghreal{$CLIENT_THREAD_MSHLOG});
-    safe_unlink($ENV{$IMATEST_MSH_LOG}) if ($ghreal{'mshlog_remove_before'} eq $YES);
+    safe_unlink($ENV{$IMATEST_MSH_LOG}) if ($ghreal{$MSHLOG_REMOVE_BEFORE} eq $YES);
     my $dosql = ($ghreal{'client_execute_sql'} eq $YES);
     dosayif($VERBOSE_ANY, " see also %s and %s and %s and %s",$ENV{$IMATEST_MSH_LOG},$outto,$errto,$sqlto);
     open(my $msql, ">$sqlto") or croak("failed to open $sqlto: $ERRNO");
@@ -2242,7 +2250,7 @@ sub server_load_thread {
     while ($TRUE) {
         my $thistime = time();
         last if ($thistime >= $lasttime);
-        last if ($snum >= $maxcount);
+        last if ($maxcount > 0 and $snum >= $maxcount);
         ++$snum;
 
         # now generate statement
@@ -2252,10 +2260,13 @@ sub server_load_thread {
             $stmt = stmt_select_generate();
         } elsif ($ksql eq 'INSERT') {
             $stmt = stmt_insert_generate();
-        } elsif ($ksql eq 'UPDATE') {
+        } elsif ($ksql eq $UPDATE) {
             $stmt = stmt_update_generate();
         } elsif ($ksql eq 'DELETE') {
             $stmt = stmt_delete_generate();
+        } elsif ($ksql eq 'CHECK') {
+            my $tnam = $glstables[int(rand()*$gntables)];
+            $stmt = "$ksql TABLE $tnam";
         } else {
             croak("load_sql_class=$ksql is not supported yet");
         }
@@ -2263,7 +2274,7 @@ sub server_load_thread {
         dosayif($VERBOSE_NEVER, "sending to execute: %s",$stmt);
         printf($msql "%s;\n", $stmt);
         printf($msh "%s;\n", $stmt) if ($dosql);
-        dosayif($VERBOSE_ANY, "sent to execute stmt #%s",$snum) if ($snum % 100 == 0);
+        dosayif($VERBOSE_ANY, "sent to execute stmt #%s",$snum) if ($snum % $ghreal{'report_every_stmt'} == 0);
         # now sleep after txn
         my $ms = process_rseq('txn_sleep_after_ms',$TRUE);
         dosleepms($ms);
@@ -2281,7 +2292,7 @@ sub server_termination_thread {
     my $checkstart = $ghreal{'server_start_control'};
     my $starttimeout = $ghreal{'server_start_timeout'};
     my $dowait = $ghreal{'server_termination_wait'};
-    my $waittimeout = $ghreal{'server_termination_wait_timeout'};
+    my $waittimeout = $ghreal{$SERVER_TERMINATION_WAIT_TIMEOUT};
     my $lasttime = $starttime + $howlong;
     my $ec = $EC_OK;
     $gdosayoff = 2;
@@ -2298,21 +2309,33 @@ sub server_termination_thread {
         dosleep($step);
         # now terminate server
         my $howterm = process_rseq('server_termination_how');
-        my $howhow = $ghreal{"server_terminate_$howterm"};
-        $howhow .= " wait $waittimeout" if ($dowait eq $YES and $howterm ne 'sigstop');
+        my $howhow = $howterm eq $SHUTKILL? $ghreal{'server_terminate_shutdown'} : $ghreal{"server_terminate_$howterm"};
+        $howhow .= " wait $waittimeout" if ($dowait eq $YES and $howterm ne $SIGSTOP and $howterm ne $SHUTKILL);
         dosayif($VERBOSE_ANY," terminating server with %s using %s for step %s",$howterm,$howhow,$stepnum);
         my $subec = doeval("system(\"$howhow\")");
         $subec <<= 8;
         dosayif($VERBOSE_ANY," execution of %s resulted in exit code %s for step %s",$howhow,$subec,$stepnum);
+        # wait for shutkill
+        if ($howterm eq $SHUTKILL) {
+            my $slep = process_rseq('server_terminate_shutkill_before');
+            dosayif($VERBOSE_ANY," sleeping %s seconds before killing server for %s",$slep,$howterm);
+            dosleep($slep);
+            my $howh = $ghreal{'server_terminate_sigkill'};
+            $howh .= $dowait eq $YES? " wait $waittimeout" : '';
+            my $kec = doeval("system(\"$howh\")");
+            $kec <<= 8;
+            dosayif($VERBOSE_ANY," execution of %s resulted in exit code %s for step %s",$howh,$kec,$stepnum);
+        }
+        my $after = process_rseq($howhow eq $SIGSTOP? 'server_termination_duration_on_sigstop' : 'server_termination_duration');
         # wait after termination
-        my $after = process_rseq($howhow eq 'sigstop'? 'server_termination_duration_on_sigstop' : 'server_termination_duration');
+        my $after = process_rseq($howhow eq $SIGSTOP? 'server_termination_duration_on_sigstop' : 'server_termination_duration');
         dosayif($VERBOSE_ANY," will sleep %s seconds after server termination for step %s",$after,$stepnum);
         # assume server is running atm even on 1st step
         dosleep($after);
         # now restart server
         dosayif($VERBOSE_ANY," starting server for step %s",$stepnum);
-        my $howrestart = $howterm eq 'sigstop' ?  $ghreal{'server_terminate_unstop'} : $ghreal{$SERVER_START};
-        $howrestart .= " wait $starttimeout" if ($checkstart eq $YES and $howterm ne 'sigstop');
+        my $howrestart = $howterm eq $SIGSTOP ?  $ghreal{'server_terminate_unstop'} : $ghreal{$SERVER_START};
+        $howrestart .= " wait $starttimeout" if ($checkstart eq $YES and $howterm ne $SIGSTOP);
         dosayif($VERBOSE_ANY," restarting server using %s for step %s",$howrestart,$stepnum);
         $subec = doeval("system(\"$howrestart\")");
         dosayif($VERBOSE_ANY," execution of %s resulted in exit code %s for step %s",$howrestart,$subec,$stepnum);
@@ -2376,7 +2399,7 @@ sub init_db {
         dosayif($VERBOSE_ANY,"exit code %s for %s, details: %s",$ec,$com,($ec == $EC_OK? 'none' : Dumper($pljson)));
     }
     if (scalar(@lcnf) > 0) {
-        my $com = sprintf("%s wait %s", $ghreal{"server_terminate_shutdown"}, $ghreal{'server_termination_wait_timeout'});
+        my $com = sprintf("%s wait %s", $ghreal{"server_terminate_shutdown"}, $ghreal{$SERVER_TERMINATION_WAIT_TIMEOUT});
         my $ec = doeval("system(\"$com\")");
         $ec <<= 8;
         dosayif($VERBOSE_ANY,"exit code %s for %s",$ec,$com);
@@ -2437,7 +2460,7 @@ buildmisc();
 dosayif($VERBOSE_DEV, "resulting test script is %s",Dumper(\%ghreal));
 
 # initial ops
-safe_unlink($ENV{$IMATEST_MSH_LOG}) if ($ghreal{'mshlog_remove_before'} eq $YES);
+safe_unlink($ENV{$IMATEST_MSH_LOG}) if ($ghreal{$MSHLOG_REMOVE_BEFORE} eq $YES);
 
 my $recreated = process_recreate();
 
@@ -2460,7 +2483,7 @@ foreach my $tnum (1..$tlod) {
 }
 
 # sleep while test is running
-my $slep = $ghreal{'test_duration_seconds'};
+my $slep = $ghreal{$TEST_DURATION};
 dosayif($VERBOSE_ANY,"will sleep for %s seconds",$slep);
 dosleep($slep);
 

@@ -33,7 +33,7 @@ character_set:
   only_names: True
 client_max_stmt:
   mandatory: True
-  allowed: only_positive_integers
+  allowed: only_non_negative_integers
 client_thread_err:
   mandatory: True
 client_thread_mshlog:
@@ -49,10 +49,9 @@ client_execute_sql:
 client_threads:
   mandatory: True
   allowed: only_positive_integers
-column_default:
+column_default_p:
   mandatory: True
-  allowed: Rseq
-  only_values_allowed: VALUE,EXPR,EMPTY
+  allowed: probability
 column_non_pk_name_format:
   allowed: Rseq       
   mandatory: True
@@ -222,6 +221,10 @@ default_expression_length:
   mandatory: True
   allowed: Rseq       
   only_positive_integers: True
+default_expression_term:
+  mandatory: True
+  allowed: Rseq       
+  only_values_allowed: CONSTANT,COLUMN,FUNCTION
 delete_where_all_p:
   mandatory: True
   allowed: probability
@@ -422,7 +425,7 @@ load_function_upper:
 load_sql_class:
   mandatory: True
   allowed: Rseq
-  only_values_allowed: SELECT,UPDATE,INSERT,DELETE,INSEL,ALTER
+  only_values_allowed: SELECT,UPDATE,INSERT,DELETE,INSEL,ALTER,CHECK
 mshlog_remove_before:
   allowed: [Yes, No]
   supported: [Yes, No]
@@ -483,6 +486,9 @@ operators_nots:
 operators_sql:
   mandatory: True
   allowed: doeval_list
+report_every_stmt:
+  mandatory: True
+  allowed: only_positive_integers
 schema_drop_first:
   mandatory: True
   allowed: [Yes, No]
@@ -523,6 +529,10 @@ server_terminate_kill:
   mandatory: True
 server_terminate_shutdown:
   mandatory: True
+server_terminate_shutkill_before:
+  mandatory: True
+  allowed: Rseq
+  only_non_negative_integers: True
 server_terminate_sigkill:
   mandatory: True
 server_terminate_sigstop:
@@ -545,7 +555,6 @@ server_termination_how:
   allowed: Rseq
   mandatory: True
   only_values_allowed: shutdown,shutkill,kill,sigkill,sigstop
-  supported: shutdown,kill,sigkill,sigstop
 server_termination_wait:
   allowed: Yes, No
   supported: Yes, No
@@ -612,10 +621,35 @@ tmpdir:
 to_check_file:
   mandatory: True
   allowed: Rseq       
+txn_begin_p:
+  mandatory: True
+  allowed: probability
+txn_commit_p:
+  mandatory: True
+  allowed: probability
+txn_maxlength_ms:
+  mandatory: True
+  allowed: Rseq       
+  only_positive_integers: True
+txn_maxlength_stmt:
+  mandatory: True
+  allowed: Rseq       
+  only_positive_integers: True
+txn_rollback_p:
+  mandatory: True
+  allowed: probability
 txn_sleep_after_ms:
   mandatory: True
   allowed: Rseq       
-  allowed: only_non_negative_integers
+  only_non_negative_integers: True
+txn_sleep_in_ms:
+  mandatory: True
+  allowed: Rseq       
+  only_non_negative_integers: True
+txn_use:
+  mandatory: True
+  allowed: [Yes, No]
+  supported: [Yes, Yes]
 update_column_p:
   mandatory: True
   allowed: probability
@@ -626,9 +660,9 @@ user:
   mandatory: True
   allowed: doeval
 usex:
+  mandatory: True
   allowed: [True, False]
   supported: [True, False]
-  mandatory: True
   needs_on_true: [xportoffset]
 value_bigint:
   mandatory: True
@@ -745,6 +779,9 @@ virtual_expression_length:
   mandatory: True
   allowed: Rseq       
   only_positive_integers: True
+where_all_by_no_where_p:
+  mandatory: True
+  allowed: probability
 where_datatype:
   mandatory: True
   allowed: Rseq       

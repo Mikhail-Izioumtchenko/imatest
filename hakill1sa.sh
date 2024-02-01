@@ -10,7 +10,7 @@ me="`$BASENAME $0`"
 ima_say "$me : starting as $0 $@"
 
 found=`$PS -ef | $GREP "$MYSQLD" | $GREP -v "$GREP" | $GREP "/$port/" | $AWK '{print $2}'`
-ima_say "$me : found instances on ports ' $found '"
+ima_say "$me : found instances on ports '$found'"
 
 com="$KILL -$sig $found"
 ima_say "$me : executing $com"
