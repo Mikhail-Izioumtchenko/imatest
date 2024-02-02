@@ -233,6 +233,10 @@ destroy_destroy:
 double_value_exp:
   mandatory: True
   allowed: Rseq
+explain:
+  mandatory: True
+  allowed: Rseq       
+  only_values_allowed: EXPLAIN,EXPLAIN_ANALYZE,EMPTY
 expression_group:
   mandatory: True
   allowed: Rseq       
@@ -354,7 +358,7 @@ function_N1D:
 function_N1N:
   mandatory: True
   allowed: Rseq       
-  only_values_allowed: EXP,ACOS,LN,SQRT,ATAN,TAN,ABS,ASIN,BIN,BIT_AND,BIT_COUNT,BIT_OR,BIT_XOR,CEIL,COS,COT,FROM_DAYS,FROM_UNIXTIME,SEC_TO_TIME,DEGREES,FLOOR,RADIANS,SIGN,SIN,OCT,ROUND
+  only_values_allowed: EXP,ACOS,LN,SQRT,ATAN,TAN,ABS,ASIN,BIN,BIT_COUNT,CEIL,COS,COT,FROM_DAYS,FROM_UNIXTIME,SEC_TO_TIME,DEGREES,FLOOR,RADIANS,SIGN,SIN,OCT,ROUND
 function_N1T:
   mandatory: True
   allowed: Rseq       
@@ -455,9 +459,6 @@ pk_autoinc_p:
 pk_first_p:
   mandatory: True
   allowed: probability
-portoffset:
-  mandatory: True
-  allowed: only_positive_integers
 ports:
   mandatory: True
 prefer_right_type_p:
@@ -466,7 +467,7 @@ prefer_right_type_p:
 operators:
   mandatory: True
   allowed: Rseq
-  only_values_allowed: PLUS,MULT,DIV,MINUS,BITAND,RSHIFT,LSHIFT,NSEQ,MOD,BITXOR,AND
+  only_values_allowed: PLUS,MULT,DIV,MINUS,BITAND,RSHIFT,LSHIFT,MOD,BITXOR,AND
 operators_isnull:
   mandatory: True
   allowed: Rseq
@@ -624,7 +625,11 @@ to_check_file:
 txn_begin_p:
   mandatory: True
   allowed: probability
-txn_commit_p:
+txn_end_how:
+  mandatory: True
+  allowed: Rseq
+  only_values_allowed: COMMIT,ROLLBACK
+txn_end_p:
   mandatory: True
   allowed: probability
 txn_maxlength_ms:
@@ -635,9 +640,6 @@ txn_maxlength_stmt:
   mandatory: True
   allowed: Rseq       
   only_positive_integers: True
-txn_rollback_p:
-  mandatory: True
-  allowed: probability
 txn_sleep_after_ms:
   mandatory: True
   allowed: Rseq       
@@ -653,17 +655,20 @@ txn_use:
 update_column_p:
   mandatory: True
   allowed: probability
+update_expression_depth:
+  mandatory: True
+  allowed: Rseq       
+  only_positive_integers: True
+update_expression_length:
+  mandatory: True
+  allowed: Rseq       
+  only_positive_integers: True
 update_where_all_p:
   mandatory: True
   allowed: probability
 user:
   mandatory: True
   allowed: doeval
-usex:
-  mandatory: True
-  allowed: [True, False]
-  supported: [True, False]
-  needs_on_true: [xportoffset]
 value_bigint:
   mandatory: True
   allowed: Rseq

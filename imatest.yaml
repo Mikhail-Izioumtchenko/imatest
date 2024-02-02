@@ -33,10 +33,8 @@ test_duration_seconds: 300
 config: single
 # single port for now, ports are relative.
 ports: 2
-# ports are relative to this offset, 2 -> 4202
-portoffset: 4200
 # offset port -> x protocol port, 2 -> 4202 -> 4302
-xportoffset: 100
+xportoffset: 4300
 
 # this and similar will be evaluated once at startup, doeval in inatest_syntax.yaml
 # environment is set im imatest.sh in fact in imatest.dot
@@ -47,8 +45,6 @@ user: $ENV{IMAROOT}
 # user that runs test SQL, all of it
 passfile: $ENV{IMAPAS}
 tmpdir: defined($ENV{IMATMPDIR})? $ENV{IMATMPDIR} : qw(/tmp)
-# try to use x protocol mostly
-usex: True
 
 # MySQL configuration, static for sandbox creation
 mysql_static_cnf: |
@@ -97,20 +93,20 @@ client_thread_mshlog: $ENV{_imatest_tmpdir}.'/'.$ENV{_imatest_client_filebase}.'
 mshlog_remove_before: Yes
 client_execute_sql: Yes
 # mostly for internal use e.g. self test. 0 means unlimited.
-client_max_stmt: 0
+client_max_stmt: 100
 report_every_stmt: 200
 
 txn_use: Yes
 # milliseconds, sleep after txn end
 txn_sleep_after_ms: 0-1:0.8,2-4:0.8,5-20:0.8,21-100
-txn_sleep_in_ms: 0-1:0.8,2-4:0.8,5-100
+txn_sleep_in_ms: 0:0.8,1-4:0.1,5-100
 # when not in txn
 txn_begin_p: 0.8
 # anytime
-txn_commit_p: 0.1
-txn_rollback_p: 0.1
+txn_end_p: 0.01
+txn_end_how: COMMIT:0.8,ROLLBACK
 # length is checked simultaneously
-txn_maxlength_ms: 100-200:0.1,1000-2000:0.5,3000-100000
+txn_maxlength_ms: 100-200:0.01,1000-2000:0.5,3000-100000
 txn_maxlength_stmt: 1-2:0.1,1-10:0.5,1-100
 
 # todo: different load config per thread
@@ -142,9 +138,9 @@ table_stats_sample_pages: 1:0.1,5-40:0.3,999:0.1,EMPTY
 # probability 0 to 1.0
 table_has_autoinc_p: 0.6
 pk_autoinc_p: 0.8
-columns_pk: 1:0.5,2:0.5,3-12
+columns_pk: 1:0.5,2:0.8,3-12
 column_pk_name_format: pk%s,primary_key_column_%09d
-columns_non_pk: 0:0.1,1:0.2,10-12:0.3,70-80:0.2,2-9:0.8,13-69
+columns_non_pk: 0:0.1,1:0.2,2-9:0.8,10-12:0.3,70-80:0.1,2-12
 column_non_pk_name_format: col%s,__col%s,test_%s_column_abc123defaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 # do we put pk columns before non pk columns in CREATE TABLE
 pk_first_p: 0.8
@@ -165,9 +161,11 @@ column_virtuality: VIRTUAL:0.5,STORED:0.5,EMPTY
 # counted separately from pk and non pk
 virtual_columns_per_table: 0:0.8,1:0.5,2-4:0.5,5-100:0.1,0
 virtual_expression_length: 1-3
-virtual_expression_depth: 1!1-2
-default_expression_length: 2-3
-default_expression_depth: 1
+virtual_expression_depth: 1-2
+update_expression_depth: 1-2
+update_expression_length: 1:0.5,2:0.5,3-4
+default_expression_length: 1-3
+default_expression_depth: 1:0.9,2
 default_expression_term: CONSTANT:0.9,COLUMN:0.5,FUNCTION
 column_default_p: 0.5
 load_sql_class: DELETE:0.1,UPDATE:0.2,INSERT:0.8,CHECK:0.1,SELECT!INSEL:0.1,ALTER
@@ -182,6 +180,7 @@ select_count_star_p: 0.5
 select_star_p: 0.5
 select_column_p: 0.2
 update_column_p: 0.5
+explain: EXPLAIN:0.1,EXPLAIN_ANALYZE:0.1,EMPTY
 # E AND E
 # for WHERE
 where_logical_length: 2-4
@@ -192,7 +191,7 @@ where_expression_depth: 1-2
 where_expression_length: 2-4
 where_datatype: bigint,binary,bit,blob,char,date,datetime,decimal,double,enum,float!geometry,geometrycollection,int,json,linestring,longblob,longtext,mediumblob,mediumint,mediumtext,multilinestring,multipoint,multipolygon,numeric,point,polygon,set,smallint,text,time,timestamp,tinyblob,tinyint,tinytext,varbinary,varchar,year
 # postprocessed e.g. PLUS becomes + per operators_sql
-operators:  PLUS,MULT,DIV,MINUS,BITAND,RSHIFT,LSHIFT,NSEQ,MOD,BITXOR,AND
+operators:  PLUS,MULT,DIV,MINUS,BITAND,RSHIFT,LSHIFT,MOD,BITXOR,AND
 operators_compare: GT,EQ,GE,LT,LE,NE,ISNULL,ISNOTNULL,NSEQ
 operators_isnull: ISNULL,ISNOTNULL
 operators_logical: AND,OR
@@ -201,7 +200,7 @@ operators_sql: qw(PLUS:+ MULT:* DIV:/ MINUS:- BITAND:& RSHIFT:>> LSHIFT:<< AND:&
 # on lowest level function is with 0 arg e.g. PI()
 expression_term: CONSTANT:0.1,COLUMN:0.5,FUNCTION
 # no function when used to build  logical expressions
-expression_group: PARENTHESIS:0.5,FUNCTION
+expression_group: PARENTHESIS:0.9,FUNCTION
 prefer_right_type_p: 0.95
 function_arg: COLUMN,CONSTANT
 # 0 is 0 arguments
@@ -211,7 +210,7 @@ function_0C: PI,CONNECTION_ID,CURDATE,CURTIME,CURRENT_ROLE,CURRENT_USER,CURRENT_
 function_0D: CURDATE,CURTIME,CURRENT_TIMESTAMP,NOW,SYSDATE,UNIX_TIMESTAMP,UTC_DATE,UTC_TIME
 # can be converted to INT and similar
 function_0N: PI,RAND,CONNECTION_ID
-function_0_as_constant_p: 0.8
+function_0_as_constant_p: 0.2
 function_0_virtual: PI
 function_todo: CONV,ADDATE_INTERVAL,CONVERT_TZ,DATE_ADD,DATE_SUB,GET_FORMAT,PERIOD_ADD,PERIOD_DIFF,STR_TO_DATE,SUBDATE_INTERVAL,TIMESTAMPADD,TIMESTAMPDIFF,EXPORT_SET,FROM_BASE64,UNHEX,FULLTEXT
 # char -> char
@@ -225,7 +224,7 @@ function_N1D: FROM_DAYS,FROM_UNIXTIME
 # n -> time
 function_N1T: SEC_TO_TIME
 # n -> n
-function_N1N: EXP,ACOS,LN,SQRT,ATAN,TAN,ABS,ASIN,BIN,BIT_AND,BIT_COUNT,BIT_OR,BIT_XOR,CEIL,COS,COT,FROM_DAYS,FROM_UNIXTIME,SEC_TO_TIME,DEGREES,FLOOR,RADIANS,SIGN,SIN,OCT,ROUND
+function_N1N: EXP,ACOS,LN,SQRT,ATAN,TAN,ABS,ASIN,BIN,BIT_COUNT,CEIL,COS,COT,FROM_DAYS,FROM_UNIXTIME,SEC_TO_TIME,DEGREES,FLOOR,RADIANS,SIGN,SIN,OCT,ROUND
 # 1 date argument, C (castable to char) return value
 function_D1C: DATE,DAY,DAYNAME,DAYOFMONTH,DAYOFWEEK,DAYOFYEAR,HOUR,LAST_DAY,MICROSECOND,MINUTE,MONTH,MONTHNAME,QUARTER,SECOND,TIME,TIMESTAMP,TIME_TO_SEC,TO_DAYS,TO_SECONDS,WEEK,WEEKDAY,WEEKOFYEAR,YEAR,YEARWEEK
 # 1 date argument, date return value

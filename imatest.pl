@@ -24,14 +24,19 @@ require 5.032;
 # 16. max source code line length is 143
 
 # todo
+# count distinct etc
 # optional server shutdown in the end
 # dry but less dry
 # database discovery
 # check 'x' for constants
 # how group by
-# implement sleep in txn
-# implement txn
 # more robust values esp. update 
+# use $TRUE not $YES
+# savepoints
+# ddl
+# set
+# stats
+# differently parametrised load threads
 
 use Carp qw(croak shortmess);
 use Data::Dumper qw(Dumper);
@@ -100,6 +105,7 @@ my $INT_RANGE_MARKER = 'I';
 my $NEG_MARKER = 'M';
 
 my $AAFUN = 'function_0C';
+my $BEGIN = 'BEGIN';
 my $CHARACTER_SET = 'character_set';
 my $CHECK_SUBKEYS = '_2levelkeys';
 my $CLIENT_THREAD_MSHLOG = 'client_thread_mshlog';
@@ -109,8 +115,10 @@ my $DATETIME = 'DATETIME';
 my $DATATYPE_LOB_KEY_LEN = 'datatype_lob_key_len';
 my $DDFUN = 'function_0D';
 my $DECIMAL = 'DECIMAL';
+my $DEFAULT = 'default';
 my $DESTROY_DESTROY = 'destroy_destroy';
 my $EMPTY = 'EMPTY';
+my $END = 'END';
 my $EXPRESSION_GROUP = 'expression_group';
 my $F0CP = 'function_0_as_constant_p';
 my $INTEGER = 'INTEGER';
@@ -150,6 +158,7 @@ my $TEARDOWN = 'teardown';
 my $TEST_DURATION = 'test_duration_seconds';
 my $TO_BUILD = 'to_build';
 my $UPDATE = 'UPDATE';
+my $UPDATELC = 'update';
 my $UPDATE_COLUMN_P = 'update_column_p';
 my $V3072 = 3072;
 my $VALUE_POINT_X = 'value_point_x';
@@ -728,8 +737,7 @@ sub checkscript {
 sub buildmisc {
     my $password = readfile($ghreal{'passfile'});
     chop($password);
-    my $usex = $ghreal{'usex'};
-    my $port = $usex? $ghreal{'ports'} + $ghreal{'xportoffset'} + $ghreal{'portoffset'} : $ghreal{'ports'} + $ghreal{'portoffset'};
+    my $port = $ghreal{'ports'} + $ghreal{'xportoffset'};
     $ENV{'_imatest_port_rel'} = $ghreal{'ports'};
     $ENV{'_imatest_port_abs'} = $ghreal{'port'};
     $ghmisc{$MYSQLSH_BASE} = sprintf(
@@ -828,14 +836,15 @@ sub db_discover {
 }
 
 # 1: schema.table
-# 2: kind: virtual default where
+# 2: kind: virtual default where update
 # 3: schema.table.column from caller
 # returns column name
 sub build_expr_column {
     my ($tnam, $kind, $colnam) = @ARG;
     my $rc = '';
     dosayif($VERBOSE_NEVER,"called with tnam=s kind=%s col=%s",$tnam,$kind,$colnam);
-    my @lgoodcols = grep {($kind eq $WHERE) or ("$tnam.$_" ne $colnam and not $ghstc2isautoinc{"$tnam.$_"})} @{$ghst2cols{$tnam}};
+    my @lgoodcols = grep {($kind eq $WHERE or $kind eq $UPDATELC)
+                          or ("$tnam.$_" ne $colnam and not $ghstc2isautoinc{"$tnam.$_"})} @{$ghst2cols{$tnam}};
     my $con = scalar(@lgoodcols);
     $rc = $con == 0? '0' : $lgoodcols[int(rand()*$con)];      # 0 is last resort
     dosayif($VERBOSE_NEVER,'%s: returning "%s" for "%s"',$rc,"@ARG");
@@ -884,7 +893,7 @@ sub build_expr_constant {
 }
 
 # 1: schema.table
-# 2: kind: virtual default where
+# 2: kind: virtual default where update
 # 3: schema.table.column, or datatype for where
 # returns expr
 sub build_expr_term {
@@ -892,10 +901,10 @@ sub build_expr_term {
     croak("called with empty column name for table $tnam and kind '$kind'") if ($colname eq '');
     dosayif($VERBOSE_NEVER," called for '%s' kind=%s",$colname,$kind);
     my $expr = '';
-    my $termkind = $kind eq 'default'? process_rseq('default_expression_term') : process_rseq('expression_term');
+    my $termkind = $kind eq $DEFAULT? process_rseq('default_expression_term') : process_rseq('expression_term');
     if ($termkind eq 'CONSTANT') {
          $expr = build_expr_constant($kind, $colname);
-    } else {      # COLUMN/FUNCTION
+    } else {      # COLUMN/FUNCTION todo
          $expr = build_expr_column($tnam, $kind, $colname);
     }
     dosayif($VERBOSE_NEVER," returns '%s'",$expr);
@@ -914,7 +923,7 @@ sub build_expr_level {
     for my $enum (1..$elen) {
         my $item = "E$level";
         my $grp = process_rseq($EXPRESSION_GROUP);
-        $item = $grp eq $PARENTHESIS? "($item)" : build_expr_function($kind,$colnam)."($item)"; #todo functions
+        $item = $grp eq $PARENTHESIS? "($item)" : build_expr_function($kind,$colnam)."($item)";
         $expr .= $item;
         next if ($enum == $elen);
         my $oper = process_rseq('operators');
@@ -925,8 +934,8 @@ sub build_expr_level {
 }
 
 # 1: table name
-# 2: kind: virtual default where
-# 3: schema.table.name of the column we are building, for virtual
+# 2: kind: virtual default where update
+# 3: schema.table.name of the column we are building
 sub build_expression {
     my ($tnam, $kind, $colnam) = @ARG;
     dosayif($VERBOSE_NEVER, " called for table %s column %s and kind=%s",  $tnam, $colnam, $kind);
@@ -1249,10 +1258,8 @@ sub db_create {
                     $dt .= " $vis" if ($vis ne $EMPTY);
                 }
                 if (not $ghstc2virtual{$colnam} and not $ghstc2isautoinc{$colnam} and rand() < $ghreal{'column_default_p'}) {
-                    #my $expr = build_expr_term($tnam,'default',$colnam);
-                    my ($expr, $plvalues) = build_values($tnam,[$cnam]);
+                    my ($expr, $plvalues) = build_expression($tnam,$DEFAULT,$colnam);
                     $dt .= " DEFAULT ($expr)";
-    #croak("#debug+$expr+");
                 }
                 my $coldef = "$cnam $dt";
                 $ghstc2dt{$colnam} = $dt;
@@ -2200,10 +2207,11 @@ sub stmt_update_generate {
     # determine schema.table
     my $tnam = $glstables[int(rand()*$gntables)];
     my $plcols = table_columns_subset($tnam,$UPDATE_COLUMN_P,$UPDATE);
-    my ($dummy, $plvalues) = build_values($tnam,$plcols);
+    #my ($dummy, $plvalues) = build_values($tnam,$plcols);
     my $n = 0;
     foreach my $col (@$plcols) {
-        $stmt .= ", $col = $plvalues->[$n]";
+        my $expr = build_expression($tnam,$UPDATELC,"$tnam.$col");
+        $stmt .= ", $col = $expr";
     }
     $stmt =~ s/^,//;
     my $wher = build_where($tnam,'update_where_all_p');
@@ -2225,6 +2233,13 @@ sub stmt_insert_generate {
     return $stmt;
 }
 
+# return time in ms
+sub mstime {
+    my ($sec, $mks) = gettimeofday();
+    my $rc = $sec*1000 + $mks / 1000;
+    return $rc;
+}
+
 # 1: thread number
 sub server_load_thread {
     my $tnum = $ARG[0];
@@ -2232,6 +2247,9 @@ sub server_load_thread {
     my $howlong = $ghreal{$TEST_DURATION};
     my $maxcount = $ghreal{'client_max_stmt'};
     my $lasttime = $starttime + $howlong;
+    my $txnin = $FALSE;
+    my $txnstmt = 0;
+    my $txnstart = 0;
     my $ec = $EC_OK;
     dosayif($VERBOSE_ANY, " load thread %s to run for %ss",$tnum,$howlong);
     $ENV{_imatest_client_filebase} = "client_thread_$tnum";
@@ -2255,26 +2273,60 @@ sub server_load_thread {
 
         # now generate statement
         my $stmt = '';
-        my $ksql = process_rseq('load_sql_class');
+        my $ksql = '';
+        if ($ghreal{'txn_use'} eq $YES) {
+            dosleepms(process_rseq('txn_sleep_in_ms')) if ($txnin);
+            $ksql = 'END' if (rand() < $ghreal{'txn_end_p'});
+            if ($txnin and $ksql eq '') {
+                 $ksql = $END if ($snum - $txnstmt > $ghreal{'txn_maxlength_stmt'} or mstime() - $txnstart > $ghreal{'txn_maxlength_ms'});
+            }
+            if ($ksql ne $END) {
+                $ksql = $BEGIN if (not $txnin and rand() < $ghreal{'txn_begin_p'});
+            } else {
+                $ksql = process_rseq('txn_end_how');
+            }
+        }
+        $ksql = process_rseq('load_sql_class') if ($ksql eq '');
+
+        my $canexp = $FALSE;
         if ($ksql eq 'SELECT') {
             $stmt = stmt_select_generate();
+            $canexp = $TRUE;
         } elsif ($ksql eq 'INSERT') {
             $stmt = stmt_insert_generate();
+            $canexp = $TRUE;
         } elsif ($ksql eq $UPDATE) {
             $stmt = stmt_update_generate();
+            $canexp = $TRUE;
         } elsif ($ksql eq 'DELETE') {
             $stmt = stmt_delete_generate();
+            $canexp = $TRUE;
         } elsif ($ksql eq 'CHECK') {
             my $tnam = $glstables[int(rand()*$gntables)];
             $stmt = "$ksql TABLE $tnam";
+        } elsif ($ksql eq $BEGIN) {
+            $stmt = 'BEGIN WORK';
+            $txnin = $TRUE;
+            $txnstmt = $snum;
+            $txnstart = mstime();
+        } elsif ($ksql eq 'COMMIT' or $ksql eq 'ROLLBACK') {
+            $stmt = $ksql;
+            $txnin = $FALSE;
         } else {
             croak("load_sql_class=$ksql is not supported yet");
         }
+        if ($canexp) {
+            my $exp = process_rseq('explain');
+            $exp =~ s/_/ /;
+            $stmt = "$exp $stmt" if ($exp ne $EMPTY);
+        }
+
         # now execute statement
         dosayif($VERBOSE_NEVER, "sending to execute: %s",$stmt);
         printf($msql "%s;\n", $stmt);
         printf($msh "%s;\n", $stmt) if ($dosql);
         dosayif($VERBOSE_ANY, "sent to execute stmt #%s",$snum) if ($snum % $ghreal{'report_every_stmt'} == 0);
+
         # now sleep after txn
         my $ms = process_rseq('txn_sleep_after_ms',$TRUE);
         dosleepms($ms);
