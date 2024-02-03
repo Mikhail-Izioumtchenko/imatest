@@ -31,24 +31,6 @@ character_set:
   mandatory: True
   allowed: Rseq
   only_names: True
-client_max_stmt:
-  mandatory: True
-  allowed: only_non_negative_integers
-client_thread_err:
-  mandatory: True
-client_thread_mshlog:
-  mandatory: True
-client_thread_out:
-  mandatory: True
-client_thread_sql:
-  mandatory: True
-client_execute_sql:
-  mandatory: True
-  allowed: [Yes, No]
-  supported: [Yes, No]
-client_threads:
-  mandatory: True
-  allowed: only_positive_integers
 column_default_p:
   mandatory: True
   allowed: probability
@@ -418,6 +400,10 @@ integer_reverse_sign_illegitimate_p:
 integer_unsigned_p:
   mandatory: True
   allowed: probability
+load_execute_sql:
+  mandatory: True
+  allowed: [Yes, No]
+  supported: [Yes, No]
 load_function_class:
   allowed: Rseq
   mandatory: True
@@ -426,10 +412,23 @@ load_function_upper:
   mandatory: True
   allowed: Rseq
   only_values_allowed: F1A,F2AT
+load_max_stmt:
+  mandatory: True
+  allowed: only_non_negative_integers
 load_sql_class:
   mandatory: True
   allowed: Rseq
   only_values_allowed: SELECT,UPDATE,INSERT,DELETE,INSEL,ALTER,CHECK
+load_thread_err:
+  mandatory: True
+load_thread_mshlog:
+  mandatory: True
+load_thread_out:
+  mandatory: True
+load_thread_sql:
+  mandatory: True
+load_threads:
+  mandatory: True
 mshlog_remove_before:
   allowed: [Yes, No]
   supported: [Yes, No]
@@ -566,6 +565,8 @@ server_termination_wait_timeout:
 spatial_srid:
   mandatory: True
   allowed: Rseq
+strict_exceptions:
+  mandatory: True
 table_autoextend_size:
   mandatory: True
   allowed: Rseq       

@@ -7,8 +7,10 @@
 # loosely grouped, no requirements on order
 
 # STRICT if True, every key must be described in syntax checker e.g. imatest_syntax.yaml
+# exception: keys ending in _k_.+ where .+ is not expected to contain another _k_
+#   followed by any of strict_exceptions
 strict: True
-# alternatively to_check_inline: can be used
+strict_exceptions: [ "ro", "ddl" ]
 
 # TO_CHECK_FILE file against which contents of the test file are checked. Absolute path is OK.
 to_check_file: imatest_syntax.yaml
@@ -83,18 +85,22 @@ server_termination_wait_timeout: 60
 server_start_control: Yes
 server_start_timeout: 60
 
-# test load: client threads
-client_threads: 1
+# test load: client threads, comma delimited list of NX[kind], format validity is checked late
+#load_threads: 1Xro,1
+load_threads: 1
 # evaluated immediately before using the file
-client_thread_out: qw(/dev/null)
-client_thread_err: qw(/dev/null)
-client_thread_sql: $ENV{_imatest_tmpdir}.'/'.$ENV{_imatest_client_filebase}.'.sql'
-client_thread_mshlog: $ENV{_imatest_tmpdir}.'/'.$ENV{_imatest_client_filebase}.'.log'
+load_thread_out: qw(/dev/null)
+load_thread_err: qw(/dev/null)
+load_thread_sql: $ENV{_imatest_tmpdir}.'/'.$ENV{_imatest_load_filebase}.'.sql'
+load_thread_mshlog: $ENV{_imatest_tmpdir}.'/'.$ENV{_imatest_load_filebase}.'.log'
 mshlog_remove_before: Yes
-client_execute_sql: Yes
+load_execute_sql: Yes
+
+# === load thread parameters ===
 # mostly for internal use e.g. self test. 0 means unlimited.
-client_max_stmt: 100
+load_max_stmt: 100
 report_every_stmt: 200
+report_every_stmt_k_ro: 20
 
 txn_use: Yes
 # milliseconds, sleep after txn end

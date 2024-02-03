@@ -24,6 +24,13 @@ require 5.032;
 # 16. max source code line length is 143
 
 # todo
+# line numbers in usage calls
+# REPLACE
+# ANALYZE + histogram
+# CHECKSUM
+# OPTIMIZE
+# FLUSH
+# LOCK
 # count distinct etc
 # optional server shutdown in the end
 # dry but less dry
@@ -37,6 +44,7 @@ require 5.032;
 # set
 # stats
 # differently parametrised load threads
+# incode verification rules
 
 use Carp qw(croak shortmess);
 use Data::Dumper qw(Dumper);
@@ -55,7 +63,7 @@ use YAML qw(LoadFile);
 STDOUT->autoflush();
 STDERR->autoflush();
 
-my $version = '2.31';
+my $version = '2.32';
 
 $Data::Dumper::Sortkeys = 1;
 
@@ -96,7 +104,6 @@ my $TRUE = 1;
 my $FALSE = 0;
 
 my $CHECKFILE = 'to_check_file';
-my $CHECKINLINE = 'to_check_inline';
 
 my $FDEC = "%05d";
 
@@ -108,7 +115,6 @@ my $AAFUN = 'function_0C';
 my $BEGIN = 'BEGIN';
 my $CHARACTER_SET = 'character_set';
 my $CHECK_SUBKEYS = '_2levelkeys';
-my $CLIENT_THREAD_MSHLOG = 'client_thread_mshlog';
 my $CREATE_CREATE = 'create_create';
 my $CREATE_DB = 'create_db';
 my $DATETIME = 'DATETIME';
@@ -126,6 +132,7 @@ my $INTEGER_REVERSE_SIGN_LEGITIMATE_P = 'integer_reverse_sign_legitimate_p';
 my $INTEGER_REVERSE_SIGN_ILLEGITIMATE_P = 'integer_reverse_sign_illegitimate_p';
 my $IMATEST_MSH_LOG = '_imatest_msh_log';
 my $JSON = 'JSON';
+my $LOAD_THREAD_MSHLOG = 'load_thread_mshlog';
 my $LOB = 'LOB';
 my $MSHLOG_REMOVE_BEFORE = 'mshlog_remove_before';
 my $MYSQLSH_BASE = 'mysqlsh_base';
@@ -157,6 +164,7 @@ my $SUPPORTED = 'supported';
 my $TEARDOWN = 'teardown';
 my $TEST_DURATION = 'test_duration_seconds';
 my $TO_BUILD = 'to_build';
+my $UKIND = '_k_';
 my $UPDATE = 'UPDATE';
 my $UPDATELC = 'update';
 my $UPDATE_COLUMN_P = 'update_column_p';
@@ -218,6 +226,7 @@ my %ghstc2virtual = ();      # schema.table.column => column is virtual
 my %ghstc2unsigned = ();      # schema.table.column => column is unsigned
 my %ghstc2isautoinc = ();      # schema.table.column => is autoinc
 my %ghstcol2def = ();      # schema.table.column => column definition
+my %ghstc2candefault = ();      # schema.table => can have DEFAULT
 my @ghstcolist = (
 \%ghstc2class,
 \%ghstc2dt,
@@ -229,6 +238,7 @@ my @ghstcolist = (
 \%ghstc2virtual,
 \%ghstc2unsigned,
 \%ghstc2isautoinc,
+\%ghstc2candefault,
 \%ghstcol2def
                  );
 # end schema.table.column hashes
@@ -275,10 +285,11 @@ $RAND => 0
 
 $ghmisc{$VERSION} = $version;
 
-# parameters: usage message
+# parameters: usage message, __LINE__
 # exits with USAGE_ERROR_EC
 sub usage {
-    my $msg = "@ARG";
+    my $msg = $ARG[0];
+    $msg = "line $ARG[1]: $msg" if (defined($ARG[1]));
     $msg .= "\nversion $ghmisc{$VERSION}" if (defined($ghasopt{$VERSION}) and $ghasopt{$VERSION});
     my $usage = <<EOF
   $msg
@@ -473,13 +484,13 @@ sub process_rseq {
             $clval =~ s/:[0-9.]*([,!])/$1/g;
             my @lhave = split(/[,!]/,$clval);
             foreach my $el (@lhave) {
-              usage("$skey subvalue $el violates Rseq Rule9: with $ONLY_VALUES_ALLOWED value must be one of: @lal")
+              usage("$skey subvalue $el violates Rseq Rule9: with $ONLY_VALUES_ALLOWED value must be one of: @lal",__LINE__)
                 if (scalar(grep {$_ eq $el} @lal) == 0);
             }
             $clval =~ s/!.*//;
             my @lsohave = split(/,/,$clval);
             foreach my $el (@lsohave) {
-              usage("$skey subvalue $el violates Rseq Rule10: with '$SUPPORTED' value must be one of: @lsup")
+              usage("$skey subvalue $el violates Rseq Rule10: with '$SUPPORTED' value must be one of: @lsup",__LINE__)
                 if (scalar(grep {$_ eq $el} @lsup) == 0);
             }
         }
@@ -500,9 +511,9 @@ sub process_rseq {
         ++$n;
         my @lsem = split(/:+/, $lcom);
         # Rule1: not more than one probability per item
-        usage("$skey value $val violates Rseq Rule1: not more than one probability per item") if ($check and scalar(@lsem) > 2);
+        usage("$skey value $val violates Rseq Rule1: not more than one probability per item",__LINE__) if ($check and scalar(@lsem) > 2);
         # Rule3: range nor probability can be empty
-        usage("$skey value $val violates Rseq Rule3: no empty ranges or probabilities")
+        usage("$skey value $val violates Rseq Rule3: no empty ranges or probabilities",__LINE__)
           if ($check and ($lsem[0] eq '' or (scalar(@lsem) == 2 and $lsem[1] eq '')));
         $hasprobs += (scalar(@lsem) - 1);
         $lastprob = scalar(@lsem) - 1;
@@ -511,13 +522,13 @@ sub process_rseq {
         my @lrange = split(/\/+/, $ls1);
         if (scalar(@lrange) == 2) {
             # Rule7: wrong character in decimal range
-            usage("$skey value $val violates Rseq Rule7: in decimal ranges are allowed only characters 0-9 / M .")
+            usage("$skey value $val violates Rseq Rule7: in decimal ranges are allowed only characters 0-9 / M .",__LINE__)
               if ($check and join('',@lrange) =~ /[^-\/0-9M.]/);
             # Rule7.1: no decimal ranges allowed for only_positive_integers
-            usage("$skey value $val violates Rseq Rule7.1: $skey only supports integers")
+            usage("$skey value $val violates Rseq Rule7.1: $skey only supports integers",__LINE__)
               if ($only_positive_integers || $only_non_negative_integers);
             # Rule7.2: no decimal ranges allowed for only_names
-            usage("$skey value $val violates Rseq Rule7.2: $skey only supports names")
+            usage("$skey value $val violates Rseq Rule7.2: $skey only supports names",__LINE__)
               if ($only_names);
             $lrange[0] .= $DEC_RANGE_MARKER;
             unshift(@lsem, @lrange);
@@ -528,22 +539,22 @@ sub process_rseq {
                 unshift(@lsem, @lrange);
             } elsif (scalar(@lrange) == 2) {
                 # Rule5: empty subrange
-                usage("$skey value $val violates Rseq Rule5: empty subranges are not allowed") if ($check and $lrange[0] eq '');
+                usage("$skey value $val violates Rseq Rule5: empty subranges are not allowed",__LINE__) if ($check and $lrange[0] eq '');
                 # Rule6: wrong character
-                usage("$skey value $val violates Rseq Rule6: in integer ranges are allowed only characters 0-9 - M ")
+                usage("$skey value $val violates Rseq Rule6: in integer ranges are allowed only characters 0-9 - M ",__LINE__)
                   if ($check and join('',@lrange) =~ /[^-0-9M]/);
-                usage("$skey value $val violates Rseq Rule6.1: $skey only supports positive integers")
+                usage("$skey value $val violates Rseq Rule6.1: $skey only supports positive integers",__LINE__)
                   if ($only_positive_integers && (join('',@lrange) =~ /M/ || $lrange[0] == 0));
-                usage("$skey value $val violates Rseq Rule6.1: $skey only supports non negative integers")
+                usage("$skey value $val violates Rseq Rule6.1: $skey only supports non negative integers",__LINE__)
                   if ($only_non_negative_integers && join('',@lrange) =~ /M/);
                 # Rule7.2: no integer ranges allowed for only_names
-                usage("$skey value $val violates Rseq Rule6.2: $skey only supports names")
+                usage("$skey value $val violates Rseq Rule6.2: $skey only supports names",__LINE__)
                   if ($only_names);
                 $lrange[0] .= $INT_RANGE_MARKER;
                 unshift(@lsem, @lrange);
             } else {
                 # Rule4: too many subranges
-                usage("$skey value $val violates Rseq Rule4: only two subranges allowed");
+                usage("$skey value $val violates Rseq Rule4: only two subranges allowed",__LINE__);
             }
         }
         @lsem = map {s/^$NEG_MARKER/-/;$_} @lsem
@@ -553,7 +564,7 @@ sub process_rseq {
     # Rule2: if there is a probability, all but the last one must have it
     dosayif($silent, "%s line+%s+to+%s+of+%s+to+%s+hasprobs+%s+lastprob+%s+\n",
        $val,"@lcommas", scalar(@lcommas), Dumper(\%hcomma),$hasprobs,$lastprob);
-    usage("$skey value $val violates Rseq Rule2: either no probabilities or each element but last must have probability")
+    usage("$skey value $val violates Rseq Rule2: either no probabilities or each element but last must have probability",__LINE__)
       if ($check and (($lastprob == 1 || $hasprobs != scalar(@lcommas) - 1) && $hasprobs != 0));
 
     dosayif($silent,"%s to process %s: %s, lcommas is %s, hasprobs=%s, hcommas is %s",
@@ -580,13 +591,13 @@ sub process_rseq {
         if ($only_names || $only_values_allowed) {
             # Rule8: string is in fact a name
             usage(
-              "$skey value $val violates Rseq Rule8: for $ONLY_NAMES and $ONLY_VALUES_ALLOWED first character must be [a-zA-Z_]")
+              "$skey value $val violates Rseq Rule8: for $ONLY_NAMES and $ONLY_VALUES_ALLOWED first character must be [a-zA-Z_]",__LINE__)
               if ($check and (not $pltopr->[0] =~ /^[a-zA-Z_]/));
         }
         # Rule6: wrong character
-        usage("$skey value $val violates Rseq Rule6.3: $skey only supports positive integers")
+        usage("$skey value $val violates Rseq Rule6.3: $skey only supports positive integers",__LINE__)
           if ($only_positive_integers && (join('',@$pltopr) =~ /M/ || $pltopr->[0] <= 0));
-        usage("$skey value $val violates Rseq Rule6.4: $skey only supports non negative integers")
+        usage("$skey value $val violates Rseq Rule6.4: $skey only supports non negative integers",__LINE__)
           if ($only_non_negative_integers && join('',@$pltopr) =~ /M/);
     }
     $ghreal{$skey} = process_range($pltopr);
@@ -625,13 +636,10 @@ sub checkscript {
     my $rc = $RC_OK;
     my $phv;
     if (defined($ghtest{$CHECKFILE})) {
-        -f $ghtest{$CHECKFILE} or usage("$ghtest{$CHECKFILE}: file does not exist, or inaccessible, or not a regular file");
+        -f $ghtest{$CHECKFILE} or usage("$ghtest{$CHECKFILE}: file does not exist, or inaccessible, or not a regular file",__LINE__);
         $phv = doeval("LoadFile('$ghtest{$CHECKFILE}')") or die "bad yaml in file $ghtest{$CHECKFILE}";
-    } elsif (defined($ghtest{$CHECKINLINE})) {
-        usage("supplying both '$CHECKFILE' and '$CHECKINLINE' is not allowed") if defined($phv);
-        $phv = $ghtest{$CHECKINLINE};
     } else {
-        usage("either '$CHECKFILE' or '$CHECKINLINE' must be supplied");
+        usage("'$CHECKFILE' must be supplied",__LINE__);
     }
     %ghver = %$phv;
     dosayif($VERBOSE_DEV, "% start: %s\n%s end", $CHECKFILE, Dumper(\%ghver), $CHECKFILE);
@@ -639,7 +647,16 @@ sub checkscript {
     # check strict
     foreach my $skey (keys(%ghtest)) {
         if ($strict eq $STRING_TRUE and not defined($ghver{$skey})) {
-            usage("strict is specified in $TESTYAML but $skey is not described in $CHECKFILE '$ghtest{$CHECKFILE}' nor in '$CHECKINLINE'");
+            if ($skey =~ /$UKIND/) {
+                my $suf = $skey;
+                $suf =~ s/.*$UKIND//;
+                my @lok = @{$ghtest{'strict_exceptions'}};
+                usage("strict is specified in $TESTYAML but $skey is not described in $CHECKFILE '$ghtest{$CHECKFILE}' and $suf is not in strict_exceptions of '@lok'",
+                  __LINE__)
+                    if (scalar(grep {$_ eq $suf } @lok) == 0);
+            } else {
+                usage("strict is specified in $TESTYAML but $skey is not described in $CHECKFILE '$ghtest{$CHECKFILE}'",__LINE__);
+            }
         }
     }
     # check subkeys
@@ -658,7 +675,7 @@ sub checkscript {
         }
         foreach my $have (keys(%hsub)) {
             croak(
- "$CHECK_SUBKEYS='@{$ghver{$CHECK_SUBKEYS}}' is defined in $CHECKFILE '$ghtest{$CHECKFILE}' or in '$CHECKINLINE' but '$have' is not there")
+ "$CHECK_SUBKEYS='@{$ghver{$CHECK_SUBKEYS}}' is defined in $CHECKFILE '$ghtest{$CHECKFILE}' but '$have' is not there")
               if (not defined($hcheck{$have}));
         }
     }
@@ -667,21 +684,21 @@ sub checkscript {
         my $phcheck = $ghver{$skey};
         if (not defined($ghtest{$skey})) {
             next if not defined($phcheck->{'mandatory'});;
-            usage("$skey is mandatory but it is not defined in $testyaml");
+            usage("$skey is mandatory but it is not defined in $testyaml",__LINE__);
         }
         my $val = $ghtest{$skey};
         dosayif($VERBOSE_DEV, " checking %s of '%s'",  $skey, $val);
         if ($val eq $STRING_TRUE and defined($phcheck->{$NEEDS_ON_TRUE})) {
             foreach my $scheck (@{$phcheck->{$NEEDS_ON_TRUE}}) {
-                usage("$skey is $val and $NEEDS_ON_TRUE includes $scheck but $scheck is not defined in $testyaml")
+                usage("$skey is $val and $NEEDS_ON_TRUE includes $scheck but $scheck is not defined in $testyaml",__LINE__)
                   if (not defined($ghtest{$scheck}));
             }
         }
         my $vcheck = $phcheck->{'allowed'};
         if (ref($vcheck) eq 'ARRAY') {
-            scalar(grep{$val eq $_} @$vcheck) > 0 or usage("$skey cannot be $val but rather one of: @{$vcheck}");
+            scalar(grep{$val eq $_} @$vcheck) > 0 or usage("$skey cannot be $val but rather one of: @{$vcheck}",__LINE__);
             my $vsup = $phcheck->{$SUPPORTED};
-            scalar(grep{$val eq $_} @$vsup) > 0 or usage("$skey of $val is not supported yet. Supported values are @{$vsup}");
+            scalar(grep{$val eq $_} @$vsup) > 0 or usage("$skey of $val is not supported yet. Supported values are @{$vsup}",__LINE__);
             next;
         }
         if (defined($vcheck) and $vcheck eq 'doeval') {
@@ -703,17 +720,17 @@ sub checkscript {
             next;
         }
         if (defined($vcheck) and $vcheck eq $ONLY_NON_NEGATIVE_INTEGERS) {
-            usage("$skey of $val is wrong, must be a non negative integer")
+            usage("$skey of $val is wrong, must be a non negative integer",__LINE__)
               unless (looks_like_number($val) and $val >= 0 and int($val) == $val);
             next;
         }
         if (defined($vcheck) and $vcheck eq $ONLY_POSITIVE_INTEGERS) {
-            usage("$skey of $val is wrong, must be a positive integer")
+            usage("$skey of $val is wrong, must be a positive integer",__LINE__)
               unless (looks_like_number($val) and $val > 0 and int($val) == $val);
             next;
         }
         if (defined($vcheck) and $vcheck eq 'probability') {
-            usage("$skey of $val is wrong, must be a probability value between 0.0 and 1.0 inclusive")
+            usage("$skey of $val is wrong, must be a probability value between 0.0 and 1.0 inclusive",__LINE__)
               unless (looks_like_number($val) and $val >= 0.0 and $val <= 1.0);
             next;
         }
@@ -789,7 +806,7 @@ sub process_teardown {
         dosayif($VERBOSE_ANY," $TEARDOWN is FALSE so doing nothing but return %s",  $rc);
         return $rc;
     }
-    usage("$TEARDOWN is TRUE but $DESTROY_DESTROY is not defined in $ghasopt{$TESTYAML}")
+    usage("$TEARDOWN is TRUE but $DESTROY_DESTROY is not defined in $ghasopt{$TESTYAML}",__LINE__)
       if (not defined($ghreal{$DESTROY_DESTROY}));
 
     if ($ghasopt{$DRYRUN}) {
@@ -818,7 +835,7 @@ sub db_discover {
     my ($ec, $pljson) = readexec($com);
     if ($ec != $EC_OK) {
         dosayif($VERBOSE_ANY,"line %s cannot proceed: failed to retrieve schemas, ec %s, json %s",  __LINE__, $ec, Dumper($pljson));
-        usage(sprintf("line %s cannot proceed: failed to retrieve schemas, exit code %s",  __LINE__, $ec));
+        usage("cannot proceed: failed to retrieve schemas, exit code $ec", __LINE__);
         exit $EC_ERROR;
     }
     dosayif($VERBOSE_ANY,"exit code %s",$ec);
@@ -975,6 +992,7 @@ sub build_expression {
             $add = build_expr_term($tnam, $kind, $colnam);
             $expr =~ s/E2/$add/;
         }
+        $expr =~ s/E2/$add/g;      # todo figure out
     }
     dosayif($VERBOSE_NEVER, "%s: returning %s", $expr);
     return $expr;
@@ -1089,6 +1107,7 @@ sub db_create {
                 $ghstc2virtual{$colnam} = $FALSE;
                 $ghstc2unsigned{$colnam} = $FALSE;
                 $ghstc2len{$colnam} = -1;
+                $ghstc2candefault{$colnam} = $TRUE;
                 my $tclass = process_rseq('datatype_class');
                 my $canpk = $ghstcol2def{$colnam};      # can be part of PK unchanged e.g. CHAR but not TEXT
                 my $keylen = undef;
@@ -1103,7 +1122,12 @@ sub db_create {
                 }
                 # now we have final datatype class
                 $ghstc2class{$colnam} = $tclass;
-                $hcolcanind{$cnam} = $TRUE if ($tclass ne $JSON);
+                if ($tclass ne $JSON) {
+                    $hcolcanind{$cnam} = $TRUE;
+                } else {
+                    # https://bugs.mysql.com/bug.php?id=113860
+                    $ghstc2candefault{$colnam} = $FALSE;
+                }
                 $hcolneedpref{$cnam} = $tclass eq $LOB? $TRUE : $FALSE;
                 my $dt = $tclass;
                 $ghstc2just{$colnam} = $dt;
@@ -1127,6 +1151,7 @@ sub db_create {
                             $ghst2hasautoinc{$tnam} = $TRUE;
                             $dt .= " AUTO_INCREMENT";
                             $ghstc2isautoinc{$colnam} = $TRUE;
+                            $ghstc2candefault{$colnam} = $FALSE;
                             if (rand() < $ghreal{'pk_autoinc_p'}) {
                                 $ghst2pkautoinc{$tnam} = $TRUE;
                                 $dt .= " PRIMARY KEY";
@@ -1224,6 +1249,7 @@ sub db_create {
                     $dt .= " AS ($TO_BUILD) $virt";
                     ++$ghst2hasvcols{$tnam};
                     $ghstc2virtual{$colnam} = $TRUE;
+                    $ghstc2candefault{$colnam} = $FALSE;
                 } else {
                     push(@lnvcols,$cnam);
                 }
@@ -1257,7 +1283,7 @@ sub db_create {
                     $vis =~ s/_/ /;
                     $dt .= " $vis" if ($vis ne $EMPTY);
                 }
-                if (not $ghstc2virtual{$colnam} and not $ghstc2isautoinc{$colnam} and rand() < $ghreal{'column_default_p'}) {
+                if ($ghstc2candefault{$colnam} and rand() < $ghreal{'column_default_p'}) {
                     my ($expr, $plvalues) = build_expression($tnam,$DEFAULT,$colnam);
                     $dt .= " DEFAULT ($expr)";
                 }
@@ -1323,7 +1349,11 @@ sub db_create {
                 }
                 $iline =~ s/\( *,/(/;
                 $iline .= ")";
-                push(@lsql,$iline) if (not $iline =~ /\(\)/);      # marginal case related to spatial
+                if (not $iline =~ /\(\)/) {      # marginal case related to spatial todo figure out
+                    push(@lsql,$iline);
+                } else {
+                    $lsql[scalar(@lsql)-1] =~ s/,$//;
+                }
             }
             push(@lsql, "$tail;");
         }
@@ -2240,25 +2270,39 @@ sub mstime {
     return $rc;
 }
 
-# 1: thread number
+# 1: thread number, absolute
+# 2: thread kind
 sub server_load_thread {
     my $tnum = $ARG[0];
+    my $tkind = $ARG[1];
     my $starttime = time();
     my $howlong = $ghreal{$TEST_DURATION};
-    my $maxcount = $ghreal{'client_max_stmt'};
+    my $maxcount = $ghreal{'load_max_stmt'};
     my $lasttime = $starttime + $howlong;
     my $txnin = $FALSE;
     my $txnstmt = 0;
     my $txnstart = 0;
     my $ec = $EC_OK;
-    dosayif($VERBOSE_ANY, " load thread %s to run for %ss",$tnum,$howlong);
-    $ENV{_imatest_client_filebase} = "client_thread_$tnum";
-    my $outto = doeval($ghreal{'client_thread_out'});
-    my $errto = doeval($ghreal{'client_thread_err'});
-    my $sqlto = doeval($ghreal{'client_thread_sql'});
-    $ENV{$IMATEST_MSH_LOG} = doeval($ghreal{$CLIENT_THREAD_MSHLOG});
+
+    # adjust load thread parameters
+    if ($tkind ne '') {
+        foreach my $parm (sort(grep {$_ =~ /${UKIND}$tkind$/} keys(%ghreal))) {
+            my $soparm = $parm;
+            $soparm =~ s/${UKIND}$tkind$//;
+            dosayif($VERBOSE_ANY,"for %s thread #%s replacing %s of %s with %s of %s",
+              $tkind,$tnum,$soparm,$ghreal{$soparm},$parm,$ghreal{$parm});
+            $ghreal{$soparm} = $ghreal{$parm};
+        }
+    }
+    
+    dosayif($VERBOSE_ANY, "%s load thread %s to run for %s secons",$tkind,$tnum,$howlong);
+    $ENV{_imatest_load_filebase} = "load_thread_$tnum";
+    my $outto = doeval($ghreal{'load_thread_out'});
+    my $errto = doeval($ghreal{'load_thread_err'});
+    my $sqlto = doeval($ghreal{'load_thread_sql'});
+    $ENV{$IMATEST_MSH_LOG} = doeval($ghreal{$LOAD_THREAD_MSHLOG});
     safe_unlink($ENV{$IMATEST_MSH_LOG}) if ($ghreal{$MSHLOG_REMOVE_BEFORE} eq $YES);
-    my $dosql = ($ghreal{'client_execute_sql'} eq $YES);
+    my $dosql = ($ghreal{'load_execute_sql'} eq $YES);
     dosayif($VERBOSE_ANY, " see also %s and %s and %s and %s",$ENV{$IMATEST_MSH_LOG},$outto,$errto,$sqlto);
     open(my $msql, ">$sqlto") or croak("failed to open $sqlto: $ERRNO");
     my $shel = "$ghmisc{$MYSQLSH_BASE} --log-file=$ENV{$IMATEST_MSH_LOG} --log-sql=all --verbose=1 --force >$outto 2>$errto";
@@ -2397,20 +2441,21 @@ sub server_termination_thread {
 }
 
 # 1: thread number
-# 2: load kind
+# 2: load kind or '' for base
 # 3: random seed
 sub start_load_thread {
     my $tnum = $ARG[0];
-    my $rseed = $ARG[1];
-    srand($rseed);
-    $ghmisc{$RSEED} = $rseed;
-    dosayif($VERBOSE_ANY, "random seed is %s for this load thread #%s", $rseed, $tnum);
+    my $tkind = $ARG[1];
+    my $rseed = $ARG[2];
     my $rc = $RC_OK;
     dosayif($VERBOSE_ANY, " invoked with --%s=%s",  $DRYRUN, $ghasopt{$DRYRUN});
     if (not $ghasopt{$DRYRUN}) {
         my $pid = fork();
         if ($pid == 0) {
-            server_load_thread($tnum);
+            srand($rseed);
+            $ghmisc{$RSEED} = $rseed;
+            dosayif($VERBOSE_ANY, "random seed is %s for this %s load thread #%s", $rseed, $tkind, $tnum);
+            server_load_thread($tnum,$tkind);
         }
         dosayif($VERBOSE_ANY, " forked thread %s with pid=%s",$tnum,$pid);
         push(@glpids,$pid);
@@ -2473,19 +2518,19 @@ sub init_db {
 }
 
 # start execution. Execution starts HERE.
-GetOptions(\%ghasopt, @LOPT) or usage("invalid options supplied");
-scalar(@ARGV) == 0 or usage("no arguments are allowed");
+GetOptions(\%ghasopt, @LOPT) or usage("invalid options supplied",__LINE__);
+scalar(@ARGV) == 0 or usage("no arguments are allowed",__LINE__);
 foreach my $soname (keys(%HDEFOPT)) {
     $ghasopt{$soname} = $HDEFOPT{$soname} if (not defined($ghasopt{$soname}));
 }
-usage("invoked with --help") if ($ghasopt{$HELP});
-usage("invoked with --version") if ($ghasopt{$VERSION});
+usage("invoked with --help",__LINE__) if ($ghasopt{$HELP});
+usage("invoked with --version",__LINE__) if ($ghasopt{$VERSION});
 dosayif($VERBOSE_ANY, "invoked with %s", "@ARGV");
 dosayif($VERBOSE_ANY, "Options to use are %s", Dumper(\%ghasopt));
-exists($ghasopt{$TESTYAML}) or usage("--".$TESTYAML." must be supplied");
+exists($ghasopt{$TESTYAML}) or usage("--".$TESTYAML." must be supplied",__LINE__);
 
 my $test_script =  $ghasopt{$TESTYAML};
--f $test_script or usage("$test_script file does not exist, or inaccessible, or not a regular file");
+-f $test_script or usage("$test_script file does not exist, or inaccessible, or not a regular file",__LINE__);
 
 my $rseed = "none";
 exists($ghasopt{$SEED}) and do {
@@ -2502,8 +2547,8 @@ my $phv = doeval("LoadFile('$test_script')") or die "bad yaml in file $test_scri
 $phv = dclone(\%ghtest);
 %ghreal = %$phv;
 $ENV{_imatest_tmpdir} = doeval($ghreal{'tmpdir'});
-$ENV{_imatest_client_filebase} = "master_thread";      # will change in load threads
-$ENV{$IMATEST_MSH_LOG} = doeval($ghreal{$CLIENT_THREAD_MSHLOG});
+$ENV{_imatest_load_filebase} = "master_thread";      # will change in load threads
+$ENV{$IMATEST_MSH_LOG} = doeval($ghreal{$LOAD_THREAD_MSHLOG});
 
 dosayif($VERBOSE_DEV, "%s start: %s\n%s end", $TESTYAML, Dumper(\%ghtest), $TESTYAML);
 
@@ -2527,11 +2572,18 @@ if ($ghreal{'server_terminate'} eq $YES) {
     $trc = start_server_termination_thread();
     croak("failed to start server termination thread") if ($trc != $RC_OK);
 }
-my $tlod = $ghreal{'client_threads'};
-dosayif($VERBOSE_ANY,"starting %s test load threads",$tlod);
-foreach my $tnum (1..$tlod) {
-    $trc = start_load_thread($tnum,int(rand()*100+1));
-    croak("failed to start test load thread") if ($trc != $RC_OK);
+my $tlod = $ghreal{'load_threads'};
+dosayif($VERBOSE_ANY,"starting test load threads: %s",$tlod);
+my @lolod = split(/,/,$tlod);
+my $talnum = 0;
+foreach my $elem (@lolod) {
+    my @lok = split('X',$elem);
+    push(@lok,'') if (scalar(@lok) < 2);
+    foreach my $tnum (1..$lok[0]) {
+        ++$talnum;
+        $trc = start_load_thread($talnum,$lok[1],int(rand()*100+1));
+        croak("failed to start test load thread") if ($trc != $RC_OK);
+    }
 }
 
 # sleep while test is running
