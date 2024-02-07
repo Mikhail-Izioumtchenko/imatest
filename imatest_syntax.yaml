@@ -400,6 +400,14 @@ integer_reverse_sign_illegitimate_p:
 integer_unsigned_p:
   mandatory: True
   allowed: probability
+load_alter_length:
+  mandatory: True
+  allowed: Rseq
+  allowed: only_positive_integers
+load_alter_kind:
+  mandatory: True
+  allowed: Rseq
+  only_values_allowed: ADD_COL,DROP_COL,ADD_KEY,DROP_KEY
 load_execute_sql:
   mandatory: True
   allowed: [Yes, No]

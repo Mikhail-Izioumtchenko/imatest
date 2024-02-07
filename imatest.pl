@@ -24,7 +24,6 @@ require 5.032;
 # 16. max source code line length is 143
 
 # todo
-# line numbers in usage calls
 # REPLACE
 # ANALYZE + histogram
 # CHECKSUM
@@ -52,7 +51,7 @@ use DateTime;
 use Getopt::Long qw(GetOptions);
 use IO::Handle;
 use IPC::Open2 qw(open2);
-use JSON qw(encode_json);
+use JSON qw(encode_json decode_json);
 use List::Util qw(shuffle);
 use POSIX ":sys_wait_h";
 use Scalar::Util qw(looks_like_number);
@@ -63,7 +62,7 @@ use YAML qw(LoadFile);
 STDOUT->autoflush();
 STDERR->autoflush();
 
-my $version = '2.32';
+my $version = '2.38';
 
 $Data::Dumper::Sortkeys = 1;
 
@@ -197,12 +196,14 @@ my %ghst2ncolspk = ();      # schema.table => number of pk cols
 my %ghst2needvcols = ();      # schema.table => number of virtual cols needed
 my %ghst2hasvcols = ();      # schema.table => number of virtual cols needed
 my %ghst2ncolsnp = ();      # schema.table => number of non pk cols
-my %ghst2cols = ();      # schema.table => ref array column names
+my %ghst2cols = ();      # schema.table => ref array column names # USED by ALTER
+my %ghst2createtable = ();      # schema.table => CREATE TABLE without CREATE TABEL name itself, USED by ALTER
 my %ghst2nvcols = ();      # schema.table => ref array column names for non virtual columns
 my %ghst2mayautoinc = ();      # schema.table => may have autoinc column
 my %ghst2hasautoinc = ();      # schema.table => does have autoinc column
 my %ghst2pkautoinc = ();      # schema.table => does have autoinc column and it is PK
 my @ghstlist = (
+\%ghst2createtable,
 \%ghst2ncolspk,
 \%ghst2needvcols,
 \%ghst2hasvcols,
@@ -758,7 +759,7 @@ sub buildmisc {
     $ENV{'_imatest_port_rel'} = $ghreal{'ports'};
     $ENV{'_imatest_port_abs'} = $ghreal{'port'};
     $ghmisc{$MYSQLSH_BASE} = sprintf(
- "%s --port=%s --user=%s --password=%s --sqlx --show-warnings=true --result-format=json --quiet-start=2 --log-sql=all --verbose=1",
+"%s --port=%s --user=%s --password=%s --sqlx --show-warnings=true --result-format=json --quiet-start=2 --log-sql=all --verbose=1",
                                $ghreal{'mysqlsh'},$port,$ghreal{'user'},$password);
     $ghmisc{$MYSQLSH_EXEC} = " $ghmisc{$MYSQLSH_BASE} --log-file=$ENV{$IMATEST_MSH_LOG} --execute";
     $ghmisc{$MYSQLSH_RUN_FILE} = " $ghmisc{$MYSQLSH_BASE} --log-file=$ENV{$IMATEST_MSH_LOG} --force --file";
@@ -1376,7 +1377,7 @@ sub db_create {
             my $badtables = 0;
             my %hblist = ();
             foreach my $tnam (keys(%ghst2cols)) {
-                my $com = "$ghmisc{$MYSQLSH_EXEC} 'SELECT 1 FROM $tnam LIMIT 1'";
+                my $com = "$ghmisc{$MYSQLSH_EXEC} 'SHOW CREATE TABLE $tnam'";
                 my ($ec, $pljson) = readexec($com);
                 if ($ec != $EC_OK) {
                     ++$badtables;
@@ -1395,6 +1396,12 @@ sub db_create {
                         $ghs2pltables{$snam} = \@lgood;
                     }
                 } else {
+                    my $str = join('',@$pljson);
+                    $str =~ s/\\n//gms;
+                    my $psome = decode_json($str);
+                    $str = $psome->{"Create Table"};
+                    $str =~ s/^[^(]*\(/(/;
+                    $ghst2createtable{$tnam} = $str;
                     ++$gntables;
                     push(@glstables,$tnam);
                 }
@@ -1965,7 +1972,7 @@ sub value_generate_multilinestring {
 # 2: if TRUE return raw data like (1 2, 3 4)
 sub value_generate_linestring {
     my $col = $ARG[0];
-    my $raw = defined($ARG[1]) and $ARG[1];
+    my $raw = defined($ARG[1])? $ARG[1] : $FALSE;
     my $value = '';
     my $len = process_rseq('value_linestring_len');
     for my $n (1..$len) {
@@ -2270,6 +2277,27 @@ sub mstime {
     return $rc;
 }
 
+# 1: schema.table
+# returns statement
+sub stmt_alter_generate {
+    my $tnam = $ARG[0];
+    my $stmt = '';
+    my $len = process_rseq('load_alter_length');
+    for my $clausen (1..$len) {
+        my $kind = process_rseq('load_alter_kind');
+        if ($kind eq 'DROP_COL') {
+            # select column to drop
+            my @lcols = @{$ghst2cols{$tnam}};
+            my $cnam = $lcols[int(rand()*scalar(@lcols))];
+            $stmt .= "DROP COLUMN $cnam, ";
+        }
+    }
+    $stmt =~ s/, *$//;
+    $stmt = "ALTER TABLE $tnam $stmt";
+    dosayif($VERBOSE_NEVER,"returning %s",$stmt);
+    return $stmt;
+}
+
 # 1: thread number, absolute
 # 2: thread kind
 sub server_load_thread {
@@ -2356,6 +2384,10 @@ sub server_load_thread {
         } elsif ($ksql eq 'COMMIT' or $ksql eq 'ROLLBACK') {
             $stmt = $ksql;
             $txnin = $FALSE;
+        } elsif ($ksql eq 'ALTER') {
+            # determine schema.table
+            my $tnam = $glstables[int(rand()*$gntables)];
+            $stmt = stmt_alter_generate($tnam);
         } else {
             croak("load_sql_class=$ksql is not supported yet");
         }
@@ -2422,7 +2454,6 @@ sub server_termination_thread {
             $kec <<= 8;
             dosayif($VERBOSE_ANY," execution of %s resulted in exit code %s for step %s",$howh,$kec,$stepnum);
         }
-        my $after = process_rseq($howhow eq $SIGSTOP? 'server_termination_duration_on_sigstop' : 'server_termination_duration');
         # wait after termination
         my $after = process_rseq($howhow eq $SIGSTOP? 'server_termination_duration_on_sigstop' : 'server_termination_duration');
         dosayif($VERBOSE_ANY," will sleep %s seconds after server termination for step %s",$after,$stepnum);
