@@ -24,6 +24,8 @@ require 5.032;
 # 16. max source code line length is 143
 
 # todo
+# reconnect or restart load threads
+# allow multiple destroyer threads
 # REPLACE
 # ANALYZE + histogram
 # CHECKSUM
@@ -48,12 +50,13 @@ require 5.032;
 use Carp qw(croak shortmess);
 use Data::Dumper qw(Dumper);
 use DateTime;
+use Fcntl qw(F_GETFL F_SETFL O_NONBLOCK);
 use Getopt::Long qw(GetOptions);
 use IO::Handle;
 use IPC::Open2 qw(open2);
 use JSON qw(encode_json decode_json);
 use List::Util qw(shuffle);
-use POSIX ":sys_wait_h";
+use POSIX qw(:sys_wait_h mkfifo);
 use Scalar::Util qw(looks_like_number);
 use Storable qw(dclone);
 use Time::HiRes qw(gettimeofday usleep);
@@ -62,7 +65,7 @@ use YAML qw(LoadFile);
 STDOUT->autoflush();
 STDERR->autoflush();
 
-my $version = '2.38';
+my $version = '2.42';
 
 $Data::Dumper::Sortkeys = 1;
 
@@ -111,6 +114,7 @@ my $INT_RANGE_MARKER = 'I';
 my $NEG_MARKER = 'M';
 
 my $AAFUN = 'function_0C';
+my $ALTER = 'ALTER';
 my $BEGIN = 'BEGIN';
 my $CHARACTER_SET = 'character_set';
 my $CHECK_SUBKEYS = '_2levelkeys';
@@ -122,6 +126,7 @@ my $DDFUN = 'function_0D';
 my $DECIMAL = 'DECIMAL';
 my $DEFAULT = 'default';
 my $DESTROY_DESTROY = 'destroy_destroy';
+my $EIGHT = 8;
 my $EMPTY = 'EMPTY';
 my $END = 'END';
 my $EXPRESSION_GROUP = 'expression_group';
@@ -168,6 +173,7 @@ my $UPDATE = 'UPDATE';
 my $UPDATELC = 'update';
 my $UPDATE_COLUMN_P = 'update_column_p';
 my $V3072 = 3072;
+my $V4326 = 4326;
 my $VALUE_POINT_X = 'value_point_x';
 my $VALUE_POINT_Y = 'value_point_y';
 my $VALUE_POLYGON_LEN = 'value_polygon_len';
@@ -181,27 +187,31 @@ my @LOPT = ("$DRYRUN!", "$HELP!", "$TESTYAML=s", "$SEE_ALSO=s", "$SEED=i", "$VER
 my %HDEFOPT = ("$DRYRUN" => 0, $HELP => 0, $VERBOSE => 0, $VERSION => 0);      # option defaults
 
 # globals of sorts
+my $gstrj;
 my $gdosayoff = 2;
 my %ghasopt = ();      # resulting options values hash
 my %ghver = ();      # syntax checker hash
 my %ghtest = ();      # test script hash
 my %ghreal = ();      # test script hash with Rseq and similar processed e.g. 1-7 becomes e.g. 4
+my %ghdt2class = ();      # datatype => class
 my $gntables = 0;         # number of tables successfully create or discovered in all schemas
-my @glstables = ();         # list of all schema.table
+# start schema related
+my @glstables = ();         # list of all schema.table USED generate DML
 my %ghcreate_schemas = ();      # schema name => create test schema SQL, may contain DROP
 my %ghs2ntables = ();      # schema name => number of tables
 my %ghs2pltables = ();      # schema name => ref array table names
+# end schema related
 # start schema.table hashes
-my %ghst2ncolspk = ();      # schema.table => number of pk cols
-my %ghst2needvcols = ();      # schema.table => number of virtual cols needed
-my %ghst2hasvcols = ();      # schema.table => number of virtual cols needed
-my %ghst2ncolsnp = ();      # schema.table => number of non pk cols
-my %ghst2cols = ();      # schema.table => ref array column names # USED by ALTER
+my %ghst2ncolspk = ();      # schema.table => number of pk cols NU
+my %ghst2needvcols = ();      # schema.table => number of virtual cols needed NU
+my %ghst2hasvcols = ();      # schema.table => number of virtual cols has NU
+my %ghst2ncolsnp = ();      # schema.table => number of non pk cols NU
+my %ghst2cols = ();      # schema.table => ref array column names # USED by ALTER and DML
 my %ghst2createtable = ();      # schema.table => CREATE TABLE without CREATE TABEL name itself, USED by ALTER
-my %ghst2nvcols = ();      # schema.table => ref array column names for non virtual columns
-my %ghst2mayautoinc = ();      # schema.table => may have autoinc column
-my %ghst2hasautoinc = ();      # schema.table => does have autoinc column
-my %ghst2pkautoinc = ();      # schema.table => does have autoinc column and it is PK
+my %ghst2nvcols = ();      # schema.table => ref array column names for non virtual columns USED DML
+my %ghst2mayautoinc = ();      # schema.table => may have autoinc column NU
+my %ghst2hasautoinc = ();      # schema.table => does have autoinc column NU
+my %ghst2pkautoinc = ();      # schema.table => does have autoinc column and it is PK NU
 my @ghstlist = (
 \%ghst2createtable,
 \%ghst2ncolspk,
@@ -216,19 +226,20 @@ my @ghstlist = (
                );
 # end schema.table hashes
 # start schema.table.column hashes
-my %ghstc2class = ();      # schema.table.column => column datatype class
-my %ghstc2dt = ();      # schema.table.column => column datatype, uniqueness etc
-my %ghstc2just = ();      # schema.table.column => column datatype, uniqueness etc
-my %ghstc2srid = ();      # schema.table.column => SRID or 0
-my %ghstc2cannull = ();      # schema.table.column => column nullability
-my %ghstc2canfull = ();      # schema.table.column => can be part of fulltext index
-my %ghstc2len = ();      # schema.table.column => column length if specified
-my %ghstc2virtual = ();      # schema.table.column => column is virtual
-my %ghstc2unsigned = ();      # schema.table.column => column is unsigned
-my %ghstc2isautoinc = ();      # schema.table.column => is autoinc
-my %ghstcol2def = ();      # schema.table.column => column definition
-my %ghstc2candefault = ();      # schema.table => can have DEFAULT
+my %ghstc2class = ();      # schema.table.column => column datatype class USED todo
+my %ghstc2dt = ();      # schema.table.column => column datatype, uniqueness etc NU
+my %ghstc2just = ();      # schema.table.column => column datatype, just it USED
+my %ghstc2srid = ();      # schema.table.column => SRID or 0 USED
+my %ghstc2cannull = ();      # schema.table.column => column nullability USED
+my %ghstc2canfull = ();      # schema.table.column => can be part of fulltext index USED todo
+my %ghstc2len = ();      # schema.table.column => column length if specified USED
+my %ghstc2virtual = ();      # schema.table.column => column is virtual USED
+my %ghstc2unsigned = ();      # schema.table.column => column is unsigned USED
+my %ghstc2isautoinc = ();      # schema.table.column => is autoinc USED
+my %ghstc2candefault = ();      # schema.table => can have DEFAULT NU
+my %ghstc2hasdefault = ();      # schema.table => has DEFAULT USED
 my @ghstcolist = (
+\%ghstc2hasdefault,
 \%ghstc2class,
 \%ghstc2dt,
 \%ghstc2just,
@@ -240,7 +251,6 @@ my @ghstcolist = (
 \%ghstc2unsigned,
 \%ghstc2isautoinc,
 \%ghstc2candefault,
-\%ghstcol2def
                  );
 # end schema.table.column hashes
 my %ghmisc = ();         # e.g. mysqlsh_exec => invocation line prefix
@@ -276,7 +286,6 @@ my %gh2json = (
 'm' => \%ghst2hasautoinc ,
 'n' => \%ghst2pkautoinc ,
 '1' => \%ghstc2isautoinc ,
-'2' => \%ghstcol2def ,
 '3' => \%ghs2pltables ,
 '4' => \%ghmisc ,
 '5' => \%ghopsql ,
@@ -314,12 +323,15 @@ EOF
 
 # 1: file to unlink
 sub safe_unlink {
-    my $tounlink = $ARG[0];
-    if (-f $tounlink) {
-        unlink($tounlink);
-        dosayif($VERBOSE_ANY,"removed file $tounlink");
-    } else {
-        dosayif($VERBOSE_ANY,"cannot remove, not a regular file: $tounlink");
+    my @l2unlink = @ARG;
+    return if ($ghasopt{$DRYRUN});
+    foreach my $tounlink (@l2unlink) {
+        if (-f $tounlink or -p $tounlink) {
+            unlink($tounlink);
+            dosayif($VERBOSE_ANY,"removed file $tounlink");
+        } else {
+            dosayif($VERBOSE_ANY,"cannot remove, not a regular file nor pipe or file does not exist: $tounlink");
+        }
     }
 }
 
@@ -353,12 +365,14 @@ sub readfile {
 
 # 1: string to eval
 # 2: eval as list if TRUE
+# 3: silent
 # returns: eval result. Will not make sense on eval error.
 # on eval error prints helpful message and returns undef
 sub doeval {
     local $EVAL_ERROR;
     my $toeval = $ARG[0];
     my $aslist = defined($ARG[1])? $ARG[1] : $FALSE;
+    my $howver = defined($ARG[2]) and $ARG[2]? $VERBOSE_NEVER : $VERBOSE_ANY;
     dosayif($VERBOSE_MORE, "is called with %s",  $toeval);
     my $rc = undef;
     if ($aslist) {
@@ -368,10 +382,9 @@ sub doeval {
         $rc = eval($toeval);
     }
     if ($EVAL_ERROR ne '') {
-      dosayif($VERBOSE_ANY, " returning undef: error evaluating '%s' : %s",  $toeval, $EVAL_ERROR);
+      dosayif($howver, " returning undef: error evaluating '%s' : %s",  $toeval, $EVAL_ERROR);
       return undef;
     }
-    dosayif($VERBOSE_MORE,"of %s returning %s",  $toeval, $rc);
     dosayif($VERBOSE_DEV,"of %s returning %s",  $toeval, Dumper($rc));
     return $rc;
 }
@@ -388,7 +401,7 @@ sub readexec {
         push(@lres,$lin);
     }
     waitpid($pid,0);
-    my $ec = $CHILD_ERROR >> 8;
+    my $ec = $CHILD_ERROR >> $EIGHT;
     my $rc = $ec == $EC_OK? $RC_OK : $RC_ERROR;
     dosayif($VERBOSE_SOME," execution of %s exit code %s returning %s",$com,$ec,$rc);
     return ($ec, \@lres);
@@ -757,13 +770,22 @@ sub buildmisc {
     chop($password);
     my $port = $ghreal{'ports'} + $ghreal{'xportoffset'};
     $ENV{'_imatest_port_rel'} = $ghreal{'ports'};
-    $ENV{'_imatest_port_abs'} = $ghreal{'port'};
+    # absolute old (not x) port number
+    $ENV{'_imatest_port_abs'} = $ghreal{'ports'} + $ghreal{'mportoffset'};
     $ghmisc{$MYSQLSH_BASE} = sprintf(
-"%s --port=%s --user=%s --password=%s --sqlx --show-warnings=true --result-format=json --quiet-start=2 --log-sql=all --verbose=1",
+"%s --port=%s --user=%s --password=%s --sqlx --show-warnings=true --result-format=json --quiet-start=2 --log-sql=all",
                                $ghreal{'mysqlsh'},$port,$ghreal{'user'},$password);
     $ghmisc{$MYSQLSH_EXEC} = " $ghmisc{$MYSQLSH_BASE} --log-file=$ENV{$IMATEST_MSH_LOG} --execute";
     $ghmisc{$MYSQLSH_RUN_FILE} = " $ghmisc{$MYSQLSH_BASE} --log-file=$ENV{$IMATEST_MSH_LOG} --force --file";
     $ENV{'_imatest_mysql_static_cnf'} = join(' ',split("\n",$ghreal{'mysql_static_cnf'}));
+    my @lcla = split(/,/,$ghreal{'datatype_class2dt'});
+    foreach my $clas (@lcla) {
+        my @l2 = split(/:/,$clas);
+        my @ldt = split(/-/,$l2[1]);
+        foreach my $dat (@ldt) {
+            $ghdt2class{$dat} = $l2[0];
+        }
+    }
     return $RC_OK;
 }
 
@@ -877,6 +899,11 @@ sub build_expr_function {
     my ($kind,$colnam) = @ARG;
     my $cl = $ghstc2class{$colnam};
     my $dt = $ghstc2just{$colnam};
+    croak("datatype not defined for $colnam") if (not defined($dt));
+    if (not defined ($cl)) {
+        $cl = $ghdt2class{$dt};
+        croak("dt class is not defined for $colnam of $dt") if (not defined($cl));
+    }
     dosayif($VERBOSE_NEVER," called for '%s' with kind=%s",$colnam,$kind);
     # 1 arg function, we need function_.1SUF
     my $suf = 'X';
@@ -952,7 +979,7 @@ sub build_expr_level {
 }
 
 # 1: table name
-# 2: kind: virtual default where update
+# 2: kind: virtual default where update etc
 # 3: schema.table.name of the column we are building
 sub build_expression {
     my ($tnam, $kind, $colnam) = @ARG;
@@ -995,6 +1022,10 @@ sub build_expression {
         }
         $expr =~ s/E2/$add/g;      # todo figure out
     }
+    # consider parentesis for DEFAULT
+    if ($kind eq $DEFAULT) {
+        $expr = "($expr)" if ($dep > 1 or $hom > 1 or rand() < $ghreal{'default_in_parenthesis_p'});
+    }
     dosayif($VERBOSE_NEVER, "%s: returning %s", $expr);
     return $expr;
 }
@@ -1004,6 +1035,7 @@ sub db_create {
     my $rc = $RC_OK;
     # CREATE TABLE SQL for all tables
     my @lsql = ();
+    my %hstcol2def = ();      # obscure pk related see code
 
     my $nschemas = $ghreal{'schemas'};
     dosayif($VERBOSE_ANY," will create %s schemas", $nschemas);
@@ -1073,14 +1105,14 @@ sub db_create {
                 my $colsn = sprintf($frm,$ncol);
                 my $colnam = "$tnam.$colsn";
                 push(@lcols,$colsn);
-                $ghstcol2def{$colnam} = "$TRUE";      # mark PK
+                $hstcol2def{$colnam} = $TRUE;      # mark PK
             }
             foreach my $ncol (1..$ghst2ncolsnp{$tnam}) {
                 $frm = process_rseq("column_non_pk_name_format");
                 my $colsn = sprintf($frm,$ncol);
                 my $colnam = "$tnam.$colsn";
                 push(@lcols,$colsn);
-                $ghstcol2def{$colnam} = "$FALSE";
+                $hstcol2def{$colnam} = $FALSE;
             }
             $ghst2needvcols{$tnam} = process_rseq('virtual_columns_per_table');
             $ghst2needvcols{$tnam} = scalar(@lcols)-1 if ($ghst2needvcols{$tnam} >= scalar(@lcols));
@@ -1109,16 +1141,17 @@ sub db_create {
                 $ghstc2unsigned{$colnam} = $FALSE;
                 $ghstc2len{$colnam} = -1;
                 $ghstc2candefault{$colnam} = $TRUE;
+                $ghstc2hasdefault{$colnam} = $FALSE;
                 my $tclass = process_rseq('datatype_class');
-                my $canpk = $ghstcol2def{$colnam};      # can be part of PK unchanged e.g. CHAR but not TEXT
+                my $canpk = $hstcol2def{$colnam};      # can be part of PK unchanged e.g. CHAR but not TEXT
                 my $keylen = undef;
                 my $canunique = $canpk eq "$TRUE"? $FALSE : $TRUE;      # UNIQUE can be added to coldef
                 # sink for PK
                 if ($tclass eq $SPATIAL or $tclass eq $JSON) {
-                    $tclass = $INTEGER if ($ghstcol2def{$colnam} eq "$TRUE");
+                    $tclass = $INTEGER if ($hstcol2def{$colnam});
                     $canunique = $FALSE;
                 }
-                if ($tclass eq $LOB and $ghstcol2def{$colnam} eq "$TRUE" and $ghst2ncolspk{$tnam} == 1) {
+                if ($tclass eq $LOB and $hstcol2def{$colnam} and $ghst2ncolspk{$tnam} == 1) {
                     $tclass = $INTEGER;
                 }
                 # now we have final datatype class
@@ -1268,8 +1301,6 @@ sub db_create {
                     --$needind;
                 }
                 my $vis = process_rseq('column_visibility');
-                $ghstcol2def{$colnam} .= " $vis" if ($vis ne $EMPTY);
-                $ghstcol2def{$colnam} .= " $cnam $dt";
                 if ($canpk) {      # todo expr
                     $table_pk .= " , $cnam";
                     $table_pk .= "($keylen)" if (defined($keylen));
@@ -1285,8 +1316,9 @@ sub db_create {
                     $dt .= " $vis" if ($vis ne $EMPTY);
                 }
                 if ($ghstc2candefault{$colnam} and rand() < $ghreal{'column_default_p'}) {
-                    my ($expr, $plvalues) = build_expression($tnam,$DEFAULT,$colnam);
-                    $dt .= " DEFAULT ($expr)";
+                    my $expr = build_expression($tnam,$DEFAULT,$colnam);
+                    $dt .= " DEFAULT $expr";
+                    $ghstc2hasdefault{$colnam} = $TRUE;
                 }
                 my $coldef = "$cnam $dt";
                 $ghstc2dt{$colnam} = $dt;
@@ -1513,6 +1545,7 @@ sub table_columns_subset {
     my ($tnam, $parm, $kind) = @ARG;
     dosayif($VERBOSE_NEVER,"called for table %s and %s",$tnam, $parm);
     my @lcall = $kind eq 'SELECT'? shuffle(@{$ghst2cols{$tnam}}) : shuffle(@{$ghst2nvcols{$tnam}});
+    @lcall = shuffle(@{$ghst2cols{$tnam}}) if (scalar(@lcall) == 0);
     my @lc = grep {rand() < $ghreal{$parm}} @lcall;
     push(@lc,$lcall[0]) if (scalar(@lc) == 0);
     my $rc = $kind eq $UPDATE? \@lc : join(',',@lc);
@@ -1876,7 +1909,7 @@ sub value_generate_multipolygon {
         $value .= ','.value_generate_polygon($col,$TRUE);
     }
     $value =~ s/^,//;
-    my $srid = defined($ghstc2srid{$col})? $ghstc2srid{$col} : 4326; #todo const
+    my $srid = defined($ghstc2srid{$col})? $ghstc2srid{$col} : $V4326;
     $value = sprintf("ST_MPolyFromText('MULTIPOLYGON(%s)',%s)",$value,$srid);
     dosayif($VERBOSE_NEVER,"for %s returning: %s",$col,$value);
     return $value;
@@ -1892,7 +1925,7 @@ sub value_generate_multipoint {
         $value .= sprintf(", %s %s",process_rseq($VALUE_POINT_X),process_rseq($VALUE_POINT_Y));
     }
     $value =~ s/^,//;
-    my $srid = defined($ghstc2srid{$col})? $ghstc2srid{$col} : 4326; #todo const
+    my $srid = defined($ghstc2srid{$col})? $ghstc2srid{$col} : $V4326;
     $value = sprintf("ST_MPointFromText('MULTIPOINT(%s)',%s)",$value,$srid);
     dosayif($VERBOSE_NEVER,"for %s returning: %s",$col,$value);
     return $value;
@@ -1946,7 +1979,7 @@ sub value_generate_polygon {
         $subp =~ s/^,//;
         $value .= ", ($subp)";
     }
-    my $srid = defined($ghstc2srid{$col})? $ghstc2srid{$col} : 4326; #todo const
+    my $srid = defined($ghstc2srid{$col})? $ghstc2srid{$col} : $V4326;
     $value = $raw? "($value)" : sprintf("ST_PolyFromText('POLYGON(%s)',%s)",$value,$srid);
     dosayif($VERBOSE_NEVER,"for %s %s returning: %s",$col,$value);
     return $value;
@@ -1962,7 +1995,7 @@ sub value_generate_multilinestring {
         $value .= ','.value_generate_linestring($col,$TRUE);
     }
     $value =~ s/^,//;
-    my $srid = defined($ghstc2srid{$col})? $ghstc2srid{$col} : 4326; #todo const
+    my $srid = defined($ghstc2srid{$col})? $ghstc2srid{$col} : $V4326;
     $value = sprintf("ST_MLineFromText('MULTILINESTRING(%s)',%s)",$value,$srid);
     dosayif($VERBOSE_NEVER,"for %s returning: %s",$col,$value);
     return $value;
@@ -1979,7 +2012,7 @@ sub value_generate_linestring {
         $value .= sprintf(", %s %s",process_rseq($VALUE_POINT_X),process_rseq($VALUE_POINT_Y));
     }
     $value =~ s/^,//;
-    my $srid = defined($ghstc2srid{$col})? $ghstc2srid{$col} : 4326; #todo const
+    my $srid = defined($ghstc2srid{$col})? $ghstc2srid{$col} : $V4326;
     $value = $raw? "($value)" : sprintf("ST_LineFromText('LINESTRING(%s)',%s)",$value,$srid);
     dosayif($VERBOSE_NEVER,"for %s %s returning: %s",$col,$value);
     return $value;
@@ -1991,7 +2024,7 @@ sub value_generate_point {
     my $col = $ARG[0];
     my $raw = (defined($ARG[1]) and $ARG[1]);
     my $value = sprintf("%s %s",process_rseq($VALUE_POINT_X),process_rseq($VALUE_POINT_Y));
-    my $srid = defined($ghstc2srid{$col})? $ghstc2srid{$col} : 4326; #todo const
+    my $srid = defined($ghstc2srid{$col})? $ghstc2srid{$col} : $V4326;
     $value = $raw? "($value)" : sprintf("ST_PointFromText('POINT (%s)',%s)",$value,$srid);
     dosayif($VERBOSE_NEVER,"for %s %s returning: %s",$col,$value);
     return $value;
@@ -2010,7 +2043,7 @@ sub value_generate_geometrycollection {
         $value .= ", $kind$subval";
     }
     $value =~ s/^,//;
-    my $srid = defined($ghstc2srid{$col})? $ghstc2srid{$col} : 4326; #todo const
+    my $srid = defined($ghstc2srid{$col})? $ghstc2srid{$col} : $V4326;
     $value = sprintf("ST_GeomCollFromText('GEOMETRYCOLLECTION(%s)',%s)",$value,$srid);
     dosayif($VERBOSE_NEVER,"for %s returning: %s",$col,$value);
     return $value;
@@ -2190,42 +2223,42 @@ sub value_generate {
 # 1: schema.table
 # 2: column list
 # returns "V1, V2, ... " string and ref array of the same
-sub build_values {
+# used only for INSERT
+sub build_insert_values {
     my ($tnam, $plcols) = @ARG;
     my $values = '';
-    my @lval = ();
-    # for each column in specified table
     foreach my $col (@$plcols) {
         my $colnam = "$tnam.$col";
+        # consider DEFAULT
+        if ($ghstc2hasdefault{$colnam} and rand() < $ghreal{'default_insert_p'}) {
+            $values .= ", DEFAULT";
+            next;
+        }
         # consider NULL
         if ($ghstc2isautoinc{$colnam} == $TRUE) {
             if (rand() >= $ghreal{'autoinc_explicit_value_p'}) {
                 $values .= ', NULL';
-                push(@lval,'NULL');
                 next;
             }
         }
         if ($ghstc2cannull{$colnam} == $TRUE) {
             if (rand() < $ghreal{'null_legitimate_p'}) {
                 $values .= ', NULL';
-                push(@lval,'NULL');
                 next;
             }
         } else {
             if (rand() < $ghreal{'null_illegitimate_p'}) {
                 $values .= ', NULL';
-                push(@lval,'NULL');
                 next;
             }
         }
         my $val = value_generate($colnam);
         $values .= ", $val";
-        push(@lval,$val);
     }
     $values =~ s/^, //;
 
     dosayif($VERBOSE_NEVER,"for %s values are: %s",$tnam,$values);
-    return $values,\@lval;
+    return $values;
 }
 
 # returns statement
@@ -2244,7 +2277,6 @@ sub stmt_update_generate {
     # determine schema.table
     my $tnam = $glstables[int(rand()*$gntables)];
     my $plcols = table_columns_subset($tnam,$UPDATE_COLUMN_P,$UPDATE);
-    #my ($dummy, $plvalues) = build_values($tnam,$plcols);
     my $n = 0;
     foreach my $col (@$plcols) {
         my $expr = build_expression($tnam,$UPDATELC,"$tnam.$col");
@@ -2262,9 +2294,10 @@ sub stmt_insert_generate {
     my $stmt = 'INSERT INTO ';
     # determine schema.table
     my $tnam = $glstables[int(rand()*$gntables)];
+    # https://bugs.mysql.com/?id=113951&edit=2
     my @lcols = shuffle(@{$ghst2nvcols{$tnam}});
     $stmt .= " $tnam (".join(',',@lcols).')';
-    my ($values,$pldummy) = build_values($tnam,\@lcols);
+    my $values = build_insert_values($tnam,\@lcols);
     $stmt .= " VALUES ($values)";
     dosayif($VERBOSE_NEVER,"returning %s",$stmt);
     return $stmt;
@@ -2298,6 +2331,61 @@ sub stmt_alter_generate {
     return $stmt;
 }
 
+# 1: schema.table
+# returns CREATE TABLE without the CREATE TABLE schema.table prefix
+sub tnam2ct {
+    my $tnam = $ARG[0];
+    my $com = "$ghmisc{$MYSQLSH_EXEC} 'SHOW CREATE TABLE $tnam'";
+    my ($ec, $pljson) = readexec($com);
+    $gstrj = join('',@$pljson);
+    $gstrj =~ s/\\n//gms;
+    my $psome = doeval('decode_json($gstrj)',$FALSE,$TRUE);      # silent
+    return undef if (not defined($psome));
+    my $str = $psome->{"Create Table"};
+    $str =~ s/^[^(]*\(/(/;
+    return $str;
+}
+
+# 1: schema.table
+# 2: CREATE TABLE without prefix
+sub internalise {
+    my ($tnam,$ctnew) = @ARG;
+    $ghst2createtable{$tnam} = $ctnew;
+    $ctnew =~ s/\(/,/;
+    my @lcoldefs = split(/, +`/,$ctnew);
+    shift(@lcoldefs);
+    my @lcols = ();
+    my @lnvcols = ();
+    foreach my $coline (@lcoldefs) {
+        my @l2 = split(/` +/,$coline);
+        push(@lcols,$l2[0]);
+        my $cnam = "$tnam.$l2[0]";
+        my $tail = $l2[1];
+        $ghstc2cannull{$cnam} = ($tail =~ / +NOT +NULL/)? $FALSE : $TRUE;
+        $ghstc2unsigned{$cnam} = ($tail =~ / +unsigned/i)? $TRUE : $FALSE;
+        $ghstc2isautoinc{$cnam} = ($tail =~ / +AUTO_INCREMENT/? $TRUE : $FALSE);
+        if ($tail =~ / GENERATED ALWAYS AS /) {
+            push(@lnvcols,$l2[0]);
+            $ghstc2virtual{$cnam} = $TRUE;
+        } else {
+            $ghstc2virtual{$cnam} = $FALSE;
+        }
+        $ghstc2dt{$cnam} = $tail;    # wrong for last column but will do for now todo
+        $tail =~ / SRID +([0-9]+) +/;
+        $ghstc2srid{$cnam} = defined($1)? $1 : 0;
+        $tail =~ /\(([0-9]+)\)/;
+        $ghstc2len{$cnam} = defined($1)? $1 : 0;
+        $tail =~ s/[ (].*//;
+        $tail = uc($tail);
+        $ghstc2just{$cnam} = $tail;
+        $ghstc2class{$cnam} = $ghdt2class{$tail};
+        $ghstc2canfull{$cnam} = (",$ghreal{'datatype_canfull'}," =~ /,$tail,/)? $TRUE : $FALSE;
+    }
+    $ghst2cols{$tnam} = \@lcols;
+    $ghst2nvcols{$tnam} = \@lnvcols;
+    return;
+}
+
 # 1: thread number, absolute
 # 2: thread kind
 sub server_load_thread {
@@ -2328,14 +2416,19 @@ sub server_load_thread {
     my $outto = doeval($ghreal{'load_thread_out'});
     my $errto = doeval($ghreal{'load_thread_err'});
     my $sqlto = doeval($ghreal{'load_thread_sql'});
+    my $logto = doeval($ghreal{'load_thread_mshlog'});
     $ENV{$IMATEST_MSH_LOG} = doeval($ghreal{$LOAD_THREAD_MSHLOG});
     safe_unlink($ENV{$IMATEST_MSH_LOG}) if ($ghreal{$MSHLOG_REMOVE_BEFORE} eq $YES);
     my $dosql = ($ghreal{'load_execute_sql'} eq $YES);
-    dosayif($VERBOSE_ANY, " see also %s and %s and %s and %s",$ENV{$IMATEST_MSH_LOG},$outto,$errto,$sqlto);
-    open(my $msql, ">$sqlto") or croak("failed to open $sqlto: $ERRNO");
-    my $shel = "$ghmisc{$MYSQLSH_BASE} --log-file=$ENV{$IMATEST_MSH_LOG} --log-sql=all --verbose=1 --force >$outto 2>$errto";
-    my $wspid = open2(my $msout, my $msh, $shel);
+    dosayif($VERBOSE_ANY, "see also %s and %s and %s and %s",$ENV{$IMATEST_MSH_LOG},$outto,$errto,$sqlto);
+    open(my $msql, ">$sqlto") or croak("failed to open >$sqlto: $ERRNO");
+    my $shel = "$ghmisc{$MYSQLSH_BASE} --log-file=$ENV{$IMATEST_MSH_LOG} --log-sql=all --force >>$outto 2>>$errto";
+    my $msh = undef;
+    my $wspid = open2(my $msout, $msh, $shel) or croak("Failed (errno: $ERRNO) to start $shel");
+    dosayif($VERBOSE_ANY, "started as pid %s: %s",$wspid,$shel);
     $msh->autoflush();
+    $msql->autoflush();
+    my $f2read = undef;
     my $snum = 0;
     while ($TRUE) {
         my $thistime = time();
@@ -2361,6 +2454,7 @@ sub server_load_thread {
         $ksql = process_rseq('load_sql_class') if ($ksql eq '');
 
         my $canexp = $FALSE;
+        my $tnam = '';
         if ($ksql eq 'SELECT') {
             $stmt = stmt_select_generate();
             $canexp = $TRUE;
@@ -2374,7 +2468,7 @@ sub server_load_thread {
             $stmt = stmt_delete_generate();
             $canexp = $TRUE;
         } elsif ($ksql eq 'CHECK') {
-            my $tnam = $glstables[int(rand()*$gntables)];
+            $tnam = $glstables[int(rand()*$gntables)];
             $stmt = "$ksql TABLE $tnam";
         } elsif ($ksql eq $BEGIN) {
             $stmt = 'BEGIN WORK';
@@ -2384,9 +2478,9 @@ sub server_load_thread {
         } elsif ($ksql eq 'COMMIT' or $ksql eq 'ROLLBACK') {
             $stmt = $ksql;
             $txnin = $FALSE;
-        } elsif ($ksql eq 'ALTER') {
+        } elsif ($ksql eq $ALTER) {
             # determine schema.table
-            my $tnam = $glstables[int(rand()*$gntables)];
+            $tnam = $glstables[int(rand()*$gntables)];
             $stmt = stmt_alter_generate($tnam);
         } else {
             croak("load_sql_class=$ksql is not supported yet");
@@ -2397,11 +2491,33 @@ sub server_load_thread {
             $stmt = "$exp $stmt" if ($exp ne $EMPTY);
         }
 
-        # now execute statement
+        # now send statement for execution
+        if (waitpid($wspid, WNOHANG) == $wspid) {
+            dosayif($VERBOSE_ANY,"process $wspid has terminated, restarting");
+        croak("#debug");
+            close($msh);
+            $wspid = open2(my $msout, $msh, $shel) or croak("Failed (errno: $ERRNO) to start $shel");
+            dosayif($VERBOSE_ANY, "restarted as pid %s: %s",$wspid,$shel);
+            $msh->autoflush();
+        }
         dosayif($VERBOSE_NEVER, "sending to execute: %s",$stmt);
-        printf($msql "%s;\n", $stmt);
+        dosayif($VERBOSE_ANY, "sending to execute stmt #%s",$snum) if ($snum % $ghreal{'report_every_stmt'} == 0);
         printf($msh "%s;\n", $stmt) if ($dosql);
         dosayif($VERBOSE_ANY, "sent to execute stmt #%s",$snum) if ($snum % $ghreal{'report_every_stmt'} == 0);
+        printf($msql "%s;\n", $stmt);
+
+        # now reflect the results in internal structures
+        if ($ksql eq $ALTER) {
+            # if ALTER succeed we do not necessarily get the current state. We will get it after the sever restart if specified
+            # in test parameters
+            my $ctnew = tnam2ct($tnam);
+            if (not defined ($ctnew) or $ctnew eq $ghst2createtable{$tnam}) {
+                dosayif($VERBOSE_MORE, "ALTER may have failed: %s", $stmt);
+            } else {
+                dosayif($VERBOSE_MORE, "ALTER may have succeeded: %s", $stmt);
+                internalise($tnam,$ctnew);
+            }
+        }
 
         # now sleep after txn
         my $ms = process_rseq('txn_sleep_after_ms',$TRUE);
@@ -2439,10 +2555,11 @@ sub server_termination_thread {
         my $howterm = process_rseq('server_termination_how');
         my $howhow = $howterm eq $SHUTKILL? $ghreal{'server_terminate_shutdown'} : $ghreal{"server_terminate_$howterm"};
         $howhow .= " wait $waittimeout" if ($dowait eq $YES and $howterm ne $SIGSTOP and $howterm ne $SHUTKILL);
-        dosayif($VERBOSE_ANY," terminating server with %s using %s for step %s",$howterm,$howhow,$stepnum);
+        my $howout = doeval("\"$howhow\"");
+        dosayif($VERBOSE_ANY," terminating server with %s using %s for step %s",$howterm,$howout,$stepnum);
         my $subec = doeval("system(\"$howhow\")");
-        $subec <<= 8;
-        dosayif($VERBOSE_ANY," execution of %s resulted in exit code %s for step %s",$howhow,$subec,$stepnum);
+        $subec >>= $EIGHT;
+        dosayif($VERBOSE_ANY," execution of %s resulted in exit code %s for step %s",$howout,$subec,$stepnum);
         # wait for shutkill
         if ($howterm eq $SHUTKILL) {
             my $slep = process_rseq('server_terminate_shutkill_before');
@@ -2451,7 +2568,7 @@ sub server_termination_thread {
             my $howh = $ghreal{'server_terminate_sigkill'};
             $howh .= $dowait eq $YES? " wait $waittimeout" : '';
             my $kec = doeval("system(\"$howh\")");
-            $kec <<= 8;
+            $kec >>= $EIGHT;
             dosayif($VERBOSE_ANY," execution of %s resulted in exit code %s for step %s",$howh,$kec,$stepnum);
         }
         # wait after termination
@@ -2529,7 +2646,7 @@ sub init_db {
     if (scalar(@lcnf) > 0) {
         my $com = sprintf("%s wait %s", $ghreal{"server_terminate_shutdown"}, $ghreal{$SERVER_TERMINATION_WAIT_TIMEOUT});
         my $ec = doeval("system(\"$com\")");
-        $ec <<= 8;
+        $ec >>= $EIGHT;
         dosayif($VERBOSE_ANY,"exit code %s for %s",$ec,$com);
     }
 
@@ -2589,6 +2706,18 @@ dosayif($VERBOSE_DEV, "resulting test script is %s",Dumper(\%ghreal));
 
 # initial ops
 safe_unlink($ENV{$IMATEST_MSH_LOG}) if ($ghreal{$MSHLOG_REMOVE_BEFORE} eq $YES);
+if ($ghreal{'init_stop_server'} eq $YES) {
+    my $howto = "$ghreal{'server_terminate_shutdown'} wait $ghreal{$SERVER_TERMINATION_WAIT_TIMEOUT}";
+    dosayif($VERBOSE_ANY," terminating server using %s for test start",$howto);
+    my $subec = doeval("system(\"$howto\")");
+    $subec >>= $EIGHT;
+    dosayif($VERBOSE_ANY," execution of %s resulted in exit code %s",$howto,$subec);
+}   
+if ($ghreal{'init_remove'} eq $YES) {
+    my $toglob = doeval($ghreal{'init_remove_pattern'});
+    my @l2unlink = glob($toglob);
+    safe_unlink(@l2unlink);
+}
 
 my $recreated = process_recreate();
 
@@ -2612,7 +2741,7 @@ foreach my $elem (@lolod) {
     push(@lok,'') if (scalar(@lok) < 2);
     foreach my $tnum (1..$lok[0]) {
         ++$talnum;
-        $trc = start_load_thread($talnum,$lok[1],int(rand()*100+1));
+        $trc = start_load_thread($talnum,$lok[1],int(rand()*1000+1));
         croak("failed to start test load thread") if ($trc != $RC_OK);
     }
 }

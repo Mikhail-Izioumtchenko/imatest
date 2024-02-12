@@ -3,7 +3,7 @@
 ### 1: mandatory comma delimited list of relative ports or ranges
 ### 2...: optional mysqldOptions list 
 ### port base is IMAPORTBASE
-### x port base is IMAPORTBAXX
+### x port base is IMAPORTMXBASE
 portst="$1"
 shift
 more="$*"
@@ -13,7 +13,7 @@ me="`$BASENAME $0`"
 ima_say "$me : starting as $0 $@"
 
 base="$IMAPORTBASE"
-baseex="$IMAPORTBAXX"
+baseex="$IMAPORTMXBASE"
 portlist="`ima_tolist $portst`"
 
 rc='0'

@@ -69,49 +69,53 @@ columns_non_pk:
   mandatory: True
   only_non_negative_integers: True
 config:
+  mandatory: True
   allowed: [single, group, chain, InnoDBCluster, ClusterSet, ReplicationSet]
   supported: [single]
-  mandatory: True
 create_create:
   mandatory: True
 create_server:
+  mandatory: True
   allowed: [True, False]
   supported: [True, False]
   needs_on_true: [create_create]
-  mandatory: True
 create_db:
+  mandatory: True
   allowed: [True, False]
   supported: [True, False]
-  mandatory: True
 datatype_binary:
-  allowed: Rseq       
   mandatory: True
+  allowed: Rseq       
   only_values_allowed: BINARY,VARBINARY
 datatype_bit_len:
-  allowed: Rseq
   mandatory: True
+  allowed: Rseq
 datatype_binary_len:
   mandatory: True
   allowed: Rseq
+datatype_canfull:
+  mandatory: True
 datatype_char_len:
+  mandatory: True
   allowed: Rseq
   only_non_negative_integers: True
-  mandatory: True
 datatype_character:
-  allowed: Rseq       
   mandatory: True
+  allowed: Rseq       
   only_values_allowed: CHAR,VARCHAR
 datatype_class:
-  allowed: Rseq       
   mandatory: True
+  allowed: Rseq       
   only_values_allowed: INTEGER,DECIMAL,FLOATING,DATETIME,CHARACTER,BINARY,LOB,ENUMS,JSON,SPATIAL
-datatype_classes_numeric:
-  allowed: Rseq       
+datatype_class2dt:
   mandatory: True
+datatype_classes_numeric:
+  mandatory: True
+  allowed: Rseq       
   only_values_allowed: INTEGER,DECIMAL,FLOATING
 datatype_datetime:
-  allowed: Rseq       
   mandatory: True
+  allowed: Rseq       
   only_values_allowed: DATE,DATETIME,TIMESTAMP,TIME,YEAR
 datatype_decimal:
   allowed: Rseq       
@@ -207,6 +211,12 @@ default_expression_term:
   mandatory: True
   allowed: Rseq       
   only_values_allowed: CONSTANT,COLUMN,FUNCTION
+default_in_parenthesis_p:
+  mandatory: True
+  allowed: probability
+default_insert_p:
+  mandatory: True
+  allowed: probability
 delete_where_all_p:
   mandatory: True
   allowed: probability
@@ -382,8 +392,8 @@ indexes_per_table:
   allowed: Rseq       
   only_non_negative_integers: True
 index_prefix_len:
-  allowed: Rseq       
   mandatory: True
+  allowed: Rseq       
 index_unique_p:
   mandatory: True
   allowed: probability
@@ -391,9 +401,19 @@ index_visibility:
   mandatory: True
   allowed: Rseq       
   only_values_allowed: VISIBLE,INVISIBLE,EMPTY
-integer_reverse_sign_legitimate_p:
-  allowed: probability
+init_remove:
   mandatory: True
+  allowed: [Yes, No]
+  supported: [Yes, No]
+init_remove_pattern:
+  mandatory: True
+init_stop_server:
+  mandatory: True
+  allowed: [Yes, No]
+  supported: [Yes, No]
+integer_reverse_sign_legitimate_p:
+  mandatory: True
+  allowed: probability
 integer_reverse_sign_illegitimate_p:
   mandatory: True
   allowed: probability
@@ -437,6 +457,9 @@ load_thread_sql:
   mandatory: True
 load_threads:
   mandatory: True
+mportoffset:
+  mandatory: True
+  allowed: only_positive_integers
 mshlog_remove_before:
   allowed: [Yes, No]
   supported: [Yes, No]
