@@ -232,7 +232,7 @@ explain:
 expression_group:
   mandatory: True
   allowed: Rseq       
-  only_values_allowed: PARENTHESIS,FUNCTION
+  only_values_allowed: PARENTHESIS,FUNCTION,EMPTY
 expression_term:
   mandatory: True
   allowed: Rseq       
@@ -243,146 +243,124 @@ float_value_exp:
 fulltext_index_p:
   mandatory: True
   allowed: probability
-# can be converted to CHAR or similar
-function_0C:
-  mandatory: True
-  allowed: Rseq
-  only_values_allowed: PI,CONNECTION_ID,CURDATE,CURTIME,CURRENT_ROLE,CURRENT_USER,CURRENT_TIMESTAMP,DATABASE,NOW,SYSDATE,UNIX_TIMESTAMP,UTC_DATE,UTC_TIME,RAND
-# can be converted to TIMESTAMP or similar
-function_0D:
-  mandatory: True
-  allowed: Rseq
-  only_values_allowed: CURDATE,CURTIME,CURRENT_TIMESTAMP,NOW,SYSDATE,UNIX_TIMESTAMP,UTC_DATE,UTC_TIME
-# can be converted to INT and similar
-function_0N:
-  mandatory: True
-  allowed: Rseq
-  only_values_allowed: PI,RAND,CONNECTION_ID
-function_0_as_constant_p:
-  allowed: probability
-  mandatory: True
-function_0_virtual:
-  mandatory: True
-  allowed: Rseq
-  only_values_allowed: PI
-function_arg:
+function_insert_binary:
   mandatory: True
   allowed: Rseq       
-function_todo:
+  only_values_allowed: PI()
+function_insert_character:
   mandatory: True
   allowed: Rseq       
-function_C1C:
+  only_values_allowed: NOW()
+function_insert_datetime:
   mandatory: True
   allowed: Rseq       
-  only_values_allowed: ASCII,HEX,BIT_LENGTH,CHAR_LENGTH,COERCIBILITY,CHARSET,COLLATION,COMPRESS,CONCAT,CRC32,LCASE,LENGTH,UPPER,ORD,QUOTE,REVERSE,RTRIM,SOUNDEX,TO_BASE64,TRIM,LTRIM,UNHEX,WEIGHT_STRING
-function_C1N:
+  only_values_allowed: NOW()
+function_insert_decimal:
   mandatory: True
   allowed: Rseq       
-  only_values_allowed: ASCII,BIT_LENGTH,CHAR_LENGTH
-function_CC2C:
+  only_values_allowed: PI()
+function_insert_enums:
   mandatory: True
   allowed: Rseq       
-  only_values_allowed: CONCAT,CONCAT_WS,FIELD,FIND_IN_SET
-function_CC2N:
+  only_values_allowed: PI()
+function_insert_floating:
   mandatory: True
   allowed: Rseq       
-  only_values_allowed: FIELD,FIND_IN_SET
-function_D1C:
+  only_values_allowed: PI()
+function_insert_integer:
   mandatory: True
   allowed: Rseq       
-  only_values_allowed: DATE,DAY,DAYNAME,DAYOFMONTH,DAYOFWEEK,DAYOFYEAR,HOUR,LAST_DAY,MICROSECOND,MINUTE,MONTH,MONTHNAME,QUARTER,SECOND,TIME,TIMESTAMP,TIME_TO_SEC,TO_DAYS,TO_SECONDS,WEEK,WEEKDAY,WEEKOFYEAR,YEAR,YEARWEEK
-function_D1D:
+  only_values_allowed: PI()
+function_insert_json:
   mandatory: True
   allowed: Rseq       
-  only_values_allowed: DATE,LAST_DAY,TIMESTAMP
-function_D1N:
+  only_values_allowed: PI() #todo
+function_insert_lob:
   mandatory: True
   allowed: Rseq       
-  only_values_allowed: DAY,DAYOFMONTH,DAYOFWEEK,DAYOFYEAR,HOUR,MICROSECOND,MINUTE,MONTH,QUARTER,SECOND,TIME_TO_SEC,TO_DAYS,TO_SECONDS,WEEK,WEEKDAY,WEEKOFYEAR,YEAR,YEARWEEK
-function_DD2C:
+  only_values_allowed: CURRENT_USER,CURRENT_USER()
+function_update_binary:
   mandatory: True
   allowed: Rseq       
-  only_values_allowed: TIMEDIFF
-function_DD2T:
+  only_values_allowed: NOW()
+function_update_character:
   mandatory: True
   allowed: Rseq       
-  only_values_allowed: TIMEDIFF
-function_DN2C:
+  only_values_allowed: NOW(),CONCAT()
+function_update_character:
   mandatory: True
   allowed: Rseq       
-  only_values_allowed: ADDDATE,SUBDATE
-function_DN2D:
+  only_values_allowed: NOW()
+function_update_datetime:
   mandatory: True
   allowed: Rseq       
-  only_values_allowed: ADDDATE,SUBDATE
-function_DN2N:
+  only_values_allowed: NOW()
+function_update_decimal:
   mandatory: True
   allowed: Rseq       
-  only_values_allowed: DATEDIFF
-function_DT2C:
+  only_values_allowed: PI()
+function_update_enums:
   mandatory: True
   allowed: Rseq       
-  only_values_allowed: ADDTIME,SUBTIME
-function_DT2D:
+  only_values_allowed: PI()
+function_update_floating:
   mandatory: True
   allowed: Rseq       
-  only_values_allowed: ADDTIME,SUBTIME
-function_INFC9C:
+  only_values_allowed: PI()
+function_update_integer:
   mandatory: True
   allowed: Rseq       
-  only_values_allowed: CONCAT,CONCAT_WS,FIELD
-function_INFC9N:
+  only_values_allowed: PI()
+function_update_json:
   mandatory: True
   allowed: Rseq       
-  only_values_allowed: FIELD
-function_INFN9C:
+  only_values_allowed: PI() #todo
+function_update_lob:
   mandatory: True
   allowed: Rseq       
-  only_values_allowed: CHAR
-function_N1C:
+  only_values_allowed: CURRENT_USER,CURRENT_USER()
+function_virtual:
   mandatory: True
   allowed: Rseq       
-  only_values_allowed: EXP,ACOS,LN,SQRT,ATAN,TAN,ABS,ASIN,CEIL,COS,COT,DEGREES,FLOOR,RADIANS,SIGN,SIN,FROM_DAYS,FROM_UNIXTIME,SEC_TO_TIME,BIN,CHAR
-function_N1D:
+  only_values_allowed: PI()
+function_where_character:
   mandatory: True
   allowed: Rseq       
-  only_values_allowed: FROM_DAYS,FROM_UNIXTIME
-function_N1N:
+  only_values_allowed: PI()
+function_where_binary:
   mandatory: True
   allowed: Rseq       
-  only_values_allowed: EXP,ACOS,LN,SQRT,ATAN,TAN,ABS,ASIN,BIN,BIT_COUNT,CEIL,COS,COT,FROM_DAYS,FROM_UNIXTIME,SEC_TO_TIME,DEGREES,FLOOR,RADIANS,SIGN,SIN,OCT,ROUND
-function_N1T:
+  only_values_allowed: PI()
+function_where_datetime:
   mandatory: True
   allowed: Rseq       
-  only_values_allowed: SEC_TO_TIME
-function_NC2C:
+  only_values_allowed: NOW()
+function_where_decimal:
   mandatory: True
   allowed: Rseq       
-  only_values_allowed: ELT
-function_NN2C:
+  only_values_allowed: PI()
+function_where_enums:
   mandatory: True
   allowed: Rseq       
-  only_values_allowed: MOD,DIV,POWER,ROUND,TRUNCATE,FORMAT
-function_NN2D:
+  only_values_allowed: PI()
+function_where_floating:
   mandatory: True
   allowed: Rseq       
-  only_values_allowed: MAKEDATE
-function_NN2N:
+  only_values_allowed: PI()
+function_where_integer:
   mandatory: True
   allowed: Rseq       
-  only_values_allowed: MOD,DIV,POWER,ROUND,TRUNCATE
-function_NNN3C:
+  only_values_allowed: PI()
+function_where_lob:
   mandatory: True
   allowed: Rseq       
-  only_values_allowed: MAKETIME,CHAR
-function_NNN3T:
-  mandatory: True
-  allowed: Rseq       
-  only_values_allowed: MAKETIME
+  only_values_allowed: PI()
 geometry_kind:
   mandatory: True
   allowed: Rseq
   only_values_allowed: POINT,LINESTRING,POLYGON
+hosts:
+  mandatory: True
 index_direction:
   mandatory: True
   allowed: Rseq       
@@ -411,12 +389,14 @@ init_stop_server:
   mandatory: True
   allowed: [Yes, No]
   supported: [Yes, No]
-integer_reverse_sign_legitimate_p:
+insert_expression_depth:
   mandatory: True
-  allowed: probability
-integer_reverse_sign_illegitimate_p:
+  allowed: Rseq       
+  only_positive_integers: True
+insert_expression_length:
   mandatory: True
-  allowed: probability
+  allowed: Rseq       
+  only_positive_integers: True
 integer_unsigned_p:
   mandatory: True
   allowed: probability
@@ -447,10 +427,14 @@ load_sql_class:
   mandatory: True
   allowed: Rseq
   only_values_allowed: SELECT,UPDATE,INSERT,DELETE,INSEL,ALTER,CHECK
+load_thread_client_log:
+  mandatory: True
 load_thread_err:
   mandatory: True
-load_thread_mshlog:
+load_thread_execute_with:
   mandatory: True
+  allowed: [mysqlsh, mysql, custom]
+  supported: [mysqlsh, mysql]
 load_thread_out:
   mandatory: True
 load_thread_sql:
@@ -460,9 +444,6 @@ load_threads:
 mportoffset:
   mandatory: True
   allowed: only_positive_integers
-mshlog_remove_before:
-  allowed: [Yes, No]
-  supported: [Yes, No]
 multigeometry_kind:
   mandatory: True
   allowed: Rseq
@@ -471,6 +452,9 @@ mysql_initial_cnf:
   mandatory: True
 mysql_static_cnf:
   mandatory: True
+mysql:
+  mandatory: True
+  allowed: doeval
 mysqlsh:
   mandatory: True
   allowed: doeval
@@ -478,6 +462,12 @@ null_illegitimate_p:
   mandatory: True
   allowed: probability
 null_legitimate_p:
+  mandatory: True
+  allowed: probability
+number_reverse_sign_illegitimate_p:
+  mandatory: True
+  allowed: probability
+number_reverse_sign_legitimate_p:
   mandatory: True
   allowed: probability
 passfile:
@@ -491,9 +481,6 @@ pk_first_p:
   allowed: probability
 ports:
   mandatory: True
-prefer_right_type_p:
-  mandatory: True
-  allowed: probability
 operators:
   mandatory: True
   allowed: Rseq
@@ -683,7 +670,7 @@ txn_sleep_in_ms:
 txn_use:
   mandatory: True
   allowed: [Yes, No]
-  supported: [Yes, Yes]
+  supported: [Yes, No]
 update_column_p:
   mandatory: True
   allowed: probability
@@ -720,7 +707,15 @@ value_int:
   mandatory: True
   only_non_negative_integers: True
   allowed: Rseq
+value_json_kind:
+  mandatory: True
+  allowed: Rseq
+  only_values_allowed: SIMPLEML,FROMSCRIPT,REFARRAY,SCALAR,REFHASH
 value_json_len:
+  mandatory: True
+  allowed: Rseq
+  only_non_negative_integers: True
+value_json_small_len:
   mandatory: True
   allowed: Rseq
   only_non_negative_integers: True

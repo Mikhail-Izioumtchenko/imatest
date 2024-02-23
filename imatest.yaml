@@ -31,7 +31,8 @@ destroy_destroy: $ENV{IMADESTROYMANY} $ENV{_imatest_port_rel}
 
 # test threads are killed by the driving thread. 
 # mysqld is left as is. todo: shutdown optionally
-test_duration_seconds: 601
+# 201
+test_duration_seconds: 901
 
 # general configuration
 
@@ -39,6 +40,7 @@ test_duration_seconds: 601
 config: single
 # single port for now, ports are relative.
 ports: 2
+hosts: 127.0.0.1
 # offset port -> x protocol port, 2 -> 4202 -> 4302
 mportoffset: 4200
 xportoffset: 4300
@@ -47,6 +49,8 @@ xportoffset: 4300
 # environment is set im imatest.sh in fact in imatest.dot
 # mysqlsh executable
 mysqlsh: $ENV{MYSQLSH}
+mysql: $ENV{MYSQL}
+# 201
 # user that runs test SQL, all of it
 user: $ENV{IMAROOT}
 # user that runs test SQL, all of it
@@ -91,26 +95,30 @@ server_start_timeout: 60
 
 # test load: client threads, comma delimited list of NX[kind], format validity is checked late
 #load_threads: 1Xro,1
-load_threads: 4
+# 201
+load_threads: 1
+#load_threads: 2
 # evaluated immediately before using the file
-load_thread_out: $ENV{_imatest_tmpdir}.'/'.$ENV{_imatest_load_filebase}.'.out'
-load_thread_err: $ENV{_imatest_tmpdir}.'/'.$ENV{_imatest_load_filebase}.'.err'
+#load_thread_out: $ENV{_imatest_tmpdir}.'/'.$ENV{_imatest_load_filebase}.'.out'
+load_thread_err: $ENV{_imatest_tmpdir}.'/'.$ENV{_imatest_load_filebase}.'.out'
+load_thread_out: qw(/dev/null)
 #load_thread_err: qw(/dev/null)
-load_thread_sql: $ENV{_imatest_tmpdir}.'/'.$ENV{_imatest_load_filebase}.'.sql'
-load_thread_mshlog: $ENV{_imatest_tmpdir}.'/'.$ENV{_imatest_load_filebase}.'.log'
-#load_thread_mshlog: qw(/dev/null)
-mshlog_remove_before: Yes
+#load_thread_sql: $ENV{_imatest_tmpdir}.'/'.$ENV{_imatest_load_filebase}.'.sql'
+load_thread_sql: qw(/dev/null)
+load_thread_client_log: $ENV{_imatest_tmpdir}.'/'.$ENV{_imatest_load_filebase}.'.log'
+load_thread_execute_with: mysql
+# 201
 load_execute_sql: Yes
 
 # === load thread parameters ===
 # mostly for internal use e.g. self test. 0 means unlimited.
-#load_max_stmt: 301
-load_max_stmt: 0
-report_every_stmt: 301
-#report_every_stmt: 1
+#load_max_stmt: 201
+load_max_stmt: 500
+report_every_stmt: 100
 report_every_stmt_k_ro: 20
 
-txn_use: Yes
+#201
+txn_use: No
 # milliseconds, sleep after txn end
 txn_sleep_after_ms: 0-1:0.8,2-4:0.8,5-20:0.8,21-100
 txn_sleep_in_ms: 0:0.8,1-4:0.1,5-100
@@ -120,8 +128,8 @@ txn_begin_p: 0.8
 txn_end_p: 0.01
 txn_end_how: COMMIT:0.8,ROLLBACK
 # length is checked simultaneously
-txn_maxlength_ms: 100-200:0.01,1000-2000:0.5,3000-100000
-txn_maxlength_stmt: 1-2:0.1,1-10:0.5,1-100
+txn_maxlength_ms: 100-200:0.01,1000-2000:0.1,3000-100000
+txn_maxlength_stmt: 1-2:0.1,1-10:0.1,1-100
 
 # todo: different load config per thread
 # database structure
@@ -132,7 +140,9 @@ schema_drop_first: Yes
 # single %s replaced with schema number
 #schema_name_format: ts%s,test_%s_schema,test_schema_longer_name_%09d
 schema_name_format: gts%s
-tables_per_schema: 4!1-4:0.2,5-9:0.4,5-10
+# 201
+#tables_per_schema: 4!1-4:0.2,5-9:0.4,5-10
+tables_per_schema: 8!1-4:0.2,5-9:0.4,5-10
 # single %s replaced with table number
 table_name_format: tt%s!test_%s_table,test_table_longer_name_%09d
 
@@ -178,34 +188,37 @@ virtual_columns_per_table: 0:0.8,1:0.5,2-4:0.5,5-100:0.1,0
 virtual_expression_length: 1-3
 # (1 + 2) + 3 is 2
 virtual_expression_depth: 1-2
+insert_expression_depth: 1-2
+insert_expression_length: 1-2
 update_expression_depth: 1-2
 update_expression_length: 1:0.5,2:0.5,3-4
-default_expression_length: 1-3
-default_expression_depth: 1:0.9,2
+default_expression_length: 1
+default_expression_depth: 1
 default_in_parenthesis_p: 0.5
 default_insert_p: 0.5
 
-default_expression_term: CONSTANT:0.9,COLUMN:0.5,FUNCTION
+default_expression_term: CONSTANT:1.0,FUNCTION:0.9,COLUMN
 
 column_default_p: 0.2
 
-load_sql_class: ALTER:0.1,DELETE:0.1,UPDATE:0.2,INSERT:0.8,CHECK:0.1,SELECT!INSEL
+# 201
+load_sql_class: INSERT:0.5,DELETE:0.05,UPDATE:0.9,CHECK:0.05,SELECT:0.5,ALTER!INSEL
 load_alter_length: 1
-load_alter_kind: DROP_COL:1.0,ADD_COL
+load_alter_kind: DROP_COL!ADD_COL
 
 #here
 # for F1A function_1A below is used
 load_function_upper: F1A,F2AT
 load_function_class: F0,F1N,F1D,F2NN,F2DI,F2DN,F2DT,F3ANN,FFN,F1A,F2AT,FFA,F3NNN,F2DA,F1T,F2AA,F3AAN,F3AAA,F3ANA
-select_where_all_p: 0.5
-update_where_all_p: 0.2
-delete_where_all_p: 0.01
-where_all_by_no_where_p: 0.2
-select_count_star_p: 0.5
+select_where_all_p: 0.2
+update_where_all_p: 0.1
+delete_where_all_p: 0.001
+where_all_by_no_where_p: 0.1
+select_count_star_p: 0.1
 select_star_p: 0.5
-select_column_p: 0.2
-update_column_p: 0.5
-explain: EXPLAIN:0.1,EXPLAIN_ANALYZE:0.1,EMPTY
+select_column_p: 0.5
+update_column_p: 0.2
+explain: EXPLAIN:0.05,EXPLAIN_ANALYZE:0.1,EMPTY
 # E AND E
 # for WHERE
 where_logical_length: 2-4
@@ -225,84 +238,43 @@ operators_sql: qw(PLUS:+ MULT:* DIV:/ MINUS:- BITAND:& RSHIFT:>> LSHIFT:<< AND:&
 # on lowest level function is with 0 arg e.g. PI()
 expression_term: CONSTANT:0.1,COLUMN:0.5,FUNCTION
 # no function when used to build  logical expressions
-expression_group: PARENTHESIS:0.9,FUNCTION
-prefer_right_type_p: 0.95
-function_arg: COLUMN,CONSTANT
-# 0 is 0 arguments
-# can be converted to CHAR or similar
-function_0C: PI,CONNECTION_ID,CURDATE,CURTIME,CURRENT_ROLE,CURRENT_USER,CURRENT_TIMESTAMP,DATABASE,NOW,SYSDATE,UNIX_TIMESTAMP,UTC_DATE,UTC_TIME,RAND
-# can be converted to TIMESTAMP or similar
-function_0D: CURDATE,CURTIME,CURRENT_TIMESTAMP,NOW,SYSDATE,UNIX_TIMESTAMP,UTC_DATE,UTC_TIME
-# can be converted to INT and similar
-function_0N: PI,RAND,CONNECTION_ID
-function_0_as_constant_p: 0.2
-function_0_virtual: PI
-function_todo: CONV,ADDATE_INTERVAL,CONVERT_TZ,DATE_ADD,DATE_SUB,GET_FORMAT,PERIOD_ADD,PERIOD_DIFF,STR_TO_DATE,SUBDATE_INTERVAL,TIMESTAMPADD,TIMESTAMPDIFF,EXPORT_SET,FROM_BASE64,UNHEX,FULLTEXT
-# char -> char
-function_C1C: ASCII,HEX,BIT_LENGTH,CHAR_LENGTH,COERCIBILITY,CHARSET,COLLATION,COMPRESS,CONCAT,CRC32,LCASE,LENGTH,UPPER,ORD,QUOTE,REVERSE,RTRIM,SOUNDEX,TO_BASE64,TRIM,LTRIM,UNHEX,WEIGHT_STRING
-# char -> n
-function_C1N: ASCII,BIT_LENGTH,CHAR_LENGTH
-# n -> c
-function_N1C: EXP,ACOS,LN,SQRT,ATAN,TAN,ABS,ASIN,CEIL,COS,COT,DEGREES,FLOOR,RADIANS,SIGN,SIN,FROM_DAYS,FROM_UNIXTIME,SEC_TO_TIME,BIN,CHAR
-# n -> date
-function_N1D: FROM_DAYS,FROM_UNIXTIME
-# n -> time
-function_N1T: SEC_TO_TIME
-# n -> n
-function_N1N: EXP,ACOS,LN,SQRT,ATAN,TAN,ABS,ASIN,BIN,BIT_COUNT,CEIL,COS,COT,FROM_DAYS,FROM_UNIXTIME,SEC_TO_TIME,DEGREES,FLOOR,RADIANS,SIGN,SIN,OCT,ROUND
-# 1 date argument, C (castable to char) return value
-function_D1C: DATE,DAY,DAYNAME,DAYOFMONTH,DAYOFWEEK,DAYOFYEAR,HOUR,LAST_DAY,MICROSECOND,MINUTE,MONTH,MONTHNAME,QUARTER,SECOND,TIME,TIMESTAMP,TIME_TO_SEC,TO_DAYS,TO_SECONDS,WEEK,WEEKDAY,WEEKOFYEAR,YEAR,YEARWEEK
-# 1 date argument, date return value
-function_D1D: DATE,LAST_DAY,TIMESTAMP
-# date -> number
-function_D1N: DAY,DAYOFMONTH,DAYOFWEEK,DAYOFYEAR,HOUR,MICROSECOND,MINUTE,MONTH,QUARTER,SECOND,TIME_TO_SEC,TO_DAYS,TO_SECONDS,WEEK,WEEKDAY,WEEKOFYEAR,YEAR,YEARWEEK
-# n,c -> c
-function_NC2C: ELT
-# c,c -> n
-function_CC2N: FIELD,FIND_IN_SET
-# n,n -> c
-function_CC2C: CONCAT,CONCAT_WS,FIELD,FIND_IN_SET
-# n,n -> c
-function_NN2C: MOD,DIV,POWER,ROUND,TRUNCATE,FORMAT
-# n,n -> n
-function_NN2N: MOD,DIV,POWER,ROUND,TRUNCATE
-# n,n -> char
-function_NN2C: MAKEDATE,CHAR
-# n,n -> date
-function_NN2D: MAKEDATE
-# date, date -> char
-function_DD2C: TIMEDIFF
-# date, date -> time
-function_DD2T: TIMEDIFF
-# date, time -> date
-function_DT2C: ADDTIME,SUBTIME
-# date, time -> date
-function_DT2D: ADDTIME,SUBTIME
-# date,number -> char
-function_DN2C: ADDDATE,SUBDATE
-# date,number -> date
-function_DN2D: ADDDATE,SUBDATE
-# date,date -> n
-function_DN2N: DATEDIFF
-# date,number -> char
-function_DN2C: DATEDIFF
-# n,n,n -> char
-function_NNN3C: MAKETIME,CHAR
-# n,n,n -> time
-function_NNN3T: MAKETIME
-# c...c -> n
-function_INFC9N: FIELD
-# c...c -> c
-function_INFC9C: CONCAT,CONCAT_WS,FIELD
-# n...n -> char
-function_INFN9C: CHAR
+expression_group: EMPTY:1,PARENTHESIS:0.9,FUNCTION
+function_insert_binary: PI()
+function_insert_character: NOW()
+function_insert_datetime: NOW()
+function_insert_decimal: PI()
+function_insert_enums: PI()
+function_insert_floating: PI()
+function_insert_integer: PI()
+function_insert_json: PI() #todo
+function_insert_lob: CURRENT_USER,CURRENT_USER()
+function_update_binary: NOW()
+# ; will become , @SELF will become column name @COL a random column name
+function_update_character: CONCAT(@SELF;@COL)
+function_update_datetime: NOW()
+function_update_enums: PI()
+function_update_decimal: PI()
+function_update_floating: PI()
+function_update_integer: PI()
+function_update_json: PI() #todo
+function_update_lob: CURRENT_USER,CURRENT_USER()
+function_virtual: PI()
+function_where_binary: PI()
+function_where_character: PI()
+function_where_datetime: NOW()
+function_where_decimal: PI()
+function_where_enums: PI()
+function_where_floating: PI()
+function_where_integer: PI()
+function_where_lob: PI()
+
 column_visibility: EMPTY:0.9,INVISIBLE:0.2,VISIBLE
 null_legitimate_p: 0.6
 null_illegitimate_p: 0
 autoinc_explicit_value_p: 0.001
 
 # like many other values this is hardcoded inside imatest.pl
-datatype_class: INTEGER,SPATIAL,DECIMAL,FLOATING,CHARACTER,BINARY,LOB,ENUMS,DATETIME,JSON
+datatype_class: INTEGER,DECIMAL,FLOATING,CHARACTER,BINARY,LOB,ENUMS,DATETIME,JSON!SPATIAL
 # mind the format
 datatype_class2dt: INTEGER:TINYINT-SMALLINT-MEDIUMINT-BIGINT-INT-BIT,SPATIAL:POLYGON-MULTIPOLYGON-GEOMETRYCOLLECTION-GEOMCOLLECTION-POINT-MULTILINESTRING-MULTIPOINT-GEOMETRY-LINESTRING,DECIMAL:DECIMAL-NUMERIC,FLOATING:FLOAT-DOUBLE,CHARACTER:CHAR-VARCHAR,BINARY:BINARY-VARBINARY,LOB:TINYBLOB-TINYTEXT-BLOB-TEXT-MEDIUMBLOB-MEDIUMTEXT-LONGBLOB-LONGTEXT,ENUMS:ENUM-SET,DATETIME:DATETIME-DATE-TIMESTAMP-TIME-YEAR,JSON:JSON
 datatype_classes_numeric: INTEGER,DECIMAL,FLOATING
@@ -318,13 +290,17 @@ datatype_datetime: DATETIME:0.2,DATE:0.3,TIMESTAMP:0.7,TIME:0.5,YEAR
 datatype_canfull: CHAR,VARCHAR,TINYTEXT,TEXT,MEDIUMTEXT,LONGTEXT
 
 integer_unsigned_p: 0.6
-integer_reverse_sign_legitimate_p: 0.2
-integer_reverse_sign_illegitimate_p: 0
+number_reverse_sign_legitimate_p: 0.2
+number_reverse_sign_illegitimate_p: 0
 datatype_bit_len: EMPTY:0.5,1-60:0.8,61-63
 # length of the value, not value itself
 value_bit: 1-4:0.5,5-60:0.8,61-63
 # sign is reversed separately, see *reverse_sign*
 value_tinyint: 0-4:0.5,5-100:0.5,101-150:0.5,250-254
+value_json_kind: SIMPLEML,FROMSCRIPT,REFARRAY,SCALAR,REFHASH
+value_json_len: 0:0.01,1-100:0.2,100-1000:0.5,10000-20000:0.1,100-1000000
+# appears in a for loop
+value_json_small_len: 0:0.1,1-1000
 value_smallint: 0-100:0.5,10000-20000:0.5,32200-32300
 value_mediumint: 0-100:0.5,10000-20000:0.5,8388000-8389000:0.5,16777000-16778000
 value_int: 0-100:0.5,10000-20000:0.5,2047483000-2047484000
@@ -356,7 +332,7 @@ value_char_len: 0:0.1,1-10:0.8,11-250:0.05,251-260
 datatype_varchar_len: 0:0.01,1-10:0.1,11-250:0.5,251-260:0.1,261-16383:0.1,100
 value_varchar_len: 0:0.1,1-10:0.1,11-250:0.5,251-260:0.1,261-5000:0.1,65000-70000
 # adjust generated value to column length, applies to binary and blob as well
-value_kchar_length_adjust_p: 1
+value_kchar_length_adjust_p: 0.99
 datatype_binary_len: EMPTY:0.1,0:0.01,1-10:0.8,11-250:0.05,251-255
 value_binary_len: 0:0.1,1-10:0.8,11-250:0.05,251-260
 datatype_varbinary_len: 0:0.01,1-10:0.1,11-250:0.5,251-260:0.1,261-5000:0.1,65000-65535
@@ -388,7 +364,6 @@ value_polygon_len: 3:0.2,3-8:0.5,3-300:0.1,4-6
 # rings
 value_polygon_size: 1:0.8,2:0.5,3-8
 value_polygon_kind: RIGHT,SAME,MIRROR,STRANGE
-value_json_len: 0:0.1,1-100:0.2,100-1000:0.5,10000-20000:0.1,2147483000-2147484000:0.1,4294967000-4294968000:0.1,1000-1500
 # todo substruct for SQL for load thread kind
 # ANY -> x_thread_any not mandatory
 # (re)creation, executed with system()

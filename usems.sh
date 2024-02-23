@@ -10,6 +10,11 @@ howd="$2"
 . `pwd`/imavars.dot
 me="`$BASENAME $0`"
 
+[ -z "$1" -o "$1" = 'h' -o "$1" = 'help' ] && {
+  $ECHO "Usage: $0 relative_port [debug|orig]"
+  $EXIT 1
+}
+
 base="$IMAPORTBASE"
 portlist="`ima_tolist $portst`"
 

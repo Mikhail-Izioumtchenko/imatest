@@ -24,7 +24,6 @@ require 5.032;
 # 16. max source code line length is 143
 
 # todo
-# reconnect or restart load threads
 # allow multiple destroyer threads
 # REPLACE
 # ANALYZE + histogram
@@ -43,20 +42,17 @@ require 5.032;
 # savepoints
 # ddl
 # set
-# stats
-# differently parametrised load threads
-# incode verification rules
+# confuser syntax
 
 use Carp qw(croak shortmess);
 use Data::Dumper qw(Dumper);
 use DateTime;
-use Fcntl qw(F_GETFL F_SETFL O_NONBLOCK);
 use Getopt::Long qw(GetOptions);
 use IO::Handle;
 use IPC::Open2 qw(open2);
 use JSON qw(encode_json decode_json);
 use List::Util qw(shuffle);
-use POSIX qw(:sys_wait_h mkfifo);
+use POSIX qw(:sys_wait_h);
 use Scalar::Util qw(looks_like_number);
 use Storable qw(dclone);
 use Time::HiRes qw(gettimeofday usleep);
@@ -113,7 +109,6 @@ my $DEC_RANGE_MARKER = 'D';
 my $INT_RANGE_MARKER = 'I';
 my $NEG_MARKER = 'M';
 
-my $AAFUN = 'function_0C';
 my $ALTER = 'ALTER';
 my $BEGIN = 'BEGIN';
 my $CHARACTER_SET = 'character_set';
@@ -122,29 +117,26 @@ my $CREATE_CREATE = 'create_create';
 my $CREATE_DB = 'create_db';
 my $DATETIME = 'DATETIME';
 my $DATATYPE_LOB_KEY_LEN = 'datatype_lob_key_len';
-my $DDFUN = 'function_0D';
 my $DECIMAL = 'DECIMAL';
 my $DEFAULT = 'default';
+my $DEFAULTUC = 'DEFAULT';
 my $DESTROY_DESTROY = 'destroy_destroy';
 my $EIGHT = 8;
 my $EMPTY = 'EMPTY';
 my $END = 'END';
 my $EXPRESSION_GROUP = 'expression_group';
-my $F0CP = 'function_0_as_constant_p';
+my $INSERT = 'insert';
 my $INTEGER = 'INTEGER';
-my $INTEGER_REVERSE_SIGN_LEGITIMATE_P = 'integer_reverse_sign_legitimate_p';
-my $INTEGER_REVERSE_SIGN_ILLEGITIMATE_P = 'integer_reverse_sign_illegitimate_p';
-my $IMATEST_MSH_LOG = '_imatest_msh_log';
 my $JSON = 'JSON';
-my $LOAD_THREAD_MSHLOG = 'load_thread_mshlog';
+my $LOAD_THREAD_CLIENT_LOG = 'load_thread_client_log';
+my $LOAD_THREAD_CLIENT_LOG_ENV = '_imatest_client_log';
 my $LOB = 'LOB';
-my $MSHLOG_REMOVE_BEFORE = 'mshlog_remove_before';
-my $MYSQLSH_BASE = 'mysqlsh_base';
-my $MYSQLSH_EXEC = 'mysqlsh_exec';
 my $MYSQLSH_RUN_FILE = 'mysqlsh_run_file';
+my $MYSQLSH_EXEC = 'mysqlsh_exec';
 my $NEEDS_ON_TRUE = 'needs_on_true';
-my $NNFUN = 'function_0N';
 my $NO = 'No';
+my $NUMBER_REVERSE_SIGN_LEGITIMATE_P = 'number_reverse_sign_legitimate_p';
+my $NUMBER_REVERSE_SIGN_ILLEGITIMATE_P = 'number_reverse_sign_illegitimate_p';
 my $ONLY_NAMES = 'only_names';
 my $ONLY_NON_NEGATIVE_INTEGERS = 'only_non_negative_integers';
 my $ONLY_POSITIVE_INTEGERS = 'only_positive_integers';
@@ -179,7 +171,6 @@ my $VALUE_POINT_Y = 'value_point_y';
 my $VALUE_POLYGON_LEN = 'value_polygon_len';
 my $VIRTUAL = 'virtual';
 my $VKCHAR = 'value_kchar_length_adjust_p';
-my $VVFUN = 'function_0_virtual';
 my $WHERE = 'where';
 my $YES = 'Yes';
 
@@ -195,6 +186,7 @@ my %ghtest = ();      # test script hash
 my %ghreal = ();      # test script hash with Rseq and similar processed e.g. 1-7 becomes e.g. 4
 my %ghdt2class = ();      # datatype => class
 my $gntables = 0;         # number of tables successfully create or discovered in all schemas
+my %ghsql2stats = ();      # INSERT => N
 # start schema related
 my @glstables = ();         # list of all schema.table USED generate DML
 my %ghcreate_schemas = ();      # schema name => create test schema SQL, may contain DROP
@@ -262,9 +254,9 @@ my %gh2json = (
 'a' => $gdosayoff ,
 'b' => \%ghasopt ,
 'c' => \%ghst2cols ,
-'e' => \%ghreal ,
-'q' => \%ghver ,
-'w' => \%ghtest ,
+#'e' => \%ghreal ,
+#'q' => \%ghver ,
+#'w' => \%ghtest ,
 'r' => $gntables ,
 't' => \@glstables ,
 's' => \%ghcreate_schemas ,
@@ -275,7 +267,7 @@ my %gh2json = (
 'x' => \%ghst2ncolsnp ,
 'v' => \%ghst2nvcols ,
 'p' => \%ghstc2class ,
-'o' => \%ghstc2dt ,
+#'o' => \%ghstc2dt ,
 '7' => \%ghstc2just ,
 'i' => \%ghstc2cannull ,
 'u' => \%ghstc2canfull ,
@@ -287,8 +279,8 @@ my %gh2json = (
 'n' => \%ghst2pkautoinc ,
 '1' => \%ghstc2isautoinc ,
 '3' => \%ghs2pltables ,
-'4' => \%ghmisc ,
-'5' => \%ghopsql ,
+#'4' => \%ghmisc ,
+#'5' => \%ghopsql ,
 '6' => \@glpids,
 $RAND => 0
 );
@@ -318,7 +310,7 @@ sub usage {
 EOF
     ;
     dosayif($VERBOSE_ANY, "%s", $usage);
-    croak("usage() called");
+    croak("usage() called. CROAK.");
 }
 
 # 1: file to unlink
@@ -355,7 +347,7 @@ sub dosleep {
 sub readfile {
     my $fn = $ARG[0];
     dosayif($VERBOSE_MORE," called with %s",$fn);
-    open(my $fh, '<', $fn) or croak("failed to open $fn for reading");
+    open(my $fh, '<', $fn) or croak("failed to open $fn for reading. CROAK.");
     my $rc = '';
     while (my $lin = <$fh>) {
         $rc .= $lin;
@@ -371,6 +363,7 @@ sub readfile {
 sub doeval {
     local $EVAL_ERROR;
     my $toeval = $ARG[0];
+    croak("Trying to evaluate an undefined value. CROAK") if (not defined($toeval));
     my $aslist = defined($ARG[1])? $ARG[1] : $FALSE;
     my $howver = defined($ARG[2]) and $ARG[2]? $VERBOSE_NEVER : $VERBOSE_ANY;
     dosayif($VERBOSE_MORE, "is called with %s",  $toeval);
@@ -416,7 +409,6 @@ sub dosayif {
     my $howver = shift @ARG;
     return if defined($ghasopt{$VERBOSE}) and $ghasopt{$VERBOSE} < $howver;
     my ($format, @largs) = @ARG;
-    #my @lf = split(/%/,$format); croak("#debug+$format+@largs") if (scalar(@lf)-1 != scalar(@largs));
     my $res = shortmess();
     my @l = split(/\n/,$res);
     $res = defined($l[$gdosayoff])? $l[$gdosayoff] : 'main';
@@ -475,12 +467,13 @@ sub process_range {
 sub process_rseq {
 # val is Rseq kind of value, $skey is top level hash key e.g. "schemas"
     my $skey = $ARG[0];
+    croak("internal error: '$skey' is not an Rseq test parameter") if (not defined($ghreal{$skey}));
     my $silent = defined($ARG[1])? $ARG[1] : $TRUE;
     my $check = defined($ARG[2])? $ARG[2] : $FALSE;
     my $verbose = $silent? $VERBOSE_NEVER : $VERBOSE_DEV;
     my $val = $ghtest{$skey};
     my $phverk = $ghver{$skey};
-    croak("$skey +$val+$skey+is not in test description file or not Rseq") if ($check and not defined($phverk));
+    croak("$skey +$val+$skey+is not in test description file or not Rseq. CROAK.") if ($check and not defined($phverk));
     my $rc = $RC_OK;
     my ($only_positive_integers, $only_non_negative_integers, $only_names, $only_values_allowed) =
          $check ?
@@ -498,14 +491,16 @@ sub process_rseq {
             $clval =~ s/:[0-9.]*([,!])/$1/g;
             my @lhave = split(/[,!]/,$clval);
             foreach my $el (@lhave) {
-              usage("$skey subvalue $el violates Rseq Rule9: with $ONLY_VALUES_ALLOWED value must be one of: @lal",__LINE__)
-                if (scalar(grep {$_ eq $el} @lal) == 0);
+                $el =~ s/\(@[A-Z@;]+\)/()/ if ($el =~ /\(@/);
+                usage("$skey subvalue $el violates Rseq Rule9: with $ONLY_VALUES_ALLOWED value must be one of: @lal",__LINE__)
+                  if (scalar(grep {$_ eq $el} @lal) == 0);
             }
             $clval =~ s/!.*//;
             my @lsohave = split(/,/,$clval);
             foreach my $el (@lsohave) {
-              usage("$skey subvalue $el violates Rseq Rule10: with '$SUPPORTED' value must be one of: @lsup",__LINE__)
-                if (scalar(grep {$_ eq $el} @lsup) == 0);
+                $el =~ s/\(@[A-Z@;]+\)/()/ if ($el =~ /\(@/);
+                usage("$skey subvalue $el violates Rseq Rule10: with '$SUPPORTED' value must be one of: @lsup",__LINE__)
+                  if (scalar(grep {$_ eq $el} @lsup) == 0);
             }
         }
     }
@@ -631,7 +626,7 @@ sub tlist2file {
     dosayif($VERBOSE_ANY,"is invoked for %s",  $fil);
     dosayif($VERBOSE_MORE, "is invoked for %s to write %s",  $fil, Dumper($pltext));
 
-    open(my $fh, $fil) or croak("failed to open $fil");
+    open(my $fh, $fil) or croak("failed to open $fil. CROAK.");
     foreach my $lin (@$pltext) {
         printf $fh "%s\n", $lin;
     }
@@ -689,7 +684,7 @@ sub checkscript {
         }
         foreach my $have (keys(%hsub)) {
             croak(
- "$CHECK_SUBKEYS='@{$ghver{$CHECK_SUBKEYS}}' is defined in $CHECKFILE '$ghtest{$CHECKFILE}' but '$have' is not there")
+ "$CHECK_SUBKEYS='@{$ghver{$CHECK_SUBKEYS}}' is defined in $CHECKFILE '$ghtest{$CHECKFILE}' but '$have' is not there. CROAK.")
               if (not defined($hcheck{$have}));
         }
     }
@@ -718,7 +713,7 @@ sub checkscript {
         if (defined($vcheck) and $vcheck eq 'doeval') {
             my $ev = doeval($ghtest{$skey});
             if (not defined($ev)) {
-                croak("$skey of $ghtest{$skey} in $testyaml failed to evaluate");
+                croak("$skey of $ghtest{$skey} in $testyaml failed to evaluate. CROAK.");
             }
             $ghreal{$skey} = $ev;
             dosayif($VERBOSE_MORE, "by doeval set %s to '%s' of ref %s",$skey,$ev,ref($ev));
@@ -727,7 +722,7 @@ sub checkscript {
         if (defined($vcheck) and $vcheck eq 'doeval_list') {
             my $ev = doeval($ghtest{$skey}, $TRUE);
             if (not defined($ev)) {
-                croak("$skey of $ghtest{$skey} in $testyaml failed to evaluate");
+                croak("$skey of $ghtest{$skey} in $testyaml failed to evaluate. CROAK.");
             }
             $ghreal{$skey} = $ev;
             dosayif($VERBOSE_MORE, "by doeval_list set %s to '%s' of ref %s",$skey,$ev,ref($ev));
@@ -769,14 +764,18 @@ sub buildmisc {
     my $password = readfile($ghreal{'passfile'});
     chop($password);
     my $port = $ghreal{'ports'} + $ghreal{'xportoffset'};
+    my $myport = $ghreal{'ports'} + $ghreal{'mportoffset'};
     $ENV{'_imatest_port_rel'} = $ghreal{'ports'};
     # absolute old (not x) port number
     $ENV{'_imatest_port_abs'} = $ghreal{'ports'} + $ghreal{'mportoffset'};
-    $ghmisc{$MYSQLSH_BASE} = sprintf(
-"%s --port=%s --user=%s --password=%s --sqlx --show-warnings=true --result-format=json --quiet-start=2 --log-sql=all",
-                               $ghreal{'mysqlsh'},$port,$ghreal{'user'},$password);
-    $ghmisc{$MYSQLSH_EXEC} = " $ghmisc{$MYSQLSH_BASE} --log-file=$ENV{$IMATEST_MSH_LOG} --execute";
-    $ghmisc{$MYSQLSH_RUN_FILE} = " $ghmisc{$MYSQLSH_BASE} --log-file=$ENV{$IMATEST_MSH_LOG} --force --file";
+    $ghmisc{'mysqlsh_base'} = sprintf(
+"%s --host=%s --port=%s --user=%s --password=%s --sqlx --show-warnings=true --result-format=json --quiet-start=2 --log-sql=all --verbose=1",
+                               $ghreal{'mysqlsh'},$ghreal{'hosts'},$port,$ghreal{'user'},$password);
+    $ghmisc{'mysql_base'} = sprintf(
+"%s --host=%s --port=%s --user=%s --password=%s --force --compression-algorithms=zstd --no-beep --unbuffered --quick  --batch --verbose",
+                               $ghreal{'mysql'},$ghreal{'hosts'},$myport,$ghreal{'user'},$password);
+    $ghmisc{$MYSQLSH_RUN_FILE} = "$ghmisc{'mysqlsh_base'} --force --log-file $ENV{$LOAD_THREAD_CLIENT_LOG_ENV} --file";
+    $ghmisc{$MYSQLSH_EXEC} = "$ghmisc{'mysqlsh_base'} --log-file $ENV{$LOAD_THREAD_CLIENT_LOG_ENV} --execute";
     $ENV{'_imatest_mysql_static_cnf'} = join(' ',split("\n",$ghreal{'mysql_static_cnf'}));
     my @lcla = split(/,/,$ghreal{'datatype_class2dt'});
     foreach my $clas (@lcla) {
@@ -879,7 +878,7 @@ sub db_discover {
 # 2: kind: virtual default where update
 # 3: schema.table.column from caller
 # returns column name
-sub build_expr_column {
+sub build_expression_column {
     my ($tnam, $kind, $colnam) = @ARG;
     my $rc = '';
     dosayif($VERBOSE_NEVER,"called with tnam=s kind=%s col=%s",$tnam,$kind,$colnam);
@@ -891,47 +890,44 @@ sub build_expr_column {
     return $rc;
 }
 
-# 1: kind: virtual default where
-# 2: schema.table.column
-# returns function name e.g. ABS 
-# 1 arg function is selected
-sub build_expr_function {
-    my ($kind,$colnam) = @ARG;
-    my $cl = $ghstc2class{$colnam};
+# 1: schema.table
+# 2: kind: virtual default where etc
+# 3: schema.table.column or datatype for where
+# returns function name e.g. ABS  todo
+sub build_expression_function {
+    my ($tnam,$kind,$colnam) = @ARG;
+    my ($cl,$dt);
     my $dt = $ghstc2just{$colnam};
-    croak("datatype not defined for $colnam") if (not defined($dt));
+    if ($kind eq $WHERE) {
+        $dt = uc($colnam);
+        $cl = $ghstc2class{$dt};
+    } else {
+        $cl = $ghstc2class{$colnam};
+        $dt = $ghstc2just{$colnam};
+    }
+    croak("datatype not defined for ($tnam, $kind) $colnam. CROAK.") if (not defined($dt));
     if (not defined ($cl)) {
         $cl = $ghdt2class{$dt};
-        croak("dt class is not defined for $colnam of $dt") if (not defined($cl));
+        croak("dt class is not defined for $tnam:$kind:$colnam of $dt. CROAK.") if (not defined($cl));
     }
     dosayif($VERBOSE_NEVER," called for '%s' with kind=%s",$colnam,$kind);
-    # 1 arg function, we need function_.1SUF
-    my $suf = 'X';
-    if ($dt eq 'TIME') {
-        $suf = 'T';
-    } elsif ($cl eq $DATETIME) {
-        $suf = 'D';
-    } elsif ($cl eq $INTEGER or $cl eq $DECIMAL or $cl eq 'FLOAT') {
-        $suf = 'N';
-    } else {
-        $suf = 'C';
-    }
-    my $sp = "function_.1$suf";
-    my @lfs = grep {$_ =~ /^$sp/} keys(%ghreal);
-    croak("failed to find function matching $sp") if (scalar(@lfs) == 0);
-    my $fclass = $lfs[int(rand()*scalar(@lfs))];
-    my $rc = process_rseq($fclass);
+    my $fukind = "function_${kind}_".lc($cl);
+    $fukind = "function_${kind}" if (not defined($ghreal{$fukind}));
+    croak("No ($tnam:$kind:$colnam:$cl:$dt) '$fukind' in testfile. CROAK.") if (not defined($ghreal{$fukind}));
+    my $fupat = process_rseq($fukind);
+    my $rc = $fupat;
+    #croak("#debugCROAK+$kind+$colnam+$cl.$dt+$rc+");
     dosayif($VERBOSE_NEVER," returning '%s'",$rc);
     return $rc;
 }
 
 # 1: kind: virtual default where
-# 2: schema.table.column from caller
+# 3: schema.table.column from caller
 # returns constant e.g. 42 '42a'
-sub build_expr_constant {
+sub build_expression_constant {
     my ($kind, $colname) = @ARG;
     dosayif($VERBOSE_NEVER," called for %s with kind=%s",$colname,$kind);
-    my $rc = value_generate($colname);
+    my $rc = value_generate($colname,$kind);
     $rc = 'PI()' if ($kind eq $VIRTUAL and $rc =~ /[(][)]/);      # will do
     dosayif($VERBOSE_NEVER," returning '%s'",$rc);
     return $rc;
@@ -941,16 +937,18 @@ sub build_expr_constant {
 # 2: kind: virtual default where update
 # 3: schema.table.column, or datatype for where
 # returns expr
-sub build_expr_term {
+sub build_expression_term {
     my ($tnam, $kind, $colname) = @ARG;
-    croak("called with empty column name for table $tnam and kind '$kind'") if ($colname eq '');
+    croak("called with empty column name for table $tnam and kind '$kind'. CROAK.") if ($colname eq '');
     dosayif($VERBOSE_NEVER," called for '%s' kind=%s",$colname,$kind);
     my $expr = '';
     my $termkind = $kind eq $DEFAULT? process_rseq('default_expression_term') : process_rseq('expression_term');
     if ($termkind eq 'CONSTANT') {
-         $expr = build_expr_constant($kind, $colname);
-    } else {      # COLUMN/FUNCTION todo
-         $expr = build_expr_column($tnam, $kind, $colname);
+         $expr = build_expression_constant($kind, $colname);
+    } elsif ($termkind eq 'COLUMN') {
+         $expr = build_expression_column($tnam, $kind, $colname);
+    } else {
+         $expr = build_expression_function($tnam, $kind, $colname);
     }
     dosayif($VERBOSE_NEVER," returns '%s'",$expr);
     return $expr;
@@ -960,7 +958,7 @@ sub build_expr_term {
 # 2: kind: virtual default where
 # 3: schema.table.column for which we are building
 # returns (expr, # of terms)
-sub build_expr_level {
+sub build_expression_level {
     my ($level,$kind,$colnam) = @ARG;
     dosayif($VERBOSE_NEVER,"%s: called with level=%s kind=%s column %s",$level,$kind,$colnam);
     my $expr = '';
@@ -968,7 +966,12 @@ sub build_expr_level {
     for my $enum (1..$elen) {
         my $item = "E$level";
         my $grp = process_rseq($EXPRESSION_GROUP);
-        $item = $grp eq $PARENTHESIS? "($item)" : build_expr_function($kind,$colnam)."($item)";
+        if ($grp eq $PARENTHESIS) {
+            $item = "($item)";
+        } elsif ($grp eq 'FUNCTION') {
+            my $fun = build_expression_function('',$kind,$colnam); #todo 
+            $item = "$fun($item)"; #todo
+        }
         $expr .= $item;
         next if ($enum == $elen);
         my $oper = process_rseq('operators');
@@ -978,11 +981,12 @@ sub build_expr_level {
     return ($expr,$elen);
 }
 
-# 1: table name
+# 1: schema.table
 # 2: kind: virtual default where update etc
-# 3: schema.table.name of the column we are building
+# 3: schema.table.column of the column we are building
 sub build_expression {
     my ($tnam, $kind, $colnam) = @ARG;
+    my ($schema,$table,$col) = split(/\./,$colnam);
     dosayif($VERBOSE_NEVER, " called for table %s column %s and kind=%s",  $tnam, $colnam, $kind);
     my $expr = '';
     my $dep = process_rseq("${kind}_expression_depth");
@@ -990,13 +994,13 @@ sub build_expression {
     # from top down
     
     my $hom = 0;
+    my $add = '';
     for (my $level = $dep; $level > 0; --$level) {
         # from top down E3 X E3 X E3 level 3/3
         #               E3 + E3 * E3
         #               (E3) + (E3) * F(E3)
-        my $add = '';
         if ($level == $dep and $dep != 1) {
-            ($add, $hom) = build_expr_level($level,$kind,$colnam);
+            ($add, $hom) = build_expression_level($level,$kind,$colnam);
             $expr .= $add;
             next;
         }
@@ -1005,7 +1009,7 @@ sub build_expression {
             my $torepl = "E".($level+1);
             my $addhom = 0;
             foreach my $item (1..$hom) {
-                ($add, my $subhom) = build_expr_level($level,$kind,$colnam);
+                ($add, my $subhom) = build_expression_level($level,$kind,$colnam);
                 $expr =~ s/$torepl/$add/;
                 $addhom += $subhom;
             }
@@ -1014,18 +1018,32 @@ sub build_expression {
         }
         # last level E1 E1 become Column or Constant or (0) function like PI()
         if ($dep == 1) {
-            ($expr, $hom) = build_expr_level(2, $kind, $colnam);
+            ($expr, $hom) = build_expression_level(2, $kind, $colnam);
         }
         for my $item (1..$hom) {
-            $add = build_expr_term($tnam, $kind, $colnam);
+            $add = build_expression_term($tnam, $kind, $colnam);
             $expr =~ s/E2/$add/;
         }
         $expr =~ s/E2/$add/g;      # todo figure out
     }
+    croak("#debugCROAK+$expr+$kind+$colnam") if ($expr =~ /E2/ and not $expr =~ /[0-9]E2/);
+    $expr =~ s/E2/$add/g;      # todo figure out
     # consider parentesis for DEFAULT
     if ($kind eq $DEFAULT) {
         $expr = "($expr)" if ($dep > 1 or $hom > 1 or rand() < $ghreal{'default_in_parenthesis_p'});
     }
+    $expr =~ s/\@SELF/$col/g;
+    if ($expr =~ /\@COL/) {
+        my $plcols = $ghst2cols{$tnam};
+        my $slcols = scalar(@$plcols);
+        while ($expr =~ /\@COL/) {
+            my $rcol = $plcols->[int(rand()*$slcols)];
+            $expr =~ s/\@COL/$rcol/;
+        }
+    }
+    $expr =~ s/\@SELF/$col/g;
+    $expr =~ s/;/,/g;
+    croak("#debugCROAKup+$kind+$colnam+$dep:$hom+$expr+") if ($kind eq $UPDATELC and $expr =~ /CONCAT/);
     dosayif($VERBOSE_NEVER, "%s: returning %s", $expr);
     return $expr;
 }
@@ -1439,7 +1457,7 @@ sub db_create {
                 }
             }
             dosayif($VERBOSE_ANY," we have %s good tables, forgot %s bad tables",$gntables,$badtables);
-            croak("Cannot proceed, no good tables") if ($gntables == 0);
+            croak("Cannot proceed, no good tables. CROAK.") if ($gntables == 0);
         }
     }
     dosayif($VERBOSE_ANY," returning %s",  $rc);
@@ -1528,7 +1546,7 @@ sub build_where {
             ($expr, $hom) = build_where_level(2);
         }
         for my $item (1..$hom) {
-            $add = build_expr_term($tnam, $WHERE, process_rseq('where_datatype'));
+            $add = build_expression_term($tnam, $WHERE, process_rseq('where_datatype'));
             $expr =~ s/E2/$add/;
         }
     }
@@ -1570,16 +1588,11 @@ sub stmt_select_generate {
 # returns: value as string suitable to add to VALUES
 sub value_generate_decimal {
     my $col = $ARG[0];
-    if (rand() < $ghreal{$F0CP}) {
-        my $value = process_rseq($NNFUN).'()';
-        dosayif($VERBOSE_NEVER,"for %s %s returning: %s",$col,$value);
-        return $value;
-    }
     my $bas = process_rseq('decimal_value');
     my $mas = defined($ghstc2len{$col})? $ghstc2len{$col} : $bas;
     $bas = $mas if ($bas > $mas and rand() < process_rseq($VKCHAR));
     my $value = rand()*(10.0**$bas);
-    $value = -$value if (rand() < $ghreal{$INTEGER_REVERSE_SIGN_LEGITIMATE_P});
+    $value = -$value if (rand() < $ghreal{$NUMBER_REVERSE_SIGN_LEGITIMATE_P});
     dosayif($VERBOSE_NEVER,"for %s %s returning: %s",$col,$value);
     return $value;
 }
@@ -1594,16 +1607,11 @@ sub value_generate_numeric {
 # returns: value as string suitable to add to VALUES
 sub value_generate_int {
     my $col = $ARG[0];
-    if (rand() < $ghreal{$F0CP}) {
-        my $value = process_rseq($NNFUN).'()';
-        dosayif($VERBOSE_NEVER,"for %s %s returning: %s",$col,$value);
-        return $value;
-    }
     my $value = process_rseq('value_int');
-    if (not defined($ghstc2unsigned{$col}) or $ghstc2unsigned{$col} == $TRUE) { #todo consider
-        $value = -$value if (rand() < $ghreal{$INTEGER_REVERSE_SIGN_ILLEGITIMATE_P});
+    if ($ghstc2unsigned{$col}) {
+        $value = -$value if (rand() < $ghreal{$NUMBER_REVERSE_SIGN_ILLEGITIMATE_P});
     } else {
-        $value = -$value if (rand() < $ghreal{$INTEGER_REVERSE_SIGN_LEGITIMATE_P});
+        $value = -$value if (rand() < $ghreal{$NUMBER_REVERSE_SIGN_LEGITIMATE_P});
     }
     dosayif($VERBOSE_NEVER,"for %s returning: %s",$col,$value);
     return $value;
@@ -1613,16 +1621,11 @@ sub value_generate_int {
 # returns: value as string suitable to add to VALUES
 sub value_generate_tinyint {
     my $col = $ARG[0];
-    if (rand() < $ghreal{$F0CP}) {
-        my $value = process_rseq($NNFUN).'()';
-        dosayif($VERBOSE_NEVER,"for %s %s returning: %s",$col,$value);
-        return $value;
-    }
     my $value = process_rseq('value_tinyint');
-    if (not defined($ghstc2unsigned{$col}) or $ghstc2unsigned{$col} == $TRUE) { #todo consider
-        $value = -$value if (rand() < $ghreal{$INTEGER_REVERSE_SIGN_ILLEGITIMATE_P});
+    if ($ghstc2unsigned{$col}) {
+        $value = -$value if (rand() < $ghreal{$NUMBER_REVERSE_SIGN_ILLEGITIMATE_P});
     } else {
-        $value = -$value if (rand() < $ghreal{$INTEGER_REVERSE_SIGN_LEGITIMATE_P});
+        $value = -$value if (rand() < $ghreal{$NUMBER_REVERSE_SIGN_LEGITIMATE_P});
     }
     dosayif($VERBOSE_NEVER,"for %s returning: %s",$col,$value);
     return $value;
@@ -1632,16 +1635,11 @@ sub value_generate_tinyint {
 # returns: value as string suitable to add to VALUES
 sub value_generate_bigint {
     my $col = $ARG[0];
-    if (rand() < $ghreal{$F0CP}) {
-        my $value = process_rseq($NNFUN).'()';
-        dosayif($VERBOSE_NEVER,"for %s %s returning: %s",$col,$value);
-        return $value;
-    }
     my $value = process_rseq('value_bigint');
-    if (not defined($ghstc2unsigned{$col}) or $ghstc2unsigned{$col} == $TRUE) { #todo consider
-        $value = -$value if (rand() < $ghreal{$INTEGER_REVERSE_SIGN_ILLEGITIMATE_P});
+    if ($ghstc2unsigned{$col}) {
+        $value = -$value if (rand() < $ghreal{$NUMBER_REVERSE_SIGN_ILLEGITIMATE_P});
     } else {
-        $value = -$value if (rand() < $ghreal{$INTEGER_REVERSE_SIGN_LEGITIMATE_P});
+        $value = -$value if (rand() < $ghreal{$NUMBER_REVERSE_SIGN_LEGITIMATE_P});
     }
     dosayif($VERBOSE_NEVER,"for %s returning: %s",$col,$value);
     return $value;
@@ -1663,16 +1661,11 @@ sub value_generate_bit {
 # returns: value as string suitable to add to VALUES
 sub value_generate_smallint {
     my $col = $ARG[0];
-    if (rand() < $ghreal{$F0CP}) {
-        my $value = process_rseq($NNFUN).'()';
-        dosayif($VERBOSE_NEVER,"for %s %s returning: %s",$col,$value);
-        return $value;
-    }
     my $value = process_rseq('value_smallint');
-    if (not defined($ghstc2unsigned{$col}) or $ghstc2unsigned{$col} == $TRUE) { #todo consider
-        $value = -$value if (rand() < $ghreal{$INTEGER_REVERSE_SIGN_ILLEGITIMATE_P});
+    if ($ghstc2unsigned{$col}) {
+        $value = -$value if (rand() < $ghreal{$NUMBER_REVERSE_SIGN_ILLEGITIMATE_P});
     } else {
-        $value = -$value if (rand() < $ghreal{$INTEGER_REVERSE_SIGN_LEGITIMATE_P});
+        $value = -$value if (rand() < $ghreal{$NUMBER_REVERSE_SIGN_LEGITIMATE_P});
     }
     dosayif($VERBOSE_NEVER,"for %s returning: %s",$col,$value);
     return $value;
@@ -1683,15 +1676,10 @@ sub value_generate_smallint {
 sub value_generate_mediumint {
     my $col = $ARG[0];
     my $value = process_rseq('value_mediumint');
-    if (rand() < $ghreal{$F0CP}) {
-        my $value = process_rseq($NNFUN).'()';
-        dosayif($VERBOSE_NEVER,"for %s %s returning: %s",$col,$value);
-        return $value;
-    }
     if (not defined($ghstc2unsigned{$col}) or $ghstc2unsigned{$col} == $TRUE) { #todo consider
-        $value = -$value if (rand() < $ghreal{$INTEGER_REVERSE_SIGN_ILLEGITIMATE_P});
+        $value = -$value if (rand() < $ghreal{$NUMBER_REVERSE_SIGN_ILLEGITIMATE_P});
     } else {
-        $value = -$value if (rand() < $ghreal{$INTEGER_REVERSE_SIGN_LEGITIMATE_P});
+        $value = -$value if (rand() < $ghreal{$NUMBER_REVERSE_SIGN_LEGITIMATE_P});
     }
     dosayif($VERBOSE_NEVER,"for %s returning: %s",$col,$value);
     return $value;
@@ -1701,13 +1689,9 @@ sub value_generate_mediumint {
 # returns: value as string suitable to add to VALUES
 sub value_generate_float {
     my $col = $ARG[0];
-    if (rand() < $ghreal{$F0CP}) {
-        my $value = process_rseq($NNFUN).'()';
-        dosayif($VERBOSE_NEVER,"for %s %s returning: %s",$col,$value);
-        return $value;
-    }
     my $exp = process_rseq('float_value_exp');
     my $value = $exp eq $EMPTY? value_generate_decimal($col) : sprintf("%sE%s",rand(),$exp);
+    $value = -$value if (rand() < $ghreal{$NUMBER_REVERSE_SIGN_LEGITIMATE_P});
     dosayif($VERBOSE_NEVER,"for %s returning: %s",$col,$value);
     return $value;
 }
@@ -1716,13 +1700,9 @@ sub value_generate_float {
 # returns: value as string suitable to add to VALUES
 sub value_generate_double {
     my $col = $ARG[0];
-    if (rand() < $ghreal{$F0CP}) {
-        my $value = process_rseq($NNFUN).'()';
-        dosayif($VERBOSE_NEVER,"for %s %s returning: %s",$col,$value);
-        return $value;
-    }
     my $exp = process_rseq('double_value_exp');
     my $value = $exp eq $EMPTY? value_generate_decimal($col) : sprintf("%sE%s",rand(),$exp);
+    $value = -$value if (rand() < $ghreal{$NUMBER_REVERSE_SIGN_LEGITIMATE_P});
     dosayif($VERBOSE_NEVER,"for %s returning: %s",$col,$value);
     return $value;
 }
@@ -1731,99 +1711,78 @@ sub value_generate_double {
 # returns: value as string suitable to add to VALUES
 sub value_generate_char {
     my $col = $ARG[0];
-    if (rand() < $ghreal{$F0CP}) {
-        my $value = process_rseq($AAFUN).'()';
-        dosayif($VERBOSE_NEVER,"for %s %s returning: %s",$col,$value);
-        return $value;
-    }
     my $valen = process_rseq('value_char_len');
     my $len = defined($ghstc2len{$col})? $ghstc2len{$col} : 0;
     $valen = $len if ($len >= 1 and $valen > $len and rand() < process_rseq($VKCHAR));
-    my $value = 'a' x $valen;
+    my $value = 'c' x $valen;
     $value = "'$value'";
     dosayif($VERBOSE_NEVER,"for %s(%s) returning: %s",$col,$len,$value);
     return $value;
 }
 
 # 1: schema.table.column
+# 2: kind e.g. default
 # returns: value as string suitable to add to VALUES
 sub value_generate_varbinary {
-    my $col = $ARG[0];
-    if (rand() < $ghreal{$F0CP}) {
-        my $value = process_rseq($AAFUN).'()';
-        dosayif($VERBOSE_NEVER,"for %s %s returning: %s",$col,$value);
-        return $value;
-    }
+    my ($col,$kind) = @ARG;
     my $valen = process_rseq('value_varbinary_len');
     my $len = defined($ghstc2len{$col})? $ghstc2len{$col} : 0;
     $valen = $len if ($len >= 1 and $valen > $len and rand() < process_rseq($VKCHAR));
-    my $value = "REPEAT('a',$valen)";
+    my $value = "REPEAT('x',$valen)";
+    $value = "($value)" if ($kind eq $DEFAULT);
     dosayif($VERBOSE_NEVER,"for %s(%s) returning: %s",$col,$len,$value);
     return $value;
 }
 
 # 1: schema.table.column
+# 2: kind e.g. default
 # returns: value as string suitable to add to VALUES
 sub value_generate_binary {
-    my $col = $ARG[0];
-    if (rand() < $ghreal{$F0CP}) {
-        my $value = process_rseq($AAFUN).'()';
-        dosayif($VERBOSE_NEVER,"for %s %s returning: %s",$col,$value);
-        return $value;
-    }
+    my ($col,$kind) = @ARG;
     my $valen = process_rseq('value_binary_len');
     my $len = defined($ghstc2len{$col})? $ghstc2len{$col} : 0;
     $valen = $len if ($len >= 1 and $valen > $len and rand() < process_rseq($VKCHAR));
-    my $value = "REPEAT('a',$valen)";
+    my $value = "REPEAT('y',$valen)";
+    $value = "($value)" if ($kind eq $DEFAULT);
     dosayif($VERBOSE_NEVER,"for %s(%s) returning: %s",$col,$len,$value);
     return $value;
 }
 
 # 1: schema.table.column
+# 2: kind e.g. default
 # returns: value as string suitable to add to VALUES
 sub value_generate_tinyblob {
-    my $col = $ARG[0];
-    if (rand() < $ghreal{$F0CP}) {
-        my $value = process_rseq($AAFUN).'()';
-        dosayif($VERBOSE_NEVER,"for %s %s returning: %s",$col,$value);
-        return $value;
-    }
+    my ($col,$kind) = @ARG;
     my $valen = process_rseq('value_tinylob_len');
     my $len = defined($ghstc2len{$col})? $ghstc2len{$col} : 0;
     $valen = $len if ($len >= 1 and $valen > $len and rand() < process_rseq($VKCHAR));
-    my $value = "REPEAT('a',$valen)";
+    my $value = "REPEAT('t',$valen)";
+    $value = "($value)" if ($kind eq $DEFAULT);
     dosayif($VERBOSE_NEVER,"for %s(%s) returning: %s",$col,$len,$value);
     return $value;
 }
 
 # 1: schema.table.column
+# 2: kind e.g. default
 # returns: value as string suitable to add to VALUES
 sub value_generate_longblob {
-    my $col = $ARG[0];
-    if (rand() < $ghreal{$F0CP}) {
-        my $value = process_rseq($AAFUN).'()';
-        dosayif($VERBOSE_NEVER,"for %s %s returning: %s",$col,$value);
-        return $value;
-    }
+    my ($col,$kind) = @ARG;
     my $valen = process_rseq('value_longlob_len');
     my $len = defined($ghstc2len{$col})? $ghstc2len{$col} : 0;
     $valen = $len if ($len >= 1 and $valen > $len and rand() < process_rseq($VKCHAR));
-    my $value = "REPEAT('a',$valen)";
+    my $value = "REPEAT('l',$valen)";
+    $value = "($value)" if ($kind eq $DEFAULT);
     dosayif($VERBOSE_NEVER,"for %s(%s) returning: %s",$col,$len,$value);
     return $value;
 }
 
 # 1: schema.table.column
+# 2: kind e.g. default
 # returns: value as string suitable to add to VALUES
 sub value_generate_datetime {
-    my $col = $ARG[0];
-    if (rand() < $ghreal{$F0CP}) {
-        my $value = process_rseq($DDFUN).'()';
-        dosayif($VERBOSE_NEVER,"for %s %s returning: %s",$col,$value);
-        return $value;
-    }
-    my ($year,$month,$day) = value_generate_date($col,$FALSE);
-    my ($hour,$minute,$sec,$micr) = value_generate_time($col,$TRUE);
+    my ($col,$kind) = @ARG;
+    my ($year,$month,$day) = value_generate_date($col,$kind,$FALSE);
+    my ($hour,$minute,$sec,$micr) = value_generate_time($col,$kind,$TRUE);
     my $value = sprintf("%04s-%02s-%02s %02s:%02s:%02s",$year,$month,$day,$hour,$minute,$sec);
     $value .= sprintf(".%06s",$micr) if ($micr ne $EMPTY);
     $value = "'$value'";
@@ -1832,11 +1791,13 @@ sub value_generate_datetime {
 }
 
 # 1: schema.table.column
-# 2: return list
+# 2: kind e.g. default
+# 3: return list
 # returns: value as string suitable to add to VALUES, if 2 is TRUE, returns list of h,m,s,ms as strings, including EMPTY for ms
 sub value_generate_time {
     my $col = $ARG[0];
-    my $retlist = (defined($ARG[1]) and $ARG[1] == $TRUE)? $TRUE : $FALSE;
+    my $kind = $ARG[1];
+    my $retlist = (defined($ARG[2]) and $ARG[2] == $TRUE)? $TRUE : $FALSE;
     my $hor = $retlist? process_rseq('datetime_hour_value') :  process_rseq('time_hour_value');
     my $mit = process_rseq('datetime_minute_value');
     my $sec = process_rseq('datetime_second_value');
@@ -1852,20 +1813,17 @@ sub value_generate_time {
         dosayif($VERBOSE_NEVER,"for %s %s returning: %s",$col,$value);
         return $value;
     }
-    croak('internal error: reached unreachable code');
+    croak('internal error: reached unreachable code. CROAK.');
 }
 
 # 1: schema.table.column
-# 2: true if timestamp wanted, false if datetime, undef if date
+# 2: kind e.g. default
+# 3: true if timestamp wanted, false if datetime, undef if date
 # returns: value as string suitable to add to VALUES, or if defined 2, list of year month day:w
 sub value_generate_date {
     my $col = $ARG[0];
-    my $ists = defined($ARG[1])? $ARG[1] : undef;
-    if ((not defined($ists)) and rand() < $ghreal{$F0CP}) {
-        my $value = process_rseq($DDFUN).'()';
-        dosayif($VERBOSE_NEVER,"for %s %s returning: %s",$col,$value);
-        return $value;
-    }
+    my $kind = $ARG[1];
+    my $ists = defined($ARG[2])? $ARG[2] : undef;
     my $month = process_rseq('datetime_month_value');
     my $day = process_rseq('datetime_day_value');
     my $year = $ists? process_rseq('timestamp_year_value') : process_rseq('datetime_year_value');
@@ -1878,20 +1836,16 @@ sub value_generate_date {
         dosayif($VERBOSE_NEVER,"for %s %s returning: %s",$col,$value);
         return $value;
     }
-    croak('internal error: reached unreachable code');
+    croak('internal error: reached unreachable code. CROAK.');
 }
 
 # 1: schema.table.column
+# 2: kind e.g. default
 # returns: value as string suitable to add to VALUES
 sub value_generate_timestamp {
-    my $col = $ARG[0];
-    if (rand() < $ghreal{$F0CP}) {
-        my $value = process_rseq($DDFUN).'()';
-        dosayif($VERBOSE_NEVER,"for %s %s returning: %s",$col,$value);
-        return $value;
-    }
-    my ($year,$month,$day) = value_generate_date($col,$TRUE);
-    my ($hour,$minute,$sec,$micr) = value_generate_time($col,$TRUE);
+    my ($col,$kind) = @ARG;
+    my ($year,$month,$day) = value_generate_date($col,$kind,$TRUE);
+    my ($hour,$minute,$sec,$micr) = value_generate_time($col,$kind,$TRUE);
     my $value = sprintf("%04s-%02s-%02s %02s:%02s:%02s",$year,$month,$day,$hour,$minute,$sec);
     $value .= sprintf(".%06s",$micr) if ($micr ne $EMPTY);
     $value = "'$value'";
@@ -1900,25 +1854,28 @@ sub value_generate_timestamp {
 }
 
 # 1: schema.table.column
+# 2: kind e.g. default
 # returns: value as string suitable to add to VALUES
 sub value_generate_multipolygon {
-    my $col = $ARG[0];
+    my ($col,$kind) = @ARG;
     my $value = '';
     my $len = process_rseq('value_multipolygon_len');
     for my $n (1..$len) {
-        $value .= ','.value_generate_polygon($col,$TRUE);
+        $value .= ','.value_generate_polygon($col,$kind,$TRUE);
     }
     $value =~ s/^,//;
     my $srid = defined($ghstc2srid{$col})? $ghstc2srid{$col} : $V4326;
     $value = sprintf("ST_MPolyFromText('MULTIPOLYGON(%s)',%s)",$value,$srid);
+    $value = "($value)" if ($kind eq $DEFAULT);
     dosayif($VERBOSE_NEVER,"for %s returning: %s",$col,$value);
     return $value;
 }
 
 # 1: schema.table.column
+# 2: kind e.g. default
 # returns: value as string suitable to add to VALUES
 sub value_generate_multipoint {
-    my $col = $ARG[0];
+    my ($col,$kind) = @ARG;
     my $value = '';
     my $len = process_rseq('value_multipoint_len');
     for my $n (1..$len) {
@@ -1927,15 +1884,17 @@ sub value_generate_multipoint {
     $value =~ s/^,//;
     my $srid = defined($ghstc2srid{$col})? $ghstc2srid{$col} : $V4326;
     $value = sprintf("ST_MPointFromText('MULTIPOINT(%s)',%s)",$value,$srid);
+    $value = "($value)" if ($kind eq $DEFAULT);
     dosayif($VERBOSE_NEVER,"for %s returning: %s",$col,$value);
     return $value;
 }
 
 # 1: schema.table.column
-# 2: if TRUE return raw data
+# 2: kind e.g. default
+# 3: if TRUE return raw data
 sub value_generate_polygon {
-    my $col = $ARG[0];
-    my $raw = (defined($ARG[1]) and $ARG[1]);
+    my ($col,$inkind) = ($ARG[0],$ARG[1]);
+    my $raw = (defined($ARG[2]) and $ARG[2]);
     my $value = '';
     my $dep = process_rseq('value_polygon_size');
     my $kind = $dep == 1? '' : process_rseq('value_polygon_kind');
@@ -1981,31 +1940,36 @@ sub value_generate_polygon {
     }
     my $srid = defined($ghstc2srid{$col})? $ghstc2srid{$col} : $V4326;
     $value = $raw? "($value)" : sprintf("ST_PolyFromText('POLYGON(%s)',%s)",$value,$srid);
+    $value = "($value)" if ($inkind eq $DEFAULT and not $raw);
     dosayif($VERBOSE_NEVER,"for %s %s returning: %s",$col,$value);
     return $value;
 }
 
 # 1: schema.table.column
+# 2: kind e.g. default
 # returns: value as string suitable to add to VALUES
 sub value_generate_multilinestring {
-    my $col = $ARG[0];
+    my ($col,$kind) = @ARG;
     my $value = '';
     my $len = process_rseq('value_multilinestring_len');
     for my $n (1..$len) {
-        $value .= ','.value_generate_linestring($col,$TRUE);
+        $value .= ','.value_generate_linestring($col,$kind,$TRUE);
     }
     $value =~ s/^,//;
     my $srid = defined($ghstc2srid{$col})? $ghstc2srid{$col} : $V4326;
     $value = sprintf("ST_MLineFromText('MULTILINESTRING(%s)',%s)",$value,$srid);
+    $value = "($value)" if ($kind eq $DEFAULT);
     dosayif($VERBOSE_NEVER,"for %s returning: %s",$col,$value);
     return $value;
 }
 
 # 1: schema.table.column
-# 2: if TRUE return raw data like (1 2, 3 4)
+# 2: kind e.g. default
+# 3: if TRUE return raw data like (1 2, 3 4)
 sub value_generate_linestring {
     my $col = $ARG[0];
-    my $raw = defined($ARG[1])? $ARG[1] : $FALSE;
+    my $kind = $ARG[1];
+    my $raw = defined($ARG[2])? $ARG[2] : $FALSE;
     my $value = '';
     my $len = process_rseq('value_linestring_len');
     for my $n (1..$len) {
@@ -2014,39 +1978,50 @@ sub value_generate_linestring {
     $value =~ s/^,//;
     my $srid = defined($ghstc2srid{$col})? $ghstc2srid{$col} : $V4326;
     $value = $raw? "($value)" : sprintf("ST_LineFromText('LINESTRING(%s)',%s)",$value,$srid);
+    $value = "($value)" if ($kind eq $DEFAULT and not $raw);
     dosayif($VERBOSE_NEVER,"for %s %s returning: %s",$col,$value);
     return $value;
 }
 
 # 1: schema.table.column
-# 2: if TRUE, return raw data
+# 2: kind e.g. default
+# 3: if TRUE, return raw data
 sub value_generate_point {
     my $col = $ARG[0];
-    my $raw = (defined($ARG[1]) and $ARG[1]);
+    my $kind = $ARG[1];
+    my $raw = (defined($ARG[2]) and $ARG[2]);
     my $value = sprintf("%s %s",process_rseq($VALUE_POINT_X),process_rseq($VALUE_POINT_Y));
     my $srid = defined($ghstc2srid{$col})? $ghstc2srid{$col} : $V4326;
     $value = $raw? "($value)" : sprintf("ST_PointFromText('POINT (%s)',%s)",$value,$srid);
+    $value = "($value)" if ($kind eq $DEFAULT);
+    croak("kind is not defined. CROAK");
     dosayif($VERBOSE_NEVER,"for %s %s returning: %s",$col,$value);
     return $value;
 }
 
 # 1: schema.table.column
+# 2: kind e.g. default
 # returns: value as string suitable to add to VALUES
 sub value_generate_geometrycollection {
-    my $col = $ARG[0];
+    my ($col,$kind) = @ARG;
     my $value = '';
     my $len = process_rseq('value_multigeometry_len');
     for my $n (1..$len) {
         my $kind = process_rseq('multigeometry_kind');
         my $subval = doeval("value_generate_".lc($kind)."('$col',1)");
-        croak("value_generate_$subval() is not defined") if (not defined($subval));
+        croak("value_generate_$subval() is not defined. CROAK.") if (not defined($subval));
         $value .= ", $kind$subval";
     }
     $value =~ s/^,//;
     my $srid = defined($ghstc2srid{$col})? $ghstc2srid{$col} : $V4326;
     $value = sprintf("ST_GeomCollFromText('GEOMETRYCOLLECTION(%s)',%s)",$value,$srid);
+    $value = "($value)" if ($kind eq $DEFAULT);
     dosayif($VERBOSE_NEVER,"for %s returning: %s",$col,$value);
     return $value;
+}
+
+sub value_generate_geomcollection {
+    return value_generate_geometrycollection(@ARG);
 }
 
 # 1: schema.table.column
@@ -2055,7 +2030,7 @@ sub value_generate_geometry {
     my $col = $ARG[0];
     my $kind = 'value_generate_'.lc(process_rseq('geometry_kind'));
     my $value = doeval("$kind('$col')");
-    croak("$kind() is not defined") if (not defined($value));
+    croak("$kind() is not defined. CROAK.") if (not defined($value));
     dosayif($VERBOSE_NEVER,"for %s returning: %s",$col,$value);
     return $value;
 }
@@ -2065,32 +2040,32 @@ sub value_generate_geometry {
 sub value_generate_json {
     my $col = $ARG[0];
     my $value = "{}";
-    my $kind = int(rand()*5);
-    if ($kind == 0) {
+    my $kind = process_rseq('value_json_kind');
+    if ($kind eq 'SIMPLEML') {
         # multilevel to be developed further todo
         my $pha = {'a' => '1a', 'b' => '2b', 'c' => ['l1','l2',3], 'd' => {'x' => 1}};
         $value = encode_json($pha);
-    } elsif ($kind == 1) {
+    } elsif ($kind eq 'FROMSCRIPT') {
         # local from script
         $gh2json{$RAND} = rand();
-        $value = encode_json(\%gh2json);
-    } elsif ($kind == 2) {
+        $value = encode_json(\%gh2json); #todo parameter and shorter
+    } elsif ($kind eq 'REFARRAY') {
         # local ref array
         my @l = ();
-        my $len = rand()*3000;
+        my $len = process_rseq('value_json_len');
         foreach my $i (1..$len) {
             push(@l,rand()*$i);
         }
         $value = encode_json(\@l);
-    } elsif ($kind == 3) { 
+    } elsif ($kind eq 'SCALAR') { 
         # local scalar
-        $value = encode_json('j'.rand()*55000);
-    } elsif ($kind == 4) { 
+        $value = encode_json('j'.process_rseq('value_json_len'));
+    } elsif ($kind eq 'REFHASH') { 
         # local ref hash
         my %hl = ();
-        my $len = rand()*4000;
+        my $len = process_rseq('value_json_small_len');
         foreach my $i (1..$len) {
-            $hl{$i} = 'abc' x (rand()*1000);
+            $hl{$i} = 'abc' x $i;
         }
         $value = encode_json(\%hl);
     }
@@ -2129,7 +2104,7 @@ sub value_generate_set {
 # returns: value as string suitable to add to VALUES
 sub value_generate_enum {
     my $col = $ARG[0];
-    my $len = defined($ghstc2len{$col})? $ghstc2len{$col} : 3; #todo consider
+    my $len = defined($ghstc2len{$col})? $ghstc2len{$col} : 3; #todo consider parm
     my $num = int(rand()*$len)+1;
     my $value = "\"v$num\"";
     dosayif($VERBOSE_NEVER,"for %s returning: %s",$col,$value);
@@ -2143,35 +2118,29 @@ sub value_generate_mediumtext {
 }
 
 # 1: schema.table.column
+# 2: kind e.g. default
 # returns: value as string suitable to add to VALUES
 sub value_generate_mediumblob {
-    my $col = $ARG[0];
-    if (rand() < $ghreal{$F0CP}) {
-        my $value = process_rseq($AAFUN).'()';
-        dosayif($VERBOSE_NEVER,"for %s %s returning: %s",$col,$value);
-        return $value;
-    }
+    my ($col,$kind) = @ARG;
     my $valen = process_rseq('value_mediumlob_len');
     my $len = defined($ghstc2len{$col})? $ghstc2len{$col} : 0;
     $valen = $len if ($len >= 1 and $valen > $len and rand() < process_rseq($VKCHAR));
-    my $value = "REPEAT('a',$valen)";
+    my $value = "REPEAT('m',$valen)";
+    $value = "($value)" if ($kind eq $DEFAULT);
     dosayif($VERBOSE_NEVER,"for %s(%s) returning: %s",$col,$len,$value);
     return $value;
 }
 
 # 1: schema.table.column
+# 2: kind e.g. default
 # returns: value as string suitable to add to VALUES
 sub value_generate_blob {
-    my $col = $ARG[0];
-    if (rand() < $ghreal{$F0CP}) {
-        my $value = process_rseq($AAFUN).'()';
-        dosayif($VERBOSE_NEVER,"for %s %s returning: %s",$col,$value);
-        return $value;
-    }
+    my ($col,$kind) = @ARG;
     my $valen = process_rseq('value_lob_len');
     my $len = defined($ghstc2len{$col})? $ghstc2len{$col} : 0;
     $valen = $len if ($len >= 1 and $valen > $len and rand() < process_rseq($VKCHAR));
-    my $value = "REPEAT('a',$valen)";
+    my $value = "REPEAT('n',$valen)";
+    $value = "($value)" if ($kind eq $DEFAULT);
     dosayif($VERBOSE_NEVER,"for %s(%s) returning: %s",$col,$len,$value);
     return $value;
 }
@@ -2195,28 +2164,27 @@ sub value_generate_text {
 }
 
 # 1: schema.table.column
+# 2: kind e.g. default
 # returns: value as string suitable to add to VALUES
 sub value_generate_varchar {
-    my $col = $ARG[0];
-    if (rand() < $ghreal{$F0CP}) {
-        my $value = process_rseq($AAFUN).'()';
-        dosayif($VERBOSE_NEVER,"for %s %s returning: %s",$col,$value);
-        return $value;
-    }
+    my ($col,$kind) = @ARG;
     my $valen = process_rseq('value_varchar_len');
     my $len = defined($ghstc2len{$col})? $ghstc2len{$col} : 0;
     $valen = $len if ($len >= 1 and $valen > $len and rand() < process_rseq($VKCHAR));
-    my $value = "REPEAT('a',$valen)";
+    my $value = "REPEAT('b',$valen)";
+    $value = "($value)" if ($kind eq $DEFAULT);
     dosayif($VERBOSE_NEVER,"for %s(%s) returning: %s",$col,$len,$value);
     return $value;
 }
 
 # 1: schema.table.column or datatype e.g. INTEGER
+# 2: kind e.g. default
 sub value_generate {
-    my $colnam = $ARG[0];
+    my ($colnam,$kind) = @ARG;
+    croak("internal error for $colnam: kind is not defined") if (not defined($kind));
     my $subase = $colnam =~ /\./? 'value_generate_'.lc($ghstc2just{$colnam}) : 'value_generate_'.lc($colnam);
-    my $rc = doeval("$subase('$colnam')");
-    croak("$subase() is not defined") if (not defined($rc));
+    my $rc = doeval("$subase('$colnam','$kind')");
+    croak("$subase() rc is not defined. CROAK.") if (not defined($rc));
     return $rc;
 }
 
@@ -2252,7 +2220,8 @@ sub build_insert_values {
                 next;
             }
         }
-        my $val = value_generate($colnam);
+        my $val =  build_expression($tnam,$INSERT,$colnam);
+    #croak("#debugCROAK+$colnam:$val:$INSERT");
         $values .= ", $val";
     }
     $values =~ s/^, //;
@@ -2271,6 +2240,7 @@ sub stmt_delete_generate {
     dosayif($VERBOSE_NEVER,"returning %s",$stmt);
     return $stmt;
 }
+
 # returns statement
 sub stmt_update_generate {
     my $stmt = '';
@@ -2361,9 +2331,10 @@ sub internalise {
         push(@lcols,$l2[0]);
         my $cnam = "$tnam.$l2[0]";
         my $tail = $l2[1];
-        $ghstc2cannull{$cnam} = ($tail =~ / +NOT +NULL/)? $FALSE : $TRUE;
-        $ghstc2unsigned{$cnam} = ($tail =~ / +unsigned/i)? $TRUE : $FALSE;
-        $ghstc2isautoinc{$cnam} = ($tail =~ / +AUTO_INCREMENT/? $TRUE : $FALSE);
+        $ghstc2cannull{$cnam} = ($tail =~ / NOT NULL/)? $FALSE : $TRUE;
+        $ghstc2unsigned{$cnam} = ($tail =~ / unsigned/i)? $TRUE : $FALSE;
+        $ghstc2isautoinc{$cnam} = ($tail =~ / AUTO_INCREMENT/? $TRUE : $FALSE);
+        $ghstc2hasdefault{$cnam} = ($tail =~ / $DEFAULTUC /? $TRUE : $FALSE);
         if ($tail =~ / GENERATED ALWAYS AS /) {
             push(@lnvcols,$l2[0]);
             $ghstc2virtual{$cnam} = $TRUE;
@@ -2416,15 +2387,20 @@ sub server_load_thread {
     my $outto = doeval($ghreal{'load_thread_out'});
     my $errto = doeval($ghreal{'load_thread_err'});
     my $sqlto = doeval($ghreal{'load_thread_sql'});
-    my $logto = doeval($ghreal{'load_thread_mshlog'});
-    $ENV{$IMATEST_MSH_LOG} = doeval($ghreal{$LOAD_THREAD_MSHLOG});
-    safe_unlink($ENV{$IMATEST_MSH_LOG}) if ($ghreal{$MSHLOG_REMOVE_BEFORE} eq $YES);
+    my $logto = doeval($ghreal{'load_thread_client_log'});
+    $ENV{$LOAD_THREAD_CLIENT_LOG_ENV} = doeval($ghreal{$LOAD_THREAD_CLIENT_LOG});
     my $dosql = ($ghreal{'load_execute_sql'} eq $YES);
-    dosayif($VERBOSE_ANY, "see also %s and %s and %s and %s",$ENV{$IMATEST_MSH_LOG},$outto,$errto,$sqlto);
-    open(my $msql, ">$sqlto") or croak("failed to open >$sqlto: $ERRNO");
-    my $shel = "$ghmisc{$MYSQLSH_BASE} --log-file=$ENV{$IMATEST_MSH_LOG} --log-sql=all --force >>$outto 2>>$errto";
+    dosayif($VERBOSE_ANY, "see also %s and %s and %s and %s",$ENV{$LOAD_THREAD_CLIENT_LOG_ENV},$outto,$errto,$sqlto);
+    open(my $msql, ">$sqlto") or croak("failed to open >$sqlto: $ERRNO. CROAK.");
+    my $shel = '';
+    my $shelkind = $ghreal{'load_thread_execute_with'};
+    if ($shelkind eq 'mysqlsh') {
+        $shel = "$ghmisc{'mysqlsh_base'} --log-file $ENV{$LOAD_THREAD_CLIENT_LOG_ENV} >>$outto 2>>$errto";
+    } elsif ($shelkind eq 'mysql') {
+        $shel = "$ghmisc{'mysql_base'} >>$outto 2>>$errto";
+    }
     my $msh = undef;
-    my $wspid = open2(my $msout, $msh, $shel) or croak("Failed (errno: $ERRNO) to start $shel");
+    my $wspid = open2(my $msout, $msh, $shel) or croak("Failed (errno: $ERRNO) to start $shel. CROAK.");
     dosayif($VERBOSE_ANY, "started as pid %s: %s",$wspid,$shel);
     $msh->autoflush();
     $msql->autoflush();
@@ -2483,7 +2459,7 @@ sub server_load_thread {
             $tnam = $glstables[int(rand()*$gntables)];
             $stmt = stmt_alter_generate($tnam);
         } else {
-            croak("load_sql_class=$ksql is not supported yet");
+            croak("load_sql_class=$ksql is not supported yet. CROAK.");
         }
         if ($canexp) {
             my $exp = process_rseq('explain');
@@ -2494,16 +2470,15 @@ sub server_load_thread {
         # now send statement for execution
         if (waitpid($wspid, WNOHANG) == $wspid) {
             dosayif($VERBOSE_ANY,"process $wspid has terminated, restarting");
-        croak("#debug");
             close($msh);
-            $wspid = open2(my $msout, $msh, $shel) or croak("Failed (errno: $ERRNO) to start $shel");
+            $wspid = open2(my $msout, $msh, $shel) or croak("Failed (errno: $ERRNO) to start $shel. CROAK.");
             dosayif($VERBOSE_ANY, "restarted as pid %s: %s",$wspid,$shel);
             $msh->autoflush();
         }
         dosayif($VERBOSE_NEVER, "sending to execute: %s",$stmt);
         dosayif($VERBOSE_ANY, "sending to execute stmt #%s",$snum) if ($snum % $ghreal{'report_every_stmt'} == 0);
         printf($msh "%s;\n", $stmt) if ($dosql);
-        dosayif($VERBOSE_ANY, "sent to execute stmt #%s",$snum) if ($snum % $ghreal{'report_every_stmt'} == 0);
+        ++$ghsql2stats{$ksql};
         printf($msql "%s;\n", $stmt);
 
         # now reflect the results in internal structures
@@ -2526,7 +2501,8 @@ sub server_load_thread {
     close $msh;
     close $msql;
     dosayif($VERBOSE_ANY, " load thread %s exiting at %s with exit code %s after executing %s statements",$tnum,time(),$ec,$snum);
-    dosayif($VERBOSE_ANY, " see also %s and %s and %s and %s",$ENV{$IMATEST_MSH_LOG},$outto,$errto,$sqlto);
+    dosayif($VERBOSE_ANY, " load thread %s statistics: %s",$tnum,Dumper(\%ghsql2stats));
+    dosayif($VERBOSE_ANY, " see also %s and %s and %s and %s",$ENV{$LOAD_THREAD_CLIENT_LOG_ENV},$outto,$errto,$sqlto);
     exit $ec;
 }
 
@@ -2696,7 +2672,7 @@ $phv = dclone(\%ghtest);
 %ghreal = %$phv;
 $ENV{_imatest_tmpdir} = doeval($ghreal{'tmpdir'});
 $ENV{_imatest_load_filebase} = "master_thread";      # will change in load threads
-$ENV{$IMATEST_MSH_LOG} = doeval($ghreal{$LOAD_THREAD_MSHLOG});
+$ENV{$LOAD_THREAD_CLIENT_LOG_ENV} = doeval($ghreal{$LOAD_THREAD_CLIENT_LOG});
 
 dosayif($VERBOSE_DEV, "%s start: %s\n%s end", $TESTYAML, Dumper(\%ghtest), $TESTYAML);
 
@@ -2705,7 +2681,6 @@ buildmisc();
 dosayif($VERBOSE_DEV, "resulting test script is %s",Dumper(\%ghreal));
 
 # initial ops
-safe_unlink($ENV{$IMATEST_MSH_LOG}) if ($ghreal{$MSHLOG_REMOVE_BEFORE} eq $YES);
 if ($ghreal{'init_stop_server'} eq $YES) {
     my $howto = "$ghreal{'server_terminate_shutdown'} wait $ghreal{$SERVER_TERMINATION_WAIT_TIMEOUT}";
     dosayif($VERBOSE_ANY," terminating server using %s for test start",$howto);
@@ -2730,7 +2705,7 @@ my $trc = $RC_OK;
 $ghreal{$TEST_DURATION} = process_rseq($TEST_DURATION);
 if ($ghreal{'server_terminate'} eq $YES) {
     $trc = start_server_termination_thread();
-    croak("failed to start server termination thread") if ($trc != $RC_OK);
+    croak("failed to start server termination thread. CROAK.") if ($trc != $RC_OK);
 }
 my $tlod = $ghreal{'load_threads'};
 dosayif($VERBOSE_ANY,"starting test load threads: %s",$tlod);
@@ -2741,8 +2716,8 @@ foreach my $elem (@lolod) {
     push(@lok,'') if (scalar(@lok) < 2);
     foreach my $tnum (1..$lok[0]) {
         ++$talnum;
-        $trc = start_load_thread($talnum,$lok[1],int(rand()*1000+1));
-        croak("failed to start test load thread") if ($trc != $RC_OK);
+        $trc = start_load_thread($talnum,$lok[1],int(rand()*10000+100));
+        croak("failed to start test load thread. CROAK.") if ($trc != $RC_OK);
     }
 }
 

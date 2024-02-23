@@ -6,6 +6,8 @@ port="$1"
 
 . `pwd`/imavars.dot
 
+ignore="Error:? +(200[236]|2013|1146|10(48|54|62|90|91)|12(10|64|65|92)|13(64|65)|1406|3105)[ :]"
+
 efiles="/tmp/imatest.pl.out /tmp/load_thread_*.* /tmp/master_thread.log /tmp/imatest.out"
 myfiles="/root/mysql-sandboxes/$port/*/error.log"
 
@@ -13,6 +15,22 @@ refiles=''
 for i in $efiles $myfiles; do
   [ -f "$i" ] && refiles="$refiles $i" || echo "$i is not a regular file, ignore"
 done
+
+$ECHO "\n=== signals and croaks ===\n"
+#$GREP 'got signal' $refiles
+#$GREP 'CROAK' $refiles
+$ECHO "\n===\n"
+
+function process_file() {
+  fil="$1"
+  $ECHO "=== $fil ==="
+  $CAT "$fil" | $GREP 'ERROR|Error' | $GREP -iv "$ignore" | $AWK '{print substr($0,1,440)}' | $SORT | $UNIQ -c | $SORT -n
+}
+
+for fil in $refiles ; do
+  process_file "$fil"
+done
+exit
 
 out=`$CAT $refiles |
 #  $GREP 'ERROR|Warning|System' |
@@ -49,8 +67,9 @@ mor=`$ECHO "$out" |
 $ECHO "\n=== next2 ===\n"
 #$ECHO "$mor" | $GREP -v ' 1 '
 
-$ECHO "\n=== signals\n"
+$ECHO "\n=== signals and croaks ===\n"
 $GREP 'got signal' $refiles
+$GREP 'CROAK' $refiles
 $ECHO "\n===\n"
 $ECHO looked at $efiles
 $ECHO and looked at $myfiles
