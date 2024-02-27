@@ -4,12 +4,19 @@
 ### 2...: optional mysqldOptions list 
 ### port base is IMAPORTBASE
 ### x port base is IMAPORTMXBASE
+forhelp="$1"
 portst="$1"
 shift
 more="$*"
 
 . `pwd`/imavars.dot
 me="`$BASENAME $0`"
+
+[ -z "$forhelp" -o "$forhelp" = 'h' -o "$forhelp" = 'help' ] && {
+  $ECHO "Usage: $0 relative_ports_as_1-3,5 [mysqldOptions]..."
+  $EXIT 1
+}
+
 ima_say "$me : starting as $0 $@"
 
 base="$IMAPORTBASE"

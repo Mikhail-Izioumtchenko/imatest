@@ -22,7 +22,7 @@ create_db: True
 init_stop_server: Yes
 # after server is stopped if it is stopped. todo improve me
 init_remove: Yes
-init_remove_pattern: $ENV{SANDBOXDIR}."/".$ENV{_imatest_port_abs}."/*/error.log ".$ENV{SANDBOXDIR}.$ENV{_imatest_port_abs}."/*/core ".$ENV{_imatest_tmpdir}."/".$ENV{_imatest_load_filebase}."*.* ".$ENV{_imatest_tmpdir}."/load_thread*.*"
+init_remove_pattern: $ENV{SANDBOXDIR}.$ENV{_imatest_port_abs}."/*/core ".$ENV{_imatest_tmpdir}."/".$ENV{_imatest_load_filebase}."*.* ".$ENV{_imatest_tmpdir}."/load_thread*.*"
 
 # destroy sandbox, datadir and all
 teardown: False
@@ -50,7 +50,6 @@ xportoffset: 4300
 # mysqlsh executable
 mysqlsh: $ENV{MYSQLSH}
 mysql: $ENV{MYSQL}
-# 201
 # user that runs test SQL, all of it
 user: $ENV{IMAROOT}
 # user that runs test SQL, all of it
@@ -68,7 +67,7 @@ mysql_initial_cnf: |
 
 # test load
 # test load: shutdown or kill and restart
-# will the test terminate mysqld every now and then
+# will the test terminate myqld every now and then
 server_terminate: Yes
 # see comments on Rseq in imatest_syntax.yaml
 # the test will terminate the server every about 60 seconds
@@ -97,14 +96,13 @@ server_start_timeout: 60
 #load_threads: 1Xro,1
 # 201
 load_threads: 1
-#load_threads: 2
 # evaluated immediately before using the file
-#load_thread_out: $ENV{_imatest_tmpdir}.'/'.$ENV{_imatest_load_filebase}.'.out'
+load_thread_out: $ENV{_imatest_tmpdir}.'/'.$ENV{_imatest_load_filebase}.'.out'
 load_thread_err: $ENV{_imatest_tmpdir}.'/'.$ENV{_imatest_load_filebase}.'.out'
-load_thread_out: qw(/dev/null)
+#load_thread_out: qw(/dev/null)
 #load_thread_err: qw(/dev/null)
-#load_thread_sql: $ENV{_imatest_tmpdir}.'/'.$ENV{_imatest_load_filebase}.'.sql'
-load_thread_sql: qw(/dev/null)
+load_thread_sql: $ENV{_imatest_tmpdir}.'/'.$ENV{_imatest_load_filebase}.'.sql'
+#load_thread_sql: qw(/dev/null)
 load_thread_client_log: $ENV{_imatest_tmpdir}.'/'.$ENV{_imatest_load_filebase}.'.log'
 load_thread_execute_with: mysql
 # 201
@@ -113,25 +111,24 @@ load_execute_sql: Yes
 # === load thread parameters ===
 # mostly for internal use e.g. self test. 0 means unlimited.
 #load_max_stmt: 201
-load_max_stmt: 500
+load_max_stmt: 0
 report_every_stmt: 100
 report_every_stmt_k_ro: 20
 
 #201
-txn_use: No
+txn_use: Yes
 # milliseconds, sleep after txn end
 txn_sleep_after_ms: 0-1:0.8,2-4:0.8,5-20:0.8,21-100
 txn_sleep_in_ms: 0:0.8,1-4:0.1,5-100
 # when not in txn
-txn_begin_p: 0.8
+txn_begin_p: 0.5
 # anytime
-txn_end_p: 0.01
+txn_end_p: 0.1
 txn_end_how: COMMIT:0.8,ROLLBACK
 # length is checked simultaneously
 txn_maxlength_ms: 100-200:0.01,1000-2000:0.1,3000-100000
 txn_maxlength_stmt: 1-2:0.1,1-10:0.1,1-100
 
-# todo: different load config per thread
 # database structure
 # database structure: # of schemas to create
 schemas: 1!1-3:0.5,7-9
@@ -151,7 +148,7 @@ tables_create_sql: $ENV{_imatest_tmpdir}.'/create_tables.sql'
 # table properties. EMPTY means do not specify
 table_autoextend_size: 4M:0.2,8M:0.2,12M:0.2,16M:0.2,20M:0.1,EMPTY
 table_autoinc: 1-10:0.01,1000-2000:0.01,EMPTY
-table_compression: EMPTY:0.9,ZLIB:0.5,LZ4:0.5,NONE
+table_compression: EMPTY:0.9,ZLIB:0.5,LZ4:0.1,NONE
 table_row_format: EMPTY:0.5,DYNAMIC:0.5,COMPACT:0.5,REDUNDANT:0.1,COMPRESSED1:0.1,COMPRESSED2:0.1,COMPRESSED8:0.1,COMPRESSED16:0.1,COMPRESSED4
 table_stats_auto_recalc: 0,1,EMPTY
 table_stats_persistent: 0:0.1,1:0.5,EMPTY
@@ -246,11 +243,11 @@ function_insert_decimal: PI()
 function_insert_enums: PI()
 function_insert_floating: PI()
 function_insert_integer: PI()
-function_insert_json: PI() #todo
+function_insert_json: value_generate_json@S(@QSTSELF)
 function_insert_lob: CURRENT_USER,CURRENT_USER()
 function_update_binary: NOW()
 # ; will become , @SELF will become column name @COL a random column name
-function_update_character: CONCAT(@SELF;@COL)
+function_update_character: CONCAT(@SELF;@COL),CONCAT(@STSELF;@COL)
 function_update_datetime: NOW()
 function_update_enums: PI()
 function_update_decimal: PI()
@@ -297,7 +294,7 @@ datatype_bit_len: EMPTY:0.5,1-60:0.8,61-63
 value_bit: 1-4:0.5,5-60:0.8,61-63
 # sign is reversed separately, see *reverse_sign*
 value_tinyint: 0-4:0.5,5-100:0.5,101-150:0.5,250-254
-value_json_kind: SIMPLEML,FROMSCRIPT,REFARRAY,SCALAR,REFHASH
+value_json_kind: SIMPLEML!FROMSCRIPT,REFARRAY,SCALAR,REFHASH
 value_json_len: 0:0.01,1-100:0.2,100-1000:0.5,10000-20000:0.1,100-1000000
 # appears in a for loop
 value_json_small_len: 0:0.1,1-1000

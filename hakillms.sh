@@ -5,6 +5,7 @@
 ### 3: if 'wait', will wait for the instances to disappear with a reasonable report interval, see code
 ### 4: timeout on wait
 ### IMAPORTBASE port number base
+forhelp="$1"
 portst="$1"
 sig="${2:-findme}"
 dowait="$3"
@@ -13,6 +14,12 @@ timeout="$4"
 rep='5'
 
 . `pwd`/imavars.dot
+
+[ -z "$forhelp" -o "$forhelp" = 'h' -o "$forhelp" = 'help' ] && {
+  $ECHO "Usage: $0 relative_ports_as_1-3,5 signal_as_KILL_or_9 [wait [wait_timeout_seconds]]"
+  $EXIT 1
+}
+
 me="`$BASENAME $0`"
 ima_say "$me : starting as $0 $@"
 

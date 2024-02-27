@@ -3,12 +3,19 @@
 ###   1: mandatory absolute port for standard protocol
 ###   2: mandatory absolute port for X protocol
 ###   3...: optional mysqldOptions list 
+forhelp="$1"
 port="$1"
 portex="$2"
 shift 2
 mopt="$*"
 
 . `pwd`/imavars.dot
+
+[ -z "$forhelp" -o "$forhelp" = 'h' -o "$forhelp" = 'help' ] && {
+  $ECHO "Usage: $0 absolute_port_std_protocol absolute_port_X_protocol [mysqldOptions]..."
+  $EXIT 1
+}
+
 me="`$BASENAME $0`"
 ima_say "$me : starting as $0 $@"
 

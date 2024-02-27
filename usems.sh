@@ -2,7 +2,7 @@
 ### replace mysqld for multiple instances
 ### 1: mandatory starting relative port
 ###    or comma delimited list of relative ports or ranges
-### 2: debug orig, if so, replace mysqld. If not supplied just show mysqld
+### 2: debug|nodebug, if so, replace mysqld. If not supplied just show mysqld
 ### IMAPORTBASE port number base
 portst="$1"
 howd="$2"
@@ -11,7 +11,7 @@ howd="$2"
 me="`$BASENAME $0`"
 
 [ -z "$1" -o "$1" = 'h' -o "$1" = 'help' ] && {
-  $ECHO "Usage: $0 relative_port [debug|orig]"
+  $ECHO "Usage: $0 relative_port [debug|nodebug]"
   $EXIT 1
 }
 
@@ -20,7 +20,7 @@ portlist="`ima_tolist $portst`"
 
 from=''
 [ "$howd" = 'debug' ] && from="$MYSQLD_DEBUG"
-[ "$howd" = 'orig' ] && from="$MYSQLD_ORIG"
+[ "$howd" = 'nodebug' ] && from="$MYSQLD_ORIG"
 
 for port in $portlist ; do
   taport="$(($port + $base))"

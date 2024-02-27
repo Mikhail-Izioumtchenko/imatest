@@ -3,7 +3,9 @@
 ### 2... schemas
 port="$1"
 
-[ -z "$1" -o "$1" = 'h' -o "$1" = 'help' ] && {
+. `pwd`/imavars.dot
+
+[ -z "$2" -o -z "$1" -o "$1" = 'h' -o "$1" = 'help' ] && {
   $ECHO "Usage: $0 relative_port schemas..."
   $EXIT 1
 }
@@ -11,7 +13,6 @@ port="$1"
 shift
 schemas="$*"
 
-. `pwd`/imavars.dot
 base="$IMAPORTBASE"
 taport="$(($port + $base))"
 pass=`$CAT "$IMAPAS"`

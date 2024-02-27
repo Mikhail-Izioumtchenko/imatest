@@ -274,7 +274,7 @@ function_insert_integer:
 function_insert_json:
   mandatory: True
   allowed: Rseq       
-  only_values_allowed: PI() #todo
+  only_values_allowed: value_generate_json@S()
 function_insert_lob:
   mandatory: True
   allowed: Rseq       

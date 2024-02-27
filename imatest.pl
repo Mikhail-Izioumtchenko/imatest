@@ -365,7 +365,7 @@ sub doeval {
     my $toeval = $ARG[0];
     croak("Trying to evaluate an undefined value. CROAK") if (not defined($toeval));
     my $aslist = defined($ARG[1])? $ARG[1] : $FALSE;
-    my $howver = defined($ARG[2]) and $ARG[2]? $VERBOSE_NEVER : $VERBOSE_ANY;
+    my $howver = (defined($ARG[2]) and $ARG[2])? $VERBOSE_NEVER : $VERBOSE_ANY;
     dosayif($VERBOSE_MORE, "is called with %s",  $toeval);
     my $rc = undef;
     if ($aslist) {
@@ -897,7 +897,7 @@ sub build_expression_column {
 sub build_expression_function {
     my ($tnam,$kind,$colnam) = @ARG;
     my ($cl,$dt);
-    my $dt = $ghstc2just{$colnam};
+    $dt = $ghstc2just{$colnam};
     if ($kind eq $WHERE) {
         $dt = uc($colnam);
         $cl = $ghstc2class{$dt};
@@ -907,6 +907,7 @@ sub build_expression_function {
     }
     croak("datatype not defined for ($tnam, $kind) $colnam. CROAK.") if (not defined($dt));
     if (not defined ($cl)) {
+        $dt =~ s/,//g; # todo proper fix
         $cl = $ghdt2class{$dt};
         croak("dt class is not defined for $tnam:$kind:$colnam of $dt. CROAK.") if (not defined($cl));
     }
@@ -1032,7 +1033,6 @@ sub build_expression {
     if ($kind eq $DEFAULT) {
         $expr = "($expr)" if ($dep > 1 or $hom > 1 or rand() < $ghreal{'default_in_parenthesis_p'});
     }
-    $expr =~ s/\@SELF/$col/g;
     if ($expr =~ /\@COL/) {
         my $plcols = $ghst2cols{$tnam};
         my $slcols = scalar(@$plcols);
@@ -1041,9 +1041,22 @@ sub build_expression {
             $expr =~ s/\@COL/$rcol/;
         }
     }
+    $expr =~ s/\@STSELF/$colnam/g;
+    $expr =~ s/\@QSTSELF/"$colnam"/g;
     $expr =~ s/\@SELF/$col/g;
     $expr =~ s/;/,/g;
-    croak("#debugCROAKup+$kind+$colnam+$dep:$hom+$expr+") if ($kind eq $UPDATELC and $expr =~ /CONCAT/);
+    if ($expr =~ /\@S\(/) {
+        while ($expr =~ /\@S\(/) {
+            $expr =~ s/^([^@]+)\@S\((.*)$/$1($2/;
+        }
+        my $evexpr = doeval($expr,$FALSE,$TRUE);      # return scalar, silent
+        # todo try to check to some degree in checkscript e.g. if undefined sub
+        # or search eval for undefined?
+    #croak("#debugCROAK+$expr+") if not defined($evexpr);
+        $expr = defined($evexpr)? $evexpr : 'NULL';
+    }
+    #croak("#debugCROAKup+$kind+$colnam+$dep:$hom+$expr+") if ($kind eq $UPDATELC and $expr =~ /CONCAT/);
+    croak("#debugCROAK2+$expr+$kind+$colnam") if ($expr =~ /E2/ and not $expr =~ /[0-9]E2/);
     dosayif($VERBOSE_NEVER, "%s: returning %s", $expr);
     return $expr;
 }
