@@ -109,10 +109,6 @@ datatype_class:
   only_values_allowed: INTEGER,DECIMAL,FLOATING,DATETIME,CHARACTER,BINARY,LOB,ENUMS,JSON,SPATIAL
 datatype_class2dt:
   mandatory: True
-datatype_classes_numeric:
-  mandatory: True
-  allowed: Rseq       
-  only_values_allowed: INTEGER,DECIMAL,FLOATING
 datatype_datetime:
   mandatory: True
   allowed: Rseq       
@@ -211,12 +207,13 @@ default_expression_term:
   mandatory: True
   allowed: Rseq       
   only_values_allowed: CONSTANT,COLUMN,FUNCTION
-default_in_parenthesis_p:
+default_parenthesis_p:
   mandatory: True
   allowed: probability
-default_insert_p:
+default_term_kind:
   mandatory: True
-  allowed: probability
+  allowed: Rseq       
+  only_values_allowed: value,function
 delete_where_all_p:
   mandatory: True
   allowed: probability
@@ -246,11 +243,11 @@ fulltext_index_p:
 function_insert_binary:
   mandatory: True
   allowed: Rseq       
-  only_values_allowed: PI()
+  only_values_allowed: PI(),NOW()
 function_insert_character:
   mandatory: True
   allowed: Rseq       
-  only_values_allowed: NOW()
+  only_values_allowed: NOW(),PI()
 function_insert_datetime:
   mandatory: True
   allowed: Rseq       
@@ -258,103 +255,107 @@ function_insert_datetime:
 function_insert_decimal:
   mandatory: True
   allowed: Rseq       
-  only_values_allowed: PI()
-function_insert_enums:
+  only_values_allowed: PI(),NOW()
+function_insert_enum:
   mandatory: True
   allowed: Rseq       
-  only_values_allowed: PI()
 function_insert_floating:
   mandatory: True
   allowed: Rseq       
-  only_values_allowed: PI()
+  only_values_allowed: PI(),NOW()
 function_insert_integer:
   mandatory: True
   allowed: Rseq       
-  only_values_allowed: PI()
+  only_values_allowed: PI(),NOW()
 function_insert_json:
   mandatory: True
   allowed: Rseq       
-  only_values_allowed: value_generate_json@S()
 function_insert_lob:
   mandatory: True
   allowed: Rseq       
-  only_values_allowed: CURRENT_USER,CURRENT_USER()
+  only_values_allowed: CURRENT_USER,CURRENT_USER(),PI(),NOW()
+function_insert_set:
+  mandatory: True
+  allowed: Rseq       
 function_update_binary:
   mandatory: True
   allowed: Rseq       
-  only_values_allowed: NOW()
+  only_values_allowed: NOW(),ASCII(),HEX()
 function_update_character:
   mandatory: True
   allowed: Rseq       
-  only_values_allowed: NOW(),CONCAT()
-function_update_character:
-  mandatory: True
-  allowed: Rseq       
-  only_values_allowed: NOW()
+  only_values_allowed: NOW(),CONCAT(),PI(),ASCII(),HEX()
 function_update_datetime:
   mandatory: True
   allowed: Rseq       
-  only_values_allowed: NOW()
 function_update_decimal:
   mandatory: True
   allowed: Rseq       
-  only_values_allowed: PI()
-function_update_enums:
+  only_values_allowed: PI(),NOW(),ASCII(),HEX(),ABS(),ACOS()
+function_update_enum:
   mandatory: True
   allowed: Rseq       
-  only_values_allowed: PI()
 function_update_floating:
   mandatory: True
   allowed: Rseq       
-  only_values_allowed: PI()
+  only_values_allowed: PI(),NOW(),ASCII(),HEX(),ABS(),ACOS()
 function_update_integer:
   mandatory: True
   allowed: Rseq       
-  only_values_allowed: PI()
+  only_values_allowed: PI(),NOW(),ASCII(),HEX(),ABS(),ACOS()
 function_update_json:
   mandatory: True
   allowed: Rseq       
-  only_values_allowed: PI() #todo
 function_update_lob:
   mandatory: True
   allowed: Rseq       
-  only_values_allowed: CURRENT_USER,CURRENT_USER()
+  only_values_allowed: CURRENT_USER,CURRENT_USER(),PI(),NOW(),ASCII(),HEX()
+function_update_set:
+  mandatory: True
+  allowed: Rseq       
+function_update_timestamp:
+  mandatory: True
+  allowed: Rseq       
+#  only_values_allowed: NOW()
 function_virtual:
   mandatory: True
   allowed: Rseq       
-  only_values_allowed: PI()
 function_where_character:
   mandatory: True
   allowed: Rseq       
-  only_values_allowed: PI()
+  only_values_allowed: PI(),NOW(),ASCII(),HEX()
 function_where_binary:
   mandatory: True
   allowed: Rseq       
-  only_values_allowed: PI()
+  only_values_allowed: PI(),NOW(),ASCII(),HEX()
 function_where_datetime:
   mandatory: True
   allowed: Rseq       
-  only_values_allowed: NOW()
 function_where_decimal:
   mandatory: True
   allowed: Rseq       
-  only_values_allowed: PI()
-function_where_enums:
+  only_values_allowed: PI(),NOW(),ASCII(),HEX(),ABS(),ACOS()
+function_where_enum:
   mandatory: True
   allowed: Rseq       
-  only_values_allowed: PI()
 function_where_floating:
   mandatory: True
   allowed: Rseq       
-  only_values_allowed: PI()
+  only_values_allowed: PI(),NOW(),ASCII(),HEX(),ABS(),ACOS()
 function_where_integer:
   mandatory: True
   allowed: Rseq       
-  only_values_allowed: PI()
+  only_values_allowed: PI(),NOW(),ASCII(),HEX(),ABS(),ACOS()
 function_where_lob:
   mandatory: True
   allowed: Rseq       
-  only_values_allowed: PI()
+  only_values_allowed: PI(),NOW(),ASCII(),HEX()
+function_where_set:
+  mandatory: True
+  allowed: Rseq       
+function_where_timestamp:
+  mandatory: True
+  allowed: Rseq       
 geometry_kind:
   mandatory: True
   allowed: Rseq
@@ -389,6 +390,9 @@ init_stop_server:
   mandatory: True
   allowed: [Yes, No]
   supported: [Yes, No]
+insert_default_p:
+  mandatory: True
+  allowed: probability
 insert_expression_depth:
   mandatory: True
   allowed: Rseq       
@@ -397,6 +401,13 @@ insert_expression_length:
   mandatory: True
   allowed: Rseq       
   only_positive_integers: True
+insert_parenthesis_p:
+  mandatory: True
+  allowed: probability
+insert_term_kind:
+  mandatory: True
+  allowed: Rseq       
+  only_values_allowed: value,function
 integer_unsigned_p:
   mandatory: True
   allowed: probability
@@ -407,19 +418,11 @@ load_alter_length:
 load_alter_kind:
   mandatory: True
   allowed: Rseq
-  only_values_allowed: ADD_COL,DROP_COL,ADD_KEY,DROP_KEY
+  only_values_allowed: ADD_COL,DROP_COL,ADD_KEY,DROP_KEY,TABLE_EB
 load_execute_sql:
   mandatory: True
   allowed: [Yes, No]
   supported: [Yes, No]
-load_function_class:
-  allowed: Rseq
-  mandatory: True
-  only_values_allowed: F0,F1N,F1D,F2NN,F2DI,F2DN,F2DT,F3ANN,FFN,F1A,F2AT,FFA,F3NNN,F2DA,F1T,F2AA,F2AN,F3AAN,F3AAA,F3ANA
-load_function_upper:
-  mandatory: True
-  allowed: Rseq
-  only_values_allowed: F1A,F2AT
 load_max_stmt:
   mandatory: True
   allowed: only_non_negative_integers
@@ -481,29 +484,38 @@ pk_first_p:
   allowed: probability
 ports:
   mandatory: True
-operators:
+operator_decimal:
   mandatory: True
   allowed: Rseq
-  only_values_allowed: PLUS,MULT,DIV,MINUS,BITAND,RSHIFT,LSHIFT,MOD,BITXOR,AND
-operators_isnull:
+  only_values_allowed: o@+,o@MINUS,o@p+,o@pMINUS,o@*,o@/,o@%,o@MOD,o@DIV,o@&,o@<<,o@>>,o@AND,o@^
+operator_floating:
   mandatory: True
   allowed: Rseq
-  only_values_allowed: ISNULL,ISNOTNULL
-operators_compare:
+  only_values_allowed: o@+,o@MINUS,o@p+,o@pMINUS,o@*,o@/,o@%,o@MOD,o@DIV,o@&,o@<<,o@>>,o@AND,o@^
+operator_integer:
   mandatory: True
   allowed: Rseq
-  only_values_allowed: GT,EQ,GE,LT,LE,NE,ISNULL,ISNOTNULL,NSEQ
-operators_logical:
+  only_values_allowed: o@+,o@MINUS,o@p+,o@pMINUS,o@*,o@/,o@%,o@MOD,o@DIV,o@&,o@<<,o@>>,o@AND,o@^
+operator_null:
+  mandatory: True
+  allowed: Rseq
+  only_values_allowed: IS_NULL,IS_NOT_NULL,EMPTY
+operator_logical_decimal:
+  mandatory: True
+  allowed: Rseq
+  only_values_allowed: o@<,o@>,o@<=,o@>=,o@<=>,o@N=
+operator_logical_floating:
+  mandatory: True
+  allowed: Rseq
+  only_values_allowed: o@<,o@>,o@<=,o@>=,o@<=>,o@N=
+operator_logical_integer:
+  mandatory: True
+  allowed: Rseq
+  only_values_allowed: o@<,o@>,o@<=,o@>=,o@<=>,o@N=
+operator_logical:
   mandatory: True
   allowed: Rseq
   only_values_allowed: AND,OR
-operators_nots:
-  mandatory: True
-  allowed: Rseq
-  only_non_negative_integers: True
-operators_sql:
-  mandatory: True
-  allowed: doeval_list
 report_every_stmt:
   mandatory: True
   allowed: only_positive_integers
@@ -674,6 +686,9 @@ txn_use:
 update_column_p:
   mandatory: True
   allowed: probability
+update_default_p:
+  mandatory: True
+  allowed: probability
 update_expression_depth:
   mandatory: True
   allowed: Rseq       
@@ -682,6 +697,13 @@ update_expression_length:
   mandatory: True
   allowed: Rseq       
   only_positive_integers: True
+update_parenthesis_p:
+  mandatory: True
+  allowed: probability
+update_term_kind:
+  mandatory: True
+  allowed: Rseq       
+  only_values_allowed: value,function
 update_where_all_p:
   mandatory: True
   allowed: probability
@@ -811,23 +833,30 @@ virtual_expression_length:
   mandatory: True
   allowed: Rseq       
   only_positive_integers: True
+virtual_parenthesis_p:
+  mandatory: True
+  allowed: probability
+virtual_term_kind:
+  mandatory: True
+  allowed: Rseq       
+  only_values_allowed: value,function
 where_all_by_no_where_p:
   mandatory: True
   allowed: probability
-where_datatype:
+where_column_p:
   mandatory: True
-  allowed: Rseq       
-  only_values_allowed: bigint,binary,bit,blob,char,date,datetime,decimal,double,enum,float,geometry,geometrycollection,int,json,linestring,longblob,longtext,mediumblob,mediumint,mediumtext,multilinestring,multipoint,multipolygon,numeric,point,polygon,set,smallint,text,time,timestamp,tinyblob,tinyint,tinytext,varbinary,varchar,year
-# (N+(N*N))/N is 2, F(N) is 1
+  allowed: probability
 where_expression_depth:
   allowed: Rseq
   mandatory: True
   only_non_negative_integers: True
-# N+N*N is 3
 where_expression_length:
   allowed: Rseq
   mandatory: True
   only_non_negative_integers: True
+where_expression_not_p:
+  mandatory: True
+  allowed: probability
 where_logical_depth:
   mandatory: True
   allowed: Rseq
@@ -836,6 +865,13 @@ where_logical_length:
   mandatory: True
   allowed: Rseq
   only_non_negative_integers: True
+where_parenthesis_p:
+  mandatory: True
+  allowed: probability
+where_term_kind:
+  mandatory: True
+  allowed: Rseq       
+  only_values_allowed: value,function
 xportoffset:
   mandatory: True
   allowed: only_positive_integers

@@ -1,4 +1,17 @@
 ---
+load_thread_out: qw(/dev/null)
+load_thread_err: qw(/dev/null)
+#load_threads: 1
+load_threads: 8
+test_duration_seconds: 1381
+load_sql_class: INSERT:0.9,UPDATE:0.8,DELETE:0.01,CHECK:0.05,SELECT:0.9,ALTER!INSEL
+load_max_stmt: 000
+report_every_stmt: 1000
+server_termination_how: shutdown:0.1,shutkill:0.1,kill:0.5,sigkill:0.9,sigstop
+mysql_static_cnf: |
+init_stop_server: No
+schemas: 3
+tables_per_schema: 11
 # todo: see imatest.pl, but some here
 # on values kinds and syntax see comments imatest_syntax.yaml
 # code rules over comments so when in doubt see code
@@ -56,14 +69,15 @@ user: $ENV{IMAROOT}
 passfile: $ENV{IMAPAS}
 tmpdir: defined($ENV{IMATMPDIR})? $ENV{IMATMPDIR} : qw(/tmp)
 
-# MySQL configuration, static for sandbox creation
+# MySQL configuration, static for sandbox creation just | for EMPTY
 mysql_static_cnf: |
   core_file
 
 # MySQL configuration, for SET PERSIST_ONLY then restart
 mysql_initial_cnf: |
-  innodb_buffer_pool_size=50000000
-  innodb_buffer_pool_in_core_file=OFF
+#mysql_initial_cnf: |
+#  innodb_buffer_pool_size=50000000
+#  innodb_buffer_pool_in_core_file=OFF
 
 # test load
 # test load: shutdown or kill and restart
@@ -99,8 +113,6 @@ load_threads: 1
 # evaluated immediately before using the file
 load_thread_out: $ENV{_imatest_tmpdir}.'/'.$ENV{_imatest_load_filebase}.'.out'
 load_thread_err: $ENV{_imatest_tmpdir}.'/'.$ENV{_imatest_load_filebase}.'.out'
-#load_thread_out: qw(/dev/null)
-#load_thread_err: qw(/dev/null)
 load_thread_sql: $ENV{_imatest_tmpdir}.'/'.$ENV{_imatest_load_filebase}.'.sql'
 #load_thread_sql: qw(/dev/null)
 load_thread_client_log: $ENV{_imatest_tmpdir}.'/'.$ENV{_imatest_load_filebase}.'.log'
@@ -111,23 +123,23 @@ load_execute_sql: Yes
 # === load thread parameters ===
 # mostly for internal use e.g. self test. 0 means unlimited.
 #load_max_stmt: 201
-load_max_stmt: 0
+load_max_stmt: 200
 report_every_stmt: 100
 report_every_stmt_k_ro: 20
 
-#201
+#201 todo ro rw
 txn_use: Yes
 # milliseconds, sleep after txn end
 txn_sleep_after_ms: 0-1:0.8,2-4:0.8,5-20:0.8,21-100
 txn_sleep_in_ms: 0:0.8,1-4:0.1,5-100
 # when not in txn
-txn_begin_p: 0.5
+txn_begin_p: 0.4
 # anytime
-txn_end_p: 0.1
-txn_end_how: COMMIT:0.8,ROLLBACK
+txn_end_p: 0.01
+txn_end_how: COMMIT:0.9,ROLLBACK
 # length is checked simultaneously
 txn_maxlength_ms: 100-200:0.01,1000-2000:0.1,3000-100000
-txn_maxlength_stmt: 1-2:0.1,1-10:0.1,1-100
+txn_maxlength_stmt: 1-2:0.01,1-10:0.1,1-1000
 
 # database structure
 # database structure: # of schemas to create
@@ -159,122 +171,132 @@ table_stats_sample_pages: 1:0.1,5-40:0.3,999:0.1,EMPTY
 # probability 0 to 1.0
 table_has_autoinc_p: 0.6
 pk_autoinc_p: 0.8
-columns_pk: 1:0.5,2:0.8,3-12
-column_pk_name_format: pk%s,primary_key_column_%09d
-columns_non_pk: 0:0.1,1:0.2,2-9:0.8,10-12:0.3,70-80:0.1,2-12
-column_non_pk_name_format: col%s,__col%s,test_%s_column_abc123defaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-# do we put pk columns before non pk columns in CREATE TABLE
+columns_pk: 1:0.8,2:0.8,3-12
+columns_non_pk: 4-8:0.8,0:0.1,1-8:0.8,10-40
+column_pk_name_format: pk%s!primary_key_column_%09d
+column_non_pk_name_format: col%s!__col%s,test_%s_column_abc123defaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 pk_first_p: 0.8
-indexes_per_table: 0:0.2,1:0.5,2-5:0.1,62:0.1,1-3
+indexes_per_table: 0:0.2,1:0.5,2-5:0.8,6-62:0.1,1-3
 # ALL means include all columns in any index
-columns_per_index: 1:0.5,2:0.5,3-16:0.2,ALL:0.1,1
+columns_per_index: 1:0.5,2:0.5,3-4:0.5,5-10:0.9,ALL:0.1,1
 index_unique_p: 0.3
+# when we must
 index_prefix_len: 1-10,100-110,254-258,765-769,3070-3072
 index_visibility: VISIBLE,INVISIBLE,EMPTY
 index_direction: EMPTY:0.7,DESC:0.6,ASC
 fulltext_index_p: 0.05
 
 # NOT_NULL will become NOT NULL
-column_null: NOT_NULL:0.7,EMPTY:0.5,NULL
-column_unique_p: 0.1
-column_virtuality: VIRTUAL:0.5,STORED:0.5,EMPTY
+column_null: NOT_NULL:0.3,EMPTY:0.9,NULL
+column_unique_p: 0.05
+column_virtuality: VIRTUAL:0.1,STORED:0.2,EMPTY
 
 # counted independently from pk and non pk
-virtual_columns_per_table: 0:0.8,1:0.5,2-4:0.5,5-100:0.1,0
-# 1 + 2 + 3 is 3
+virtual_columns_per_table: 0:0.9,1:0.8,2-4:0.9,5-100:0.1,0
 virtual_expression_length: 1-3
-# (1 + 2) + 3 is 2
 virtual_expression_depth: 1-2
-insert_expression_depth: 1-2
-insert_expression_length: 1-2
-update_expression_depth: 1-2
-update_expression_length: 1:0.5,2:0.5,3-4
-default_expression_length: 1
-default_expression_depth: 1
-default_in_parenthesis_p: 0.5
-default_insert_p: 0.5
-
-default_expression_term: CONSTANT:1.0,FUNCTION:0.9,COLUMN
-
-column_default_p: 0.2
-
-# 201
-load_sql_class: INSERT:0.5,DELETE:0.05,UPDATE:0.9,CHECK:0.05,SELECT:0.5,ALTER!INSEL
-load_alter_length: 1
-load_alter_kind: DROP_COL!ADD_COL
-
-#here
-# for F1A function_1A below is used
-load_function_upper: F1A,F2AT
-load_function_class: F0,F1N,F1D,F2NN,F2DI,F2DN,F2DT,F3ANN,FFN,F1A,F2AT,FFA,F3NNN,F2DA,F1T,F2AA,F3AAN,F3AAA,F3ANA
+virtual_term_kind: function,value #todo expression?
 select_where_all_p: 0.2
-update_where_all_p: 0.1
-delete_where_all_p: 0.001
-where_all_by_no_where_p: 0.1
 select_count_star_p: 0.1
 select_star_p: 0.5
 select_column_p: 0.5
+insert_expression_depth: 1-2
+insert_expression_length: 1-2
+insert_term_kind: function,value
+insert_default_p: 0.5
+update_expression_depth: 1-2
+update_expression_length: 1-2
+update_term_kind: function,value
 update_column_p: 0.2
-explain: EXPLAIN:0.05,EXPLAIN_ANALYZE:0.1,EMPTY
-# E AND E
-# for WHERE
-where_logical_length: 2-4
+update_default_p: 0.01
+update_where_all_p: 0.1
+delete_where_all_p: 0.0001
+default_expression_length: 1-2
+default_expression_depth: 1-2
+default_parenthesis_p: 0.99
+default_expression_term: CONSTANT:0.5,FUNCTION:0.9,COLUMN
+default_term_kind: function,value
+column_default_p: 0.2
+where_all_by_no_where_p: 0.1
+where_logical_length: 1-4
 where_logical_depth: 1-2
-# (N+(N*N))/N
 where_expression_depth: 1-2
-# N+N
-where_expression_length: 2-4
-where_datatype: bigint,binary,bit,blob,char,date,datetime,decimal,double,enum,float!geometry,geometrycollection,int,json,linestring,longblob,longtext,mediumblob,mediumint,mediumtext,multilinestring,multipoint,multipolygon,numeric,point,polygon,set,smallint,text,time,timestamp,tinyblob,tinyint,tinytext,varbinary,varchar,year
-# postprocessed e.g. PLUS becomes + per operators_sql
-operators:  PLUS,MULT,DIV,MINUS,BITAND,RSHIFT,LSHIFT,MOD,BITXOR,AND
-operators_compare: GT,EQ,GE,LT,LE,NE,ISNULL,ISNOTNULL,NSEQ
-operators_isnull: ISNULL,ISNOTNULL
-operators_logical: AND,OR
-operators_nots: 0:0.9,1:0.8,2
-operators_sql: qw(PLUS:+ MULT:* DIV:/ MINUS:- BITAND:& RSHIFT:>> LSHIFT:<< AND:&& GT:> EQ:= GE:>= LT:< LE:<= NE:!= NSEQ:<=> MOD:% BITXOR:^ ISNULL:IS_NULL ISNOTNULL:IS_NOT_NULL) 
-# on lowest level function is with 0 arg e.g. PI()
+where_expression_length: 1-3
+where_expression_not_p: 0.1
+where_term_kind: function,value
+where_column_p: 0.3
+
+# 201
+load_sql_class: INSERT:0.9,UPDATE:0.8,DELETE:0.05,CHECK:0.5,SELECT:0.9,ALTER!INSEL
+load_alter_length: 1
+load_alter_kind: DROP_COL,TABLE_EB,ADD_COL!ADD_KEY,DROP_KEY
+
+#here
+# for F1A function_1A below is used
+explain: EXPLAIN:0.05,EXPLAIN_ANALYZE:0.1,EMPTY
+operator_null: EMPTY,IS_NULL,IS_NOT_NULL
+operator_logical: AND,OR
 expression_term: CONSTANT:0.1,COLUMN:0.5,FUNCTION
-# no function when used to build  logical expressions
 expression_group: EMPTY:1,PARENTHESIS:0.9,FUNCTION
-function_insert_binary: PI()
-function_insert_character: NOW()
+insert_parenthesis_p: 0.3
+update_parenthesis_p: 0.3
+virtual_parenthesis_p: 0.3
+where_parenthesis_p: 1
+function_insert_binary: PI(),NOW()
+function_insert_character: PI(),NOW()
 function_insert_datetime: NOW()
-function_insert_decimal: PI()
-function_insert_enums: PI()
-function_insert_floating: PI()
-function_insert_integer: PI()
-function_insert_json: value_generate_json@S(@QSTSELF)
-function_insert_lob: CURRENT_USER,CURRENT_USER()
-function_update_binary: NOW()
+function_insert_decimal: PI(),NOW()
+# N= becomes !=
+operator_logical_decimal: o@<,o@>,o@<=,o@>=,o@<=>,o@N=
+operator_logical_integer: o@<,o@>,o@<=,o@>=,o@<=>,o@N=
+operator_logical_floating: o@<,o@>,o@<=,o@>=,o@<=>,o@N=
+# M is -
+operator_decimal: o@+,o@MINUS,o@*,o@/,o@%,o@p+,o@pMINUS,o@MOD,o@DIV,o@&,o@<<,o@>>,o@AND,o@^
+operator_integer: o@+,o@MINUS,o@*,o@/,o@%,o@p+,o@pMINUS,o@MOD,o@DIV,o@&,o@<<,o@>>,o@AND,o@^
+operator_floating: o@+,o@MINUS,o@*,o@/,o@%,o@p+,o@pMINUS,o@MOD,o@DIV,o@&,o@<<,o@>>,o@AND,o@^
+function_insert_enum: value_generate_enum@S(@QSTSELF;"insert")
+function_insert_set: value_generate_set@S(@QSTSELF;"insert")
+function_insert_floating: PI(),NOW()
+function_insert_integer: PI(),NOW()
+function_insert_json: value_generate_json@S(@QSTSELF;"insert")
+function_insert_lob: CURRENT_USER,CURRENT_USER(),PI(),NOW()
+function_update_binary: NOW(),ASCII(@COL),ASCII(@SELF),HEX(@COL),HEX(@SELF)
 # ; will become , @SELF will become column name @COL a random column name
-function_update_character: CONCAT(@SELF;@COL),CONCAT(@STSELF;@COL)
-function_update_datetime: NOW()
-function_update_enums: PI()
-function_update_decimal: PI()
-function_update_floating: PI()
-function_update_integer: PI()
-function_update_json: PI() #todo
-function_update_lob: CURRENT_USER,CURRENT_USER()
-function_virtual: PI()
-function_where_binary: PI()
-function_where_character: PI()
-function_where_datetime: NOW()
-function_where_decimal: PI()
-function_where_enums: PI()
-function_where_floating: PI()
-function_where_integer: PI()
-function_where_lob: PI()
+function_update_character: CONCAT(@SELF;@COL),CONCAT(@STSELF;@COL),CONCAT(@SELF;@SELF),PI(),NOW(),ASCII(@COL),ASCII(@SELF),HEX(@COL),HEX(@SELF)
+function_update_datetime: NOW(),ADDDATE(@SELF;1),ADDTIME(@SELF;1)
+function_update_timestamp: NOW(),ADDDATE(@SELF;111),ADDTIME(@SELF;112)
+# "schema.table.col"
+function_update_enum: value_generate_enum@S(@QSTSELF;"update")
+function_update_set: value_generate_set@S(@QSTSELF;"update")
+# todo some col kind, col of type
+function_update_decimal: PI(),NOW(),ASCII(@COL),ASCII(@SELF),HEX(@COL),HEX(@SELF),ABS(@COL),ACOS(@SELF)
+function_update_floating: PI(),NOW(),ASCII(@COL),ASCII(@SELF),HEX(@COL),HEX(@SELF),ABS(@COL),ACOS(@SELF)
+function_update_integer: PI(),NOW(),ASCII(@COL),ASCII(@SELF),HEX(@COL),HEX(@SELF),ABS(@COL),ACOS(@SELF)
+function_update_json: value_generate_json@S(@QSTSELF;"update")
+function_update_lob: CURRENT_USER,CURRENT_USER(),PI(),NOW(),ASCII(@COL),ASCII(@SELF),HEX(@COL),HEX(@SELF)
+# } will become )
+function_virtual: PI(),CONCAT(@COL;@COL),CONCAT(@FPI(};@COL),ASCII(@COL),HEX(@COL),ABS(@COL),ACOS(@COL),ADDDATE(@COL;1),ADDTIME(@COL;1)
+#function_virtual: PI(),CONCAT(@COL;@COL)
+function_where_binary: PI(),NOW(),ASCII(@COL),HEX(@COL)
+function_where_character: PI(),NOW(),ASCII(@COL),HEX(@COL)
+function_where_datetime: NOW(),ADDDATE(@SELF;1),ADDTIME(@SELF;1)
+function_where_timestamp: NOW(),ADDDATE(@SELF;1),ADDTIME(@SELF;123)
+function_where_decimal: PI(),NOW(),ASCII(@COL),HEX(@COL),ABS(@COL),ACOS(@SELF)
+function_where_enum: value_generate_enum@S(@QSTSELF;"where")
+function_where_set: value_generate_set@S(@QSTSELF;"where")
+function_where_floating: PI(),NOW(),ASCII(@COL),HEX(@COL),ABS(@COL),ACOS(@SELF)
+function_where_integer: PI(),NOW(),ASCII(@COL),HEX(@COL),ABS(@COL),ACOS(@SELF)
+function_where_lob: PI(),NOW(),ASCII(@COL),HEX(@COL)
 
 column_visibility: EMPTY:0.9,INVISIBLE:0.2,VISIBLE
 null_legitimate_p: 0.6
-null_illegitimate_p: 0
+null_illegitimate_p: 0.05
 autoinc_explicit_value_p: 0.001
 
 # like many other values this is hardcoded inside imatest.pl
-datatype_class: INTEGER,DECIMAL,FLOATING,CHARACTER,BINARY,LOB,ENUMS,DATETIME,JSON!SPATIAL
+datatype_class: INTEGER,DECIMAL,FLOATING,CHARACTER,BINARY,LOB,ENUMS,DATETIME,JSON,SPATIAL
 # mind the format
 datatype_class2dt: INTEGER:TINYINT-SMALLINT-MEDIUMINT-BIGINT-INT-BIT,SPATIAL:POLYGON-MULTIPOLYGON-GEOMETRYCOLLECTION-GEOMCOLLECTION-POINT-MULTILINESTRING-MULTIPOINT-GEOMETRY-LINESTRING,DECIMAL:DECIMAL-NUMERIC,FLOATING:FLOAT-DOUBLE,CHARACTER:CHAR-VARCHAR,BINARY:BINARY-VARBINARY,LOB:TINYBLOB-TINYTEXT-BLOB-TEXT-MEDIUMBLOB-MEDIUMTEXT-LONGBLOB-LONGTEXT,ENUMS:ENUM-SET,DATETIME:DATETIME-DATE-TIMESTAMP-TIME-YEAR,JSON:JSON
-datatype_classes_numeric: INTEGER,DECIMAL,FLOATING
 datatype_integer: TINYINT:0.01,SMALLINT:0.1,MEDIUMINT:0.01,BIGINT:0.5,INT:0.9,BIT
 datatype_spatial: POLYGON,MULTIPOLYGON,GEOMETRYCOLLECTION,POINT,MULTILINESTRING,MULTIPOINT,GEOMETRY,LINESTRING
 datatype_decimal: DECIMAL:0.9,NUMERIC
@@ -286,19 +308,20 @@ datatype_enums: ENUM:0.9,SET
 datatype_datetime: DATETIME:0.2,DATE:0.3,TIMESTAMP:0.7,TIME:0.5,YEAR
 datatype_canfull: CHAR,VARCHAR,TINYTEXT,TEXT,MEDIUMTEXT,LONGTEXT
 
-integer_unsigned_p: 0.6
+integer_unsigned_p: 0.3
 number_reverse_sign_legitimate_p: 0.2
-number_reverse_sign_illegitimate_p: 0
-datatype_bit_len: EMPTY:0.5,1-60:0.8,61-63
+number_reverse_sign_illegitimate_p: 0.05
+datatype_bit_len: EMPTY:0.5,1-60:0.8,61-68
 # length of the value, not value itself
-value_bit: 1-4:0.5,5-60:0.8,61-63
+value_bit: 1-4:0.5,5-60:0.8,61-68
 # sign is reversed separately, see *reverse_sign*
-value_tinyint: 0-4:0.5,5-100:0.5,101-150:0.5,250-254
-value_json_kind: SIMPLEML!FROMSCRIPT,REFARRAY,SCALAR,REFHASH
+value_tinyint: 0-4:0.5,5-100:0.5,101-150:0.5,250-258
+value_json_kind: SIMPLEML,FROMSCRIPT,REFARRAY,SCALAR,REFHASH
 value_json_len: 0:0.01,1-100:0.2,100-1000:0.5,10000-20000:0.1,100-1000000
 # appears in a for loop
-value_json_small_len: 0:0.1,1-1000
-value_smallint: 0-100:0.5,10000-20000:0.5,32200-32300
+value_json_small_len: 0:0.1,1:0.1,2-10:0.9,11-1000
+value_smallint: 0-100:0.5,10000-20000:0.5,32200-32300:0.1,1-80000
+#here
 value_mediumint: 0-100:0.5,10000-20000:0.5,8388000-8389000:0.5,16777000-16778000
 value_int: 0-100:0.5,10000-20000:0.5,2047483000-2047484000
 # todo better separate for unsigned
@@ -338,8 +361,8 @@ datatype_lob_key_len: 1-255
 # applies to both text and binary
 value_tinylob_len: 0:0.01,1-100:0.5,101-255
 value_lob_len: 0:0.01,1-100:0.5,10000-20000:0.1,25000-35000
-value_mediumlob_len: 0:0.01,1-100:0.5,10000-20000:0.1,8388000-8389000:0.1,6777000-6778000:0.1,1-1000
-value_longlob_len: 0:0.01,1-100:0.5,10000-20000:0.1,2147483000-2147484000:0.1,4294967000-4294968000:0.1,1-10
+value_mediumlob_len: 0:0.01,1-100:0.5,10000-20000:0.1,8388000-8389000:0.01,6777000-6778000:0.01,1-1000
+value_longlob_len: 0:0.01,1-100:0.5,10000-20000:0.1,2147483000-2147484000:0.01,4294967000-4294968000:0.01,1-10
 datatype_enum_len: 1-10:0.5,11-25:0.9,25-26:0.9,27-65000
 datatype_set_len: 1-10:0.8,11-60:0.5,61-64
 datatype_set_value_len: 1:0.2,2:0.5,1-10:0.8,11-60:0.5,61-70

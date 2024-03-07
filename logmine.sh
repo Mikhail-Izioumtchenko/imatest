@@ -1,10 +1,16 @@
 #!/bin/sh
 # search logs, report
 # 1: absolute port
-
+forhelp="$1"
 port="$1"
 
 . `pwd`/imavars.dot
+
+[ -z "$forhelp" -o "$forhelp" = 'h' -o "$forhelp" = 'help' ] && {
+  $ECHO "Usage: $0 absolute_port_as_4202"
+  $EXIT 1
+}
+
 
 ignore="Error:? +(200[236]|2013|1146|10(48|54|62|90|91)|12(10|64|65|92)|13(64|65)|1406|3105)[ :]"
 
@@ -30,7 +36,6 @@ function process_file() {
 for fil in $refiles ; do
   process_file "$fil"
 done
-exit
 
 out=`$CAT $refiles |
 #  $GREP 'ERROR|Warning|System' |
