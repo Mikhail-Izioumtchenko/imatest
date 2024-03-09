@@ -24,6 +24,7 @@ require 5.032;
 # 16. max source code line length is 143
 
 # todo
+# croak with date
 # allow multiple destroyer threads
 # REPLACE
 # ANALYZE + histogram
@@ -61,7 +62,7 @@ use YAML qw(LoadFile);
 STDOUT->autoflush();
 STDERR->autoflush();
 
-my $version = '2.58';
+my $version = '2.62';
 
 $Data::Dumper::Sortkeys = 1;
 
@@ -157,7 +158,6 @@ my $STRING_TRUE = 'True';
 my $SUPPORTED = 'supported';
 my $TEARDOWN = 'teardown';
 my $TEST_DURATION = 'test_duration_seconds';
-my $TO_BUILD = 'to_build';
 my $UKIND = '_k_';
 my $UPDATE = 'UPDATE';
 my $UPDATELC = 'update';
@@ -514,11 +514,11 @@ sub process_rseq {
     my $lastprob = 0;
     foreach my $lcom (@lcommas) {
         ++$n;
-        my @lsem = split(/:+/, $lcom);
+        my @lsem = split(/:/, $lcom);
         # Rule1: not more than one probability per item
         usage("$skey value $val violates Rseq Rule1: not more than one probability per item",__LINE__) if ($check and scalar(@lsem) > 2);
         # Rule3: range nor probability can be empty
-        usage("$skey value $val violates Rseq Rule3: no empty ranges or probabilities",__LINE__)
+        usage("$skey value $val violates Rseq Rule3: no empty ranges or probabilities, lcom '$lcom' and '@lsem: +$lsem[0]+$lsem[1]+' of size ".scalar(@lsem),__LINE__)
           if ($check and ($lsem[0] eq '' or (scalar(@lsem) == 2 and $lsem[1] eq '')));
         $hasprobs += (scalar(@lsem) - 1);
         $lastprob = scalar(@lsem) - 1;
@@ -654,11 +654,12 @@ sub checkscript {
                 my $suf = $skey;
                 $suf =~ s/.*$UKIND//;
                 my @lok = @{$ghtest{'strict_exceptions'}};
-                usage("strict is specified in $TESTYAML but $skey is not described in $CHECKFILE '$ghtest{$CHECKFILE}' and $suf is not in strict_exceptions of '@lok'",
+                usage("strict is specified in $TESTYAML but '$skey' is not described in $CHECKFILE '$ghtest{$CHECKFILE}' and $suf is not in strict_exceptions of '@lok'",
                   __LINE__)
                     if (scalar(grep {$_ eq $suf } @lok) == 0);
             } else {
-                usage("strict is specified in $TESTYAML but $skey is not described in $CHECKFILE '$ghtest{$CHECKFILE}'",__LINE__);
+                usage("strict is spocified in $TESTYAML but '$skey' is not described in $CHECKFILE '$ghtest{$CHECKFILE}'",__LINE__)
+                  if ($skey ne 'define');
             }
         }
     }
@@ -863,6 +864,49 @@ sub db_discover {
     return $rc;
 }
 
+my %ghvgsub = (
+'value_generate_bigint' => \&value_generate_bigint,
+'value_generate_binary' => \&value_generate_binary,
+'value_generate_bit' => \&value_generate_bit,
+'value_generate_blob' => \&value_generate_blob,
+'value_generate_char' => \&value_generate_char,
+'value_generate_datetime' => \&value_generate_datetime,
+'value_generate_date' => \&value_generate_date,
+'value_generate_decimal' => \&value_generate_decimal,
+'value_generate_double' => \&value_generate_double,
+'value_generate_enum' => \&value_generate_enum,
+'value_generate_float' => \&value_generate_float,
+'value_generate_geomcollection' => \&value_generate_geomcollection,
+'value_generate_geometrycollection' => \&value_generate_geometrycollection,
+'value_generate_geometry' => \&value_generate_geometry,
+'value_generate_int' => \&value_generate_int,
+'value_generate_integer' => \&value_generate_int,
+'value_generate_json' => \&value_generate_json,
+'value_generate_linestring' => \&value_generate_linestring,
+'value_generate_longblob' => \&value_generate_longblob,
+'value_generate_longtext' => \&value_generate_longtext,
+'value_generate_mediumblob' => \&value_generate_mediumblob,
+'value_generate_mediumint' => \&value_generate_mediumint,
+'value_generate_mediumtext' => \&value_generate_mediumtext,
+'value_generate_multilinestring' => \&value_generate_multilinestring,
+'value_generate_multipoint' => \&value_generate_multipoint,
+'value_generate_multipolygon' => \&value_generate_multipolygon,
+'value_generate_numeric' => \&value_generate_numeric,
+'value_generate_point' => \&value_generate_point,
+'value_generate_polygon' => \&value_generate_polygon,
+'value_generate_set' => \&value_generate_set,
+'value_generate_smallint' => \&value_generate_smallint,
+'value_generate_text' => \&value_generate_text,
+'value_generate_timestamp' => \&value_generate_timestamp,
+'value_generate_time' => \&value_generate_time,
+'value_generate_tinyblob' => \&value_generate_tinyblob,
+'value_generate_tinyint' => \&value_generate_tinyint,
+'value_generate_tinytext' => \&value_generate_tinytext,
+'value_generate_varbinary' => \&value_generate_varbinary,
+'value_generate_varchar' => \&value_generate_varchar,
+'value_generate_year' => \&value_generate_year
+);
+
 # 1: kind: virtual default where update etc
 # 2: schema.table.column of the column we are building
 # returns: (value_generate_sub function_sub operator)
@@ -876,8 +920,7 @@ sub descrcol {
     $dt = lc($dt); #todo at origin
     my $subvaldt = "value_generate_$dt";
     my $subvaldtclass = "value_generate_$dtclass";
-    my $subval = defined(&$subvaldt)? $subvaldt : $subvaldtclass;
-    croak("$kind:$colnam:$dtclass:$dt sub '$subval' is not defined. CROAK.") if (not defined(&$subval));
+    my $subval = defined($ghvgsub{$subvaldt})? $subvaldt : $subvaldtclass;
     my $fundt = "function_${kind}_$dt";
     my $fundtclass = "function_${kind}_$dtclass";
     my $fun = defined($ghreal{$fundt})? $fundt : $fundtclass;
@@ -916,48 +959,6 @@ sub dooper {
     croak("dooper() rc '$rc' wrong. CROAK.") if ($rc =~ /MINUS/ or $rc =~ /N=/);
     return $rc;
 }
-
-my %ghvgsub = (
-'value_generate_bigint' => \&value_generate_bigint,
-'value_generate_binary' => \&value_generate_binary,
-'value_generate_bit' => \&value_generate_bit,
-'value_generate_blob' => \&value_generate_blob,
-'value_generate_char' => \&value_generate_char,
-'value_generate_datetime' => \&value_generate_datetime,
-'value_generate_date' => \&value_generate_date,
-'value_generate_decimal' => \&value_generate_decimal,
-'value_generate_double' => \&value_generate_double,
-'value_generate_enum' => \&value_generate_enum,
-'value_generate_float' => \&value_generate_float,
-'value_generate_geomcollection' => \&value_generate_geomcollection,
-'value_generate_geometrycollection' => \&value_generate_geometrycollection,
-'value_generate_geometry' => \&value_generate_geometry,
-'value_generate_int' => \&value_generate_int,
-'value_generate_json' => \&value_generate_json,
-'value_generate_linestring' => \&value_generate_linestring,
-'value_generate_longblob' => \&value_generate_longblob,
-'value_generate_longtext' => \&value_generate_longtext,
-'value_generate_mediumblob' => \&value_generate_mediumblob,
-'value_generate_mediumint' => \&value_generate_mediumint,
-'value_generate_mediumtext' => \&value_generate_mediumtext,
-'value_generate_multilinestring' => \&value_generate_multilinestring,
-'value_generate_multipoint' => \&value_generate_multipoint,
-'value_generate_multipolygon' => \&value_generate_multipolygon,
-'value_generate_numeric' => \&value_generate_numeric,
-'value_generate_point' => \&value_generate_point,
-'value_generate_polygon' => \&value_generate_polygon,
-'value_generate_set' => \&value_generate_set,
-'value_generate_smallint' => \&value_generate_smallint,
-'value_generate_text' => \&value_generate_text,
-'value_generate_timestamp' => \&value_generate_timestamp,
-'value_generate_time' => \&value_generate_time,
-'value_generate_tinyblob' => \&value_generate_tinyblob,
-'value_generate_tinyint' => \&value_generate_tinyint,
-'value_generate_tinytext' => \&value_generate_tinytext,
-'value_generate_varbinary' => \&value_generate_varbinary,
-'value_generate_varchar' => \&value_generate_varchar,
-'value_generate_year' => \&value_generate_year
-);
 
 # 1: schema.table
 # 2: kind: virtual default where update etc
@@ -1037,12 +1038,222 @@ sub build_expression {
     return $expr;
 }
 
+# pseudo globals
+my %hpsgstcol2def = ();      # obscure pk related see code
+my %hpsgcolcanind = ();      # col => can_be_indexed
+my %hpsgcolneedpref = ();       # col => need prefix if key
+my $psgtable_pk = '';        # table PK clause
+my $psgneedind = 0;          # indexes per table
+# 1: kind: create_table, alter_table. Not used. Yet?
+# 2: column name e.g. s.t.col1
+# return: column definition e.g. col1 INTEGER
+sub generate_column_def {
+    my ($kind,$colnam) = @ARG;
+    my ($schema,$tabl,$cnam) = split(/\./,$colnam);
+    my $tnam = "$schema.$tabl";
+    my $canpk = $hpsgstcol2def{$colnam};
+    my $coldef = '';
+    my @lnvcols = ();
+    $ghstc2isautoinc{$colnam} = $FALSE;
+    $ghstc2cannull{$colnam} = $TRUE;
+    $ghstc2canfull{$colnam} = $FALSE;
+    $ghstc2virtual{$colnam} = $FALSE;
+    $ghstc2unsigned{$colnam} = $FALSE;
+    $ghstc2len{$colnam} = -1;
+    $ghstc2candefault{$colnam} = $TRUE;
+    $ghstc2hasdefault{$colnam} = $FALSE;
+    my $srid = undef;
+    my $tclass = process_rseq('datatype_class');
+    my $keylen = undef;
+    my $canunique = $canpk eq "$TRUE"? $FALSE : $TRUE;      # UNIQUE can be added to coldef
+    # sink for PK
+    if ($tclass eq $SPATIAL or $tclass eq $JSON) {
+        $tclass = $INTEGER if ($canpk);
+        $canunique = $FALSE;
+    }
+    if ($tclass eq $LOB and $canpk and $ghst2ncolspk{$tnam} == 1) {
+        $tclass = $INTEGER;
+    }
+    # now we have final datatype class
+    $ghstc2class{$colnam} = $tclass;
+    $hpsgcolcanind{$cnam} = $FALSE;
+    if ($tclass ne $JSON) {
+        $hpsgcolcanind{$cnam} = $TRUE;
+    } else {
+        # https://bugs.mysql.com/bug.php?id=113860
+        $ghstc2candefault{$colnam} = $FALSE;
+    }
+    $hpsgcolneedpref{$cnam} = ($tclass eq $LOB)? $TRUE : $FALSE;
+    my $dt = $tclass;
+    $ghstc2just{$colnam} = $dt;
+    my $can_autoinc = $FALSE;
+    if ($tclass eq $INTEGER) {
+        $can_autoinc = $TRUE;
+        $dt = process_rseq('datatype_integer');
+        $ghstc2just{$colnam} = $dt;
+        if ($dt eq 'BIT') {
+            my $len = process_rseq('datatype_bit_len');
+            if ($len ne $EMPTY) {
+                $dt .= "($len)";
+                $ghstc2len{$colnam} = $len;
+            }
+        } else {
+            my $prob = rand();
+            if ($prob < $ghreal{'integer_unsigned_p'}) {
+                $dt .= " UNSIGNED";
+                $ghstc2unsigned{$colnam} = $TRUE;
+            }
+            if ($ghst2mayautoinc{$tnam} and not $ghst2hasautoinc{$tnam} and rand() < $ghreal{table_has_autoinc_p}) {
+                $ghst2hasautoinc{$tnam} = $TRUE;
+                $dt .= " AUTO_INCREMENT";
+                $ghstc2isautoinc{$colnam} = $TRUE;
+                $ghstc2candefault{$colnam} = $FALSE;
+                if (rand() < $ghreal{'pk_autoinc_p'}) {
+                    $ghst2pkautoinc{$tnam} = $TRUE;
+                    $dt .= " PRIMARY KEY";
+                    $ghstc2cannull{$colnam} = $FALSE;
+                } else {
+                    # todo consider edge case of missing in any subsequent index/ autoinc_unique_p ?
+                    $dt .= " UNIQUE";
+                }
+            }
+        }
+    } elsif ($tclass eq $DECIMAL) {
+        $dt = process_rseq('datatype_decimal');
+        $ghstc2just{$colnam} = $dt;
+        my $whole = process_rseq('decimal_whole');
+        if ($whole ne $EMPTY) {
+            $ghstc2len{$colnam} = $whole;
+            $dt .= "($whole";
+            my $part = process_rseq('decimal_part');
+            if ($part ne $EMPTY) {
+                $part = $whole if ($part > $whole);
+                $dt .= ",$part";
+                $ghstc2len{$colnam} = $whole - $part;      # digits BEFORE .
+            }
+            $dt .= ')';
+        }
+    } elsif ($tclass eq 'FLOATING') {
+        $dt = process_rseq('datatype_floating');
+        $ghstc2just{$colnam} = $dt;
+    } elsif ($tclass eq $DATETIME) {
+        $dt = process_rseq('datatype_datetime');
+        $ghstc2just{$colnam} = $dt;
+        if ($dt eq $DATETIME or $dt eq 'TIMESTAMP') {
+            my $frac = process_rseq('datetime_fractional');
+            $dt .= "($frac)" if ($frac ne $EMPTY);
+        }
+    } elsif ($tclass eq 'CHARACTER') {
+        $ghstc2canfull{$colnam} = $TRUE;
+        $dt = process_rseq('datatype_character');
+        $ghstc2just{$colnam} = $dt;
+        my $len = $dt eq 'CHAR'? process_rseq('datatype_char_len') : process_rseq('datatype_varchar_len');
+        $len = $V3072 if ($canpk and $len > $V3072);
+        $dt .= "($len)";
+        $ghstc2len{$colnam} = $len;
+        my $cs = process_rseq($CHARACTER_SET);
+        $dt .= " CHARACTER SET $cs" if ($cs ne $EMPTY);
+    } elsif ($tclass eq 'BINARY') {
+        $dt = process_rseq('datatype_binary');
+        $ghstc2just{$colnam} = $dt;
+        my $len = '';
+        if ($dt eq 'BINARY') {
+            $len = process_rseq('datatype_binary_len');
+            if ($canpk) {
+                $keylen = process_rseq($DATATYPE_LOB_KEY_LEN);
+                $keylen = $len if ($len ne $EMPTY and $keylen > $len);
+                $keylen = 1 if ($len eq $EMPTY);
+            }
+        } else {
+            $len = process_rseq('datatype_varbinary_len');
+        }
+        $len = $V3072 if ($canpk and $len ne $EMPTY and $len > $V3072);
+        if ($len ne $EMPTY) {
+            $dt .= "($len)";
+            $ghstc2len{$colnam} = $len;
+        } else {
+            $ghstc2len{$colnam} = 1;
+        }
+    } elsif ($tclass eq $LOB) {
+        $canunique = $FALSE;
+        $dt = process_rseq('datatype_lob');
+        $ghstc2just{$colnam} = $dt;
+        $ghstc2canfull{$colnam} = $TRUE if ($dt =~ /TEXT/);
+        if ($canpk) {
+            $keylen = process_rseq($DATATYPE_LOB_KEY_LEN);
+        }
+    } elsif ($tclass eq 'ENUMS') {
+        $dt = process_rseq('datatype_enums');
+        $ghstc2just{$colnam} = $dt;
+        my $len = $dt eq 'ENUM'? process_rseq('datatype_enum_len') : process_rseq('datatype_set_len');
+        $ghstc2len{$colnam} = $len;
+        my $vl = '';
+        for (my $n = 1; $n <= $len; ++$n) {
+            $vl .= ",'v$n'";
+        }
+        $vl =~ s/^.//;
+        $dt .= "($vl)";
+    } elsif ($tclass eq $SPATIAL) {
+        $dt = process_rseq('datatype_spatial');
+        $ghstc2just{$colnam} = $dt;
+        $srid = process_rseq('spatial_srid');
+    }
+    if (defined($srid)) {
+        if ($srid ne $EMPTY) {
+            $dt .= " SRID $srid";
+            $ghstc2srid{$colnam} = $srid;
+        } else {
+            $ghstc2srid{$colnam} = 0;
+        }
+    }
+    my $virt = ($ghstc2isautoinc{$colnam} or $ghst2hasvcols{$tnam} >= $ghst2needvcols{$tnam})?
+                 $EMPTY: process_rseq('column_virtuality');
+    if ($virt ne $EMPTY) {
+        $virt = 'STORED' if ($canpk);
+        my $expr = build_expression($tnam,$VIRTUAL,$colnam);
+        $dt .= " AS ($expr) $virt";
+        ++$ghst2hasvcols{$tnam};
+        $ghstc2virtual{$colnam} = $TRUE;
+        $ghstc2candefault{$colnam} = $FALSE;
+    } else {
+        push(@lnvcols,$cnam);
+    }
+    if ($canunique and $psgneedind > 0 and rand() < $ghreal{'column_unique_p'}) {
+        $dt .= " UNIQUE";
+        --$psgneedind;
+    }
+    my $vis = process_rseq('column_visibility');
+    if (not $canpk) {
+        if ($ghstc2isautoinc{$colnam} or $tclass eq $SPATIAL) {
+            $vis =  $EMPTY; # todo allow spatial null
+        } else {
+            $vis = process_rseq('column_null');
+            $ghstc2cannull{$colnam} = ($vis eq 'NOT_NULL')? $FALSE : $TRUE;
+        }
+        $vis =~ s/_/ /;
+        $dt .= " $vis" if ($vis ne $EMPTY);
+    } else {
+        $psgtable_pk .= " , $cnam";
+        $psgtable_pk .= "($keylen)" if (defined($keylen));
+        $ghstc2cannull{$colnam} = $FALSE;
+    }
+    if ($ghstc2candefault{$colnam} and rand() < $ghreal{'column_default_p'}) {
+        my $expr = build_expression($tnam,$DEFAULT,$colnam);
+        $dt .= " DEFAULT $expr";
+        $ghstc2hasdefault{$colnam} = $TRUE;
+    }
+    $coldef = "$cnam $dt";
+    $ghstc2dt{$colnam} = $dt;
+    $ghst2nvcols{$tnam} = \@lnvcols;
+    return $coldef;
+}
+
 # returns RC_OK if all SQL is executed successfully, othrwise RC_WARNING
 sub db_create {
     my $rc = $RC_OK;
     # CREATE TABLE SQL for all tables
     my @lsql = ();
-    my %hstcol2def = ();      # obscure pk related see code
+    %hpsgstcol2def = ();      # obscure pk related see code
 
     my $nschemas = $ghreal{'schemas'};
     dosayif($VERBOSE_ANY," will create %s schemas", $nschemas);
@@ -1070,7 +1281,7 @@ sub db_create {
         # for each table
         for my $ntab (1..$ghs2ntables{$snam}) {
             # table structure
-            my $needind = process_rseq("indexes_per_table");
+            $psgneedind = process_rseq("indexes_per_table");
             my $frm = process_rseq("table_name_format");
             my $tnam = "$snam.".sprintf($frm,$ntab);
             push(@{$ghs2pltables{$snam}}, $tnam);
@@ -1102,23 +1313,26 @@ sub db_create {
             $tail .= " STATS_SAMPLE_PAGES=$tas" if ($tas ne $EMPTY);
             $tas = process_rseq($CHARACTER_SET);
             $tail .= " CHARACTER SET $tas" if ($tas ne $EMPTY);
-            my $table_pk = '';
             $ghst2ncolspk{$tnam} = process_rseq('columns_pk');
             $ghst2ncolsnp{$tnam} = process_rseq('columns_non_pk');
+            $psgtable_pk = '';
+            %hpsgcolcanind = ();
+            %hpsgcolneedpref = ();
+            %hpsgstcol2def = ();
             my @lcols = ();
             foreach my $ncol (1..$ghst2ncolspk{$tnam}) {
                 $frm = process_rseq("column_pk_name_format");
                 my $colsn = sprintf($frm,$ncol);
                 my $colnam = "$tnam.$colsn";
                 push(@lcols,$colsn);
-                $hstcol2def{$colnam} = $TRUE;      # mark PK
+                $hpsgstcol2def{$colnam} = $TRUE;      # mark PK
             }
             foreach my $ncol (1..$ghst2ncolsnp{$tnam}) {
                 $frm = process_rseq("column_non_pk_name_format");
                 my $colsn = sprintf($frm,$ncol);
                 my $colnam = "$tnam.$colsn";
                 push(@lcols,$colsn);
-                $hstcol2def{$colnam} = $FALSE;
+                $hpsgstcol2def{$colnam} = $FALSE;
             }
             $ghst2needvcols{$tnam} = process_rseq('virtual_columns_per_table');
             $ghst2needvcols{$tnam} = scalar(@lcols)-1 if ($ghst2needvcols{$tnam} >= scalar(@lcols));
@@ -1130,228 +1344,25 @@ sub db_create {
                 @lcols = shuffle(@lcols);
                 $ghst2cols{$tnam} = \@lcols;
             }
-            my $can_autoinc = $FALSE;
             my $indnum = 0;
-            my %hcolcanind = ();
-            my %hcolneedpref = ();
-            my $srid = undef;
-            my @lnvcols = ();
             my @ltabsql = ();      # SQL for this table
             foreach my $cnam (@lcols) {
                 # each column in table
                 my $colnam = "$tnam.$cnam";
-                $ghstc2isautoinc{$colnam} = $FALSE;
-                $ghstc2cannull{$colnam} = $TRUE;
-                $ghstc2canfull{$colnam} = $FALSE;
-                $ghstc2virtual{$colnam} = $FALSE;
-                $ghstc2unsigned{$colnam} = $FALSE;
-                $ghstc2len{$colnam} = -1;
-                $ghstc2candefault{$colnam} = $TRUE;
-                $ghstc2hasdefault{$colnam} = $FALSE;
-                my $tclass = process_rseq('datatype_class');
-                my $canpk = $hstcol2def{$colnam};      # can be part of PK unchanged e.g. CHAR but not TEXT
-                my $keylen = undef;
-                my $canunique = $canpk eq "$TRUE"? $FALSE : $TRUE;      # UNIQUE can be added to coldef
-                # sink for PK
-                if ($tclass eq $SPATIAL or $tclass eq $JSON) {
-                    $tclass = $INTEGER if ($hstcol2def{$colnam});
-                    $canunique = $FALSE;
-                }
-                if ($tclass eq $LOB and $hstcol2def{$colnam} and $ghst2ncolspk{$tnam} == 1) {
-                    $tclass = $INTEGER;
-                }
-                # now we have final datatype class
-                $ghstc2class{$colnam} = $tclass;
-                if ($tclass ne $JSON) {
-                    $hcolcanind{$cnam} = $TRUE;
-                } else {
-                    # https://bugs.mysql.com/bug.php?id=113860
-                    $ghstc2candefault{$colnam} = $FALSE;
-                }
-                $hcolneedpref{$cnam} = $tclass eq $LOB? $TRUE : $FALSE;
-                my $dt = $tclass;
-                $ghstc2just{$colnam} = $dt;
-                if ($tclass eq $INTEGER) {
-                    $can_autoinc = $TRUE;
-                    $dt = process_rseq('datatype_integer');
-                    $ghstc2just{$colnam} = $dt;
-                    if ($dt eq 'BIT') {
-                        my $len = process_rseq('datatype_bit_len');
-                        if ($len ne $EMPTY) {
-                            $dt .= "($len)";
-                            $ghstc2len{$colnam} = $len;
-                        }
-                    } else {
-                        my $prob = rand();
-                        if ($prob < $ghreal{'integer_unsigned_p'}) {
-                            $dt .= " UNSIGNED";
-                            $ghstc2unsigned{$colnam} = $TRUE;
-                        }
-                        if ($ghst2mayautoinc{$tnam} and not $ghst2hasautoinc{$tnam} and rand() < $ghreal{table_has_autoinc_p}) {
-                            $ghst2hasautoinc{$tnam} = $TRUE;
-                            $dt .= " AUTO_INCREMENT";
-                            $ghstc2isautoinc{$colnam} = $TRUE;
-                            $ghstc2candefault{$colnam} = $FALSE;
-                            if (rand() < $ghreal{'pk_autoinc_p'}) {
-                                $ghst2pkautoinc{$tnam} = $TRUE;
-                                $dt .= " PRIMARY KEY";
-                                $ghstc2cannull{$colnam} = $FALSE;
-                            } else {
-                                # todo consider edge case of missing in any subsequent index/ autoinc_unique_p ?
-                                $dt .= " UNIQUE";
-                            }
-                        }
-                    }
-                } elsif ($tclass eq $DECIMAL) {
-                    $dt = process_rseq('datatype_decimal');
-                    $ghstc2just{$colnam} = $dt;
-                    my $whole = process_rseq('decimal_whole');
-                    if ($whole ne $EMPTY) {
-                        $ghstc2len{$colnam} = $whole;
-                        $dt .= "($whole";
-                        my $part = process_rseq('decimal_part');
-                        if ($part ne $EMPTY) {
-                            $part = $whole if ($part > $whole);
-                            $dt .= ",$part";
-                            $ghstc2len{$colnam} = $whole - $part;      # digits BEFORE .
-                        }
-                        $dt .= ')';
-                    }
-                } elsif ($tclass eq 'FLOATING') {
-                    $dt = process_rseq('datatype_floating');
-                    $ghstc2just{$colnam} = $dt;
-                } elsif ($tclass eq $DATETIME) {
-                    $dt = process_rseq('datatype_datetime');
-                    $ghstc2just{$colnam} = $dt;
-                    if ($dt eq $DATETIME or $dt eq 'TIMESTAMP') {
-                        my $frac = process_rseq('datetime_fractional');
-                        $dt .= "($frac)" if ($frac ne $EMPTY);
-                    }
-                } elsif ($tclass eq 'CHARACTER') {
-                    $ghstc2canfull{$colnam} = $TRUE;
-                    $dt = process_rseq('datatype_character');
-                    $ghstc2just{$colnam} = $dt;
-                    my $len = $dt eq 'CHAR'? process_rseq('datatype_char_len') : process_rseq('datatype_varchar_len');
-                    $len = $V3072 if ($canpk and $len > $V3072);
-                    $dt .= "($len)";
-                    $ghstc2len{$colnam} = $len;
-                    my $cs = process_rseq($CHARACTER_SET);
-                    $dt .= " CHARACTER SET $cs" if ($cs ne $EMPTY);
-                } elsif ($tclass eq 'BINARY') {
-                    $dt = process_rseq('datatype_binary');
-                    $ghstc2just{$colnam} = $dt;
-                    my $len = '';
-                    if ($dt eq 'BINARY') {
-                        $len = process_rseq('datatype_binary_len');
-                        if ($canpk) {
-                            $keylen = process_rseq($DATATYPE_LOB_KEY_LEN);
-                            $keylen = $len if ($len ne $EMPTY and $keylen > $len);
-                            $keylen = 1 if ($len eq $EMPTY);
-                        }
-                    } else {
-                        $len = process_rseq('datatype_varbinary_len');
-                    }
-                    $len = $V3072 if ($canpk and $len ne $EMPTY and $len > $V3072);
-                    if ($len ne $EMPTY) {
-                        $dt .= "($len)";
-                        $ghstc2len{$colnam} = $len;
-                    } else {
-                        $ghstc2len{$colnam} = 1;
-                    }
-                } elsif ($tclass eq $LOB) {
-                    $canunique = $FALSE;
-                    $dt = process_rseq('datatype_lob');
-                    $ghstc2just{$colnam} = $dt;
-                    $ghstc2canfull{$colnam} = $TRUE if ($dt =~ /TEXT/);
-                    if ($canpk) {
-                        $keylen = process_rseq($DATATYPE_LOB_KEY_LEN);
-                    }
-                } elsif ($tclass eq 'ENUMS') {
-                    $dt = process_rseq('datatype_enums');
-                    $ghstc2just{$colnam} = $dt;
-                    my $len = $dt eq 'ENUM'? process_rseq('datatype_enum_len') : process_rseq('datatype_set_len');
-                    $ghstc2len{$colnam} = $len;
-                    my $vl = '';
-                    for (my $n = 1; $n <= $len; ++$n) {
-                        $vl .= ",'v$n'";
-                    }
-                    $vl =~ s/^.//;
-                    $dt .= "($vl)";
-                } elsif ($tclass eq $SPATIAL) {
-                    $dt = process_rseq('datatype_spatial');
-                    $ghstc2just{$colnam} = $dt;
-                    $srid = process_rseq('spatial_srid');
-                }
-                my $virt = ($ghstc2isautoinc{$colnam} or $ghst2hasvcols{$tnam} >= $ghst2needvcols{$tnam})?
-                             $EMPTY: process_rseq('column_virtuality');
-                if ($virt ne $EMPTY) {
-                    $virt = 'STORED' if ($canpk);
-                    $dt .= " AS ($TO_BUILD) $virt";
-                    ++$ghst2hasvcols{$tnam};
-                    $ghstc2virtual{$colnam} = $TRUE;
-                    $ghstc2candefault{$colnam} = $FALSE;
-                } else {
-                    push(@lnvcols,$cnam);
-                }
-                if (defined($srid)) {
-                    if ($srid ne $EMPTY) {
-                        $dt .= " SRID $srid";
-                        $ghstc2srid{$colnam} = $srid;
-                    } else {
-                        $ghstc2srid{$colnam} = 0;
-                    }
-                    $srid = undef;
-                }
-                if ($canunique and $needind > 0 and rand() < $ghreal{'column_unique_p'}) {
-                    $dt .= " UNIQUE";
-                    --$needind;
-                }
-                my $vis = process_rseq('column_visibility');
-                if ($canpk) {      # todo expr
-                    $table_pk .= " , $cnam";
-                    $table_pk .= "($keylen)" if (defined($keylen));
-                    $ghstc2cannull{$colnam} = $FALSE;
-                } else {
-                    if ($canpk or $ghstc2isautoinc{$colnam} or $tclass eq $SPATIAL) {
-                        $vis =  $EMPTY; # todo allow spatial null
-                    } else {
-                        $vis = process_rseq('column_null');
-                        $ghstc2cannull{$colnam} = $vis eq 'NOT_NULL'? $FALSE : $TRUE;
-                    }
-                    $vis =~ s/_/ /;
-                    $dt .= " $vis" if ($vis ne $EMPTY);
-                }
-                if ($ghstc2candefault{$colnam} and rand() < $ghreal{'column_default_p'}) {
-                    my $expr = build_expression($tnam,$DEFAULT,$colnam);
-                    $dt .= " DEFAULT $expr";
-                    $ghstc2hasdefault{$colnam} = $TRUE;
-                }
-                my $coldef = "$cnam $dt";
-                $ghstc2dt{$colnam} = $dt;
+                my $coldef = generate_column_def('create_table',$colnam); #todo const
+    #croak("#debugCROAK+$colnam+def+$coldef+");
                 # small chance there will be no keys after the last column
-                $coldef .= ',' unless ($ghst2pkautoinc{$tnam} and $needind == 0 and $cnam eq $lcols[scalar(@lcols)-1]);
+                $coldef .= ',' unless ($ghst2pkautoinc{$tnam} and $psgneedind == 0 and $cnam eq $lcols[scalar(@lcols)-1]);
                 push(@ltabsql, $coldef);
             }
-            # now build virtual columns definition
-            foreach my $col (@lcols) {
-                my $colnam = "$tnam.$col";
-                next if (not $ghstc2virtual{$colnam});
-                my $expr = build_expression($tnam,$VIRTUAL,$colnam);
-                foreach my $sql (@ltabsql) {
-                    $sql =~ /$TO_BUILD/ or next;
-                    $sql =~ s/$TO_BUILD/$expr/;
-                    last;
-                }
-            }
             push(@lsql, @ltabsql);
-            $ghst2nvcols{$tnam} = \@lnvcols;
-            $table_pk =~ s/^ *,+/ PRIMARY KEY(/;
+            $psgtable_pk =~ s/^ *,+/ PRIMARY KEY(/;
             my $table_indexes = '';
-            push(@lsql, "$table_pk)")
+            push(@lsql, "$psgtable_pk)")
               unless ($ghst2pkautoinc{$tnam});
-            my @lindcols = keys(%hcolcanind);
-            $needind = 0 if (scalar(@lindcols) == 0);
-            foreach my $inum (1..$needind) {
+            my @lindcols = keys(%hpsgcolcanind);
+            $psgneedind = 0 if (scalar(@lindcols) == 0);
+            foreach my $inum (1..$psgneedind) {
                 my $needcols = process_rseq('columns_per_index');
                 if ($needcols eq 'ALL') {
                     $needcols = scalar(@lindcols) <= 16? scalar(@lindcols) : 16; #todo const
@@ -1378,7 +1389,7 @@ sub db_create {
                         }
                     }
                     $iline .= ", $thiscol";
-                    if ($hcolneedpref{$thiscol}) {
+                    if ($hpsgcolneedpref{$thiscol}) {
                         my $lenp = process_rseq('index_prefix_len');
                         $lenp = $ghstc2len{$coname}
                           if ($ghstc2len{$coname} > 0 and $lenp > $ghstc2len{$coname}
@@ -1601,7 +1612,6 @@ sub value_generate_int {
     } else {
         $value = -$value if (rand() < $ghreal{$NUMBER_REVERSE_SIGN_LEGITIMATE_P});
     }
-    dosayif($VERBOSE_NEVER,"for %s returning: %s",$col,$value);
     return $value;
 }
 
@@ -1616,7 +1626,6 @@ sub value_generate_tinyint {
     } else {
         $value = -$value if (rand() < $ghreal{$NUMBER_REVERSE_SIGN_LEGITIMATE_P});
     }
-    dosayif($VERBOSE_NEVER,"for %s returning: %s",$col,$value);
     return $value;
 }
 
@@ -1631,7 +1640,6 @@ sub value_generate_bigint {
     } else {
         $value = -$value if (rand() < $ghreal{$NUMBER_REVERSE_SIGN_LEGITIMATE_P});
     }
-    dosayif($VERBOSE_NEVER,"for %s returning: %s",$col,$value);
     return $value;
 }
 
@@ -1644,7 +1652,6 @@ sub value_generate_bit {
     my $valmax = defined($ghstc2len{$col})? 2**$ghstc2len{$col}-1 : $value;
     $value = $valmax if ($value > $valmax and rand() < process_rseq($VKCHAR));
     $value = abs($value); #todo workaround need bugfix
-    dosayif($VERBOSE_NEVER,"for %s returning: %s",$col,$value);
     return $value;
 }
 
@@ -1659,7 +1666,6 @@ sub value_generate_smallint {
     } else {
         $value = -$value if (rand() < $ghreal{$NUMBER_REVERSE_SIGN_LEGITIMATE_P});
     }
-    dosayif($VERBOSE_NEVER,"for %s returning: %s",$col,$value);
     return $value;
 }
 
@@ -1674,7 +1680,6 @@ sub value_generate_mediumint {
     } else {
         $value = -$value if (rand() < $ghreal{$NUMBER_REVERSE_SIGN_LEGITIMATE_P});
     }
-    dosayif($VERBOSE_NEVER,"for %s returning: %s",$col,$value);
     return $value;
 }
 
@@ -1686,7 +1691,6 @@ sub value_generate_float {
     my $exp = process_rseq('float_value_exp');
     my $value = $exp eq $EMPTY? value_generate_decimal($col,$kind) : sprintf("%sE%s",rand(),$exp);
     $value = -$value if (rand() < $ghreal{$NUMBER_REVERSE_SIGN_LEGITIMATE_P});
-    dosayif($VERBOSE_NEVER,"for %s returning: %s",$col,$value);
     return $value;
 }
 
@@ -1698,7 +1702,6 @@ sub value_generate_double {
     my $exp = process_rseq('double_value_exp');
     my $value = $exp eq $EMPTY? value_generate_decimal($col,$kind) : sprintf("%sE%s",rand(),$exp);
     $value = -$value if (rand() < $ghreal{$NUMBER_REVERSE_SIGN_LEGITIMATE_P});
-    dosayif($VERBOSE_NEVER,"for %s returning: %s",$col,$value);
     return $value;
 }
 
@@ -1712,7 +1715,6 @@ sub value_generate_char {
     $valen = $len if ($len >= 1 and $valen > $len and rand() < process_rseq($VKCHAR));
     my $value = 'c' x $valen;
     $value = "'$value'";
-    dosayif($VERBOSE_NEVER,"for %s(%s) returning: %s",$col,$len,$value);
     return $value;
 }
 
@@ -1783,7 +1785,6 @@ sub value_generate_datetime {
     my $value = sprintf("%04s-%02s-%02s %02s:%02s:%02s",$year,$month,$day,$hour,$minute,$sec);
     $value .= sprintf(".%06s",$micr) if ($micr ne $EMPTY);
     $value = "'$value'";
-    dosayif($VERBOSE_NEVER,"for %s %s returning: %s",$col,$value);
     return $value;
 }
 
@@ -1802,13 +1803,11 @@ sub value_generate_time {
     my $micr = process_rseq('datetime_microsecond_value');
     if ($retlist) {
         my @lval = ($hor,$mit,$sec,$micr);
-        dosayif($VERBOSE_NEVER,"for %s %s returning: %s",$col,"@lval");
         return @lval;
     } else {
         my $value = "$hor:$mit:$sec";
         $value .= ".$micr" if ($micr ne $EMPTY);
         $value = "'$value'";
-        dosayif($VERBOSE_NEVER,"for %s %s returning: %s",$col,$value);
         return $value;
     }
     croak('internal error: reached unreachable code. CROAK.');
@@ -1828,11 +1827,9 @@ sub value_generate_date {
     my $year = $ists? process_rseq('timestamp_year_value') : process_rseq('datetime_year_value');
     if (defined($ists)) {
         my @lval = ($year,$month,$day);
-        dosayif($VERBOSE_NEVER,"for %s %s returning: %s",$col,"@lval");
         return @lval;
     } else {
         my $value = sprintf("'%04d-%02d-%02d'",$year,$month,$day);
-        dosayif($VERBOSE_NEVER,"for %s %s returning: %s",$col,$value);
         return $value;
     }
     croak('internal error: reached unreachable code. CROAK.');
@@ -1848,7 +1845,6 @@ sub value_generate_timestamp {
     my $value = sprintf("%04s-%02s-%02s %02s:%02s:%02s",$year,$month,$day,$hour,$minute,$sec);
     $value .= sprintf(".%06s",$micr) if ($micr ne $EMPTY);
     $value = "'$value'";
-    dosayif($VERBOSE_NEVER,"for %s %s returning: %s",$col,$value);
     return $value;
 }
 
@@ -2071,7 +2067,6 @@ sub value_generate_json {
     }
     $value =~ s/'/\\'/g;
     $value = "'$value'";
-    dosayif($VERBOSE_NEVER,"for %s %s returning: %s",$col,$value);
     return $value;
 }
 
@@ -2195,7 +2190,8 @@ sub build_insert_values {
             next;
         }
         # consider NULL
-        if ($ghstc2isautoinc{$colnam} == $TRUE) {
+        croak("undefined autoinc info for '$colnam' with '@{$plcols}'") if (not defined($ghstc2isautoinc{$colnam}));
+        if ($ghstc2isautoinc{$colnam}) {
             if (rand() >= $ghreal{'autoinc_explicit_value_p'}) {
                 $values .= ', NULL';
                 next;
@@ -2281,17 +2277,16 @@ sub stmt_alter_generate {
             my $cnam = $lcols[int(rand()*scalar(@lcols))];
             $stmt .= "DROP COLUMN $cnam, ";
         } elsif ($kind eq 'ADD_COL') {
-            my $cnf = process_rseq('column_non_pk_name_format'); #todo const
-            my $cnam = sprintf($cnf,"_new_".int(rand()*1000));
-            $stmt .= "ADD COLUMN $cnam INTEGER"; # todo robust
+            my $colnam = sprintf("%s.added_col_%s",$tnam,int(rand()*1000)); #todo 1000 maybe
+            my $coldef = generate_column_def('alter_table',$colnam); #todo const
+            $stmt .= "ADD COLUMN $coldef, ";
         } elsif ($kind eq 'TABLE_EB') {
-            $stmt .= "ENGINE=InnoDB";
+            $stmt = "ENGINE=InnoDB";
             last;
         }
     }
     $stmt =~ s/, *$//;
     $stmt = "ALTER TABLE $tnam $stmt";
-    dosayif($VERBOSE_NEVER,"returning %s",$stmt);
     return $stmt;
 }
 
@@ -2469,7 +2464,6 @@ sub server_load_thread {
             dosayif($VERBOSE_ANY, "restarted as pid %s: %s",$wspid,$shel);
             $msh->autoflush();
         }
-        dosayif($VERBOSE_NEVER, "sending to execute: %s",$stmt);
         dosayif($VERBOSE_ANY, "sending to execute stmt #%s",$snum) if ($snum % $ghreal{'report_every_stmt'} == 0);
         printf($msh "%s;\n", $stmt) if ($dosql);
         ++$ghsql2stats{$ksql};

@@ -243,15 +243,12 @@ fulltext_index_p:
 function_insert_binary:
   mandatory: True
   allowed: Rseq       
-  only_values_allowed: PI(),NOW()
 function_insert_character:
   mandatory: True
   allowed: Rseq       
-  only_values_allowed: NOW(),PI()
 function_insert_datetime:
   mandatory: True
   allowed: Rseq       
-  only_values_allowed: NOW()
 function_insert_decimal:
   mandatory: True
   allowed: Rseq       
@@ -280,36 +277,30 @@ function_insert_set:
 function_update_binary:
   mandatory: True
   allowed: Rseq       
-  only_values_allowed: NOW(),ASCII(),HEX()
 function_update_character:
   mandatory: True
   allowed: Rseq       
-  only_values_allowed: NOW(),CONCAT(),PI(),ASCII(),HEX()
 function_update_datetime:
   mandatory: True
   allowed: Rseq       
 function_update_decimal:
   mandatory: True
   allowed: Rseq       
-  only_values_allowed: PI(),NOW(),ASCII(),HEX(),ABS(),ACOS()
 function_update_enum:
   mandatory: True
   allowed: Rseq       
 function_update_floating:
   mandatory: True
   allowed: Rseq       
-  only_values_allowed: PI(),NOW(),ASCII(),HEX(),ABS(),ACOS()
 function_update_integer:
   mandatory: True
   allowed: Rseq       
-  only_values_allowed: PI(),NOW(),ASCII(),HEX(),ABS(),ACOS()
 function_update_json:
   mandatory: True
   allowed: Rseq       
 function_update_lob:
   mandatory: True
   allowed: Rseq       
-  only_values_allowed: CURRENT_USER,CURRENT_USER(),PI(),NOW(),ASCII(),HEX()
 function_update_set:
   mandatory: True
   allowed: Rseq       
@@ -323,33 +314,27 @@ function_virtual:
 function_where_character:
   mandatory: True
   allowed: Rseq       
-  only_values_allowed: PI(),NOW(),ASCII(),HEX()
 function_where_binary:
   mandatory: True
   allowed: Rseq       
-  only_values_allowed: PI(),NOW(),ASCII(),HEX()
 function_where_datetime:
   mandatory: True
   allowed: Rseq       
 function_where_decimal:
   mandatory: True
   allowed: Rseq       
-  only_values_allowed: PI(),NOW(),ASCII(),HEX(),ABS(),ACOS()
 function_where_enum:
   mandatory: True
   allowed: Rseq       
 function_where_floating:
   mandatory: True
   allowed: Rseq       
-  only_values_allowed: PI(),NOW(),ASCII(),HEX(),ABS(),ACOS()
 function_where_integer:
   mandatory: True
   allowed: Rseq       
-  only_values_allowed: PI(),NOW(),ASCII(),HEX(),ABS(),ACOS()
 function_where_lob:
   mandatory: True
   allowed: Rseq       
-  only_values_allowed: PI(),NOW(),ASCII(),HEX()
 function_where_set:
   mandatory: True
   allowed: Rseq       
@@ -503,15 +488,12 @@ operator_null:
 operator_logical_decimal:
   mandatory: True
   allowed: Rseq
-  only_values_allowed: o@<,o@>,o@<=,o@>=,o@<=>,o@N=
 operator_logical_floating:
   mandatory: True
   allowed: Rseq
-  only_values_allowed: o@<,o@>,o@<=,o@>=,o@<=>,o@N=
 operator_logical_integer:
   mandatory: True
   allowed: Rseq
-  only_values_allowed: o@<,o@>,o@<=,o@>=,o@<=>,o@N=
 operator_logical:
   mandatory: True
   allowed: Rseq
