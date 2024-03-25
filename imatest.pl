@@ -4,7 +4,7 @@ use English;
 
 require 5.032;
 
-# style: flexible, mostly per perldoc perlstyle
+# style: flexible, mostly per perldoc perlstyle. Follow suit.
 # M1. mandatory: no tabs, 4 blanks indentation
 # M2. mandatory: no case statement, no camelCase
 # 2. desirable: should look like C. Postfix if is OK and is preferred over postfix unless. 
@@ -24,6 +24,8 @@ require 5.032;
 # 16. max source code line length is 143
 
 # todo
+# watch for load thread termination
+# as (NULL) desupport
 # croak with date
 # allow multiple destroyer threads
 # REPLACE
@@ -62,7 +64,7 @@ use YAML qw(LoadFile);
 STDOUT->autoflush();
 STDERR->autoflush();
 
-my $version = '2.62';
+my $version = '2.84';
 
 $Data::Dumper::Sortkeys = 1;
 
@@ -78,7 +80,7 @@ my $VERBOSE_ANY = 0;
 my $VERBOSE_SOME = 1;
 my $VERBOSE_MORE = 2;
 my $VERBOSE_DEV = 3;
-my $VERBOSE_NEVER = 4;      # still can be passed
+my $VERBOSE_NEVER = 4;
 my $VERSION = 'version';
 
 my $USAGE_ERROR_EC = 1;
@@ -301,12 +303,12 @@ sub usage {
         2 means quite verbose
         3 very verbose, mostly for internal development use
         4 or more extremely verbose
-    --$SEE_ALSO string: optional, this string is output at the end of the run.
+    --$SEE_ALSO string: optional, this string is output at the end of the run
     --$VERSION: show script version and exit
 EOF
     ;
     dosayif($VERBOSE_ANY, "%s", $usage);
-    croak("usage() called. CROAK.");
+    docroak("usage() called. CROAK.");
 }
 
 # 1: file to unlink
@@ -343,7 +345,7 @@ sub dosleep {
 sub readfile {
     my $fn = $ARG[0];
     dosayif($VERBOSE_MORE," called with %s",$fn);
-    open(my $fh, '<', $fn) or croak("failed to open $fn for reading. CROAK.");
+    open(my $fh, '<', $fn) or docroak("failed to open $fn for reading. CROAK.");
     my $rc = '';
     while (my $lin = <$fh>) {
         $rc .= $lin;
@@ -359,7 +361,7 @@ sub readfile {
 sub doeval {
     local $EVAL_ERROR;
     my $toeval = $ARG[0];
-    croak("Trying to evaluate an undefined value. CROAK") if (not defined($toeval));
+    docroak("Trying to evaluate an undefined value. CROAK") if (not defined($toeval));
     my $aslist = defined($ARG[1])? $ARG[1] : $FALSE;
     my $howver = (defined($ARG[2]) and $ARG[2])? $VERBOSE_NEVER : $VERBOSE_ANY;
     dosayif($VERBOSE_MORE, "is called with %s",  $toeval);
@@ -418,6 +420,14 @@ sub dosayif {
     printf($doformat, $PID, $dout, $PROGRAM_NAME, $res, @largs);
 }
 
+# format, arguments
+sub docroak {
+    dosayif($VERBOSE_ANY,@ARG);
+    my ($format,@larg) = @ARG;
+    my $msg = sprintf("Now we CROAK. ".$format,@larg);
+    croak($msg);
+}
+
 # 1: range or value as ref array as 1I 2 0.1 1D 2 0.1 or 1 1.0. 3d element is ignored.
 sub process_range {
     my $plval = $ARG[0];
@@ -463,13 +473,13 @@ sub process_range {
 sub process_rseq {
 # val is Rseq kind of value, $skey is top level hash key e.g. "schemas"
     my $skey = $ARG[0];
-    croak("internal error: '$skey' is not an Rseq test parameter") if (not defined($ghreal{$skey}));
+    docroak("internal error: '$skey' is not an Rseq test parameter") if (not defined($ghreal{$skey}));
     my $silent = defined($ARG[1])? $ARG[1] : $TRUE;
     my $check = defined($ARG[2])? $ARG[2] : $FALSE;
     my $verbose = $silent? $VERBOSE_NEVER : $VERBOSE_DEV;
     my $val = $ghtest{$skey};
     my $phverk = $ghver{$skey};
-    croak("$skey +$val+$skey+is not in test description file or not Rseq. CROAK.") if ($check and not defined($phverk));
+    docroak("$skey +$val+$skey+is not in test description file or not Rseq. CROAK.") if ($check and not defined($phverk));
     my $rc = $RC_OK;
     my ($only_positive_integers, $only_non_negative_integers, $only_names, $only_values_allowed) =
          $check ?
@@ -995,11 +1005,16 @@ sub build_expression {
                     $termval =~ s/[}]/)/g;
                 }
                 if ($termval =~ /\@COL/) {
-                    my $plcols = $ghst2cols{$tnam};
-                    my $slcols = scalar(@$plcols);
+                    my @lcols = @{$ghst2cols{$tnam}};
+                    if ($termval =~ /\@COL_([a-zA-Z_]+)/) {
+                        my $needtype = $1;
+                        @lcols = grep {my $fn = "$tnam.$_"; ($ghstc2just{$fn} eq $needtype or $ghstc2class{$fn} eq $needtype)} @lcols;
+                        push(@lcols,$ghst2cols{$tnam}->[0]) if (scalar(@lcols) == 0);
+                    }
+                    my $slcols = scalar(@lcols);
                     while ($termval =~ /\@COL/) {
-                        my $rcol = $plcols->[int(rand()*$slcols)];
-                        $termval =~ s/\@COL/$rcol/;
+                        my $rcol = $lcols[int(rand()*$slcols)];
+                        $termval =~ s/\@COL(_[a-zA-Z_]*)?/$rcol/;
                     }
                 }
                 $termval =~ s/\@STSELF/$colnam/g;
@@ -1051,9 +1066,8 @@ sub generate_column_def {
     my ($kind,$colnam) = @ARG;
     my ($schema,$tabl,$cnam) = split(/\./,$colnam);
     my $tnam = "$schema.$tabl";
-    my $canpk = $hpsgstcol2def{$colnam};
+    my $canpk = defined($hpsgstcol2def{$colnam})? $hpsgstcol2def{$colnam} : $TRUE;      # latter for ADD COLUMN, need +p todo
     my $coldef = '';
-    my @lnvcols = ();
     $ghstc2isautoinc{$colnam} = $FALSE;
     $ghstc2cannull{$colnam} = $TRUE;
     $ghstc2canfull{$colnam} = $FALSE;
@@ -1216,7 +1230,12 @@ sub generate_column_def {
         $ghstc2virtual{$colnam} = $TRUE;
         $ghstc2candefault{$colnam} = $FALSE;
     } else {
-        push(@lnvcols,$cnam);
+        if (defined($ghst2nvcols{$tnam})) {
+            #$ghst2nvcols{$tnam}->[scalar(@{$ghst2nvcols{$tnam}})] = $cnam;
+            push(@{$ghst2nvcols{$tnam}},$cnam);
+        } else {
+            $ghst2nvcols{$tnam} = [$cnam];
+        }
     }
     if ($canunique and $psgneedind > 0 and rand() < $ghreal{'column_unique_p'}) {
         $dt .= " UNIQUE";
@@ -1244,7 +1263,8 @@ sub generate_column_def {
     }
     $coldef = "$cnam $dt";
     $ghstc2dt{$colnam} = $dt;
-    $ghst2nvcols{$tnam} = \@lnvcols;
+    $ghstc2just{$colnam} = lc($ghstc2just{$colnam});
+    $ghstc2class{$colnam} = lc($ghstc2class{$colnam});
     return $coldef;
 }
 
@@ -1350,7 +1370,6 @@ sub db_create {
                 # each column in table
                 my $colnam = "$tnam.$cnam";
                 my $coldef = generate_column_def('create_table',$colnam); #todo const
-    #croak("#debugCROAK+$colnam+def+$coldef+");
                 # small chance there will be no keys after the last column
                 $coldef .= ',' unless ($ghst2pkautoinc{$tnam} and $psgneedind == 0 and $cnam eq $lcols[scalar(@lcols)-1]);
                 push(@ltabsql, $coldef);
@@ -2076,7 +2095,6 @@ sub value_generate_year {
     my ($col,$kind) = @ARG;
     croak("kind is not defined. CROAK.") if (not defined($kind));
     my $value = process_rseq('year_value');
-    dosayif($VERBOSE_NEVER,"for %s returning: %s",$col,$value);
     return $value;
 }
 
@@ -2093,7 +2111,6 @@ sub value_generate_set {
     }
     $value =~ s/^,//;
     $value = "'$value'";
-    dosayif($VERBOSE_NEVER,"for %s %s returning: %s",$col,$len,$value);
     return $value;
 }
 
@@ -2105,7 +2122,6 @@ sub value_generate_enum {
     my $len = defined($ghstc2len{$col})? $ghstc2len{$col} : 3; #todo consider parm
     my $num = int(rand()*$len)+1;
     my $value = "\"v$num\"";
-    dosayif($VERBOSE_NEVER,"for %s returning: %s",$col,$value);
     return $value;
 }
 
@@ -2340,6 +2356,8 @@ sub internalise {
         $ghstc2just{$cnam} = $tail;
         $ghstc2class{$cnam} = $ghdt2class{$tail};
         $ghstc2canfull{$cnam} = (",$ghreal{'datatype_canfull'}," =~ /,$tail,/)? $TRUE : $FALSE;
+        $ghstc2just{$cnam} = lc($ghstc2just{$cnam});
+        $ghstc2class{$cnam} = lc($ghstc2class{$cnam});
     }
     $ghst2cols{$tnam} = \@lcols;
     $ghst2nvcols{$tnam} = \@lnvcols;
@@ -2371,7 +2389,7 @@ sub server_load_thread {
         }
     }
     
-    dosayif($VERBOSE_ANY, "%s load thread %s to run for %s secons",$tkind,$tnum,$howlong);
+    dosayif($VERBOSE_ANY, "%s load thread %s to run for %s seconds",$tkind,$tnum,$howlong);
     $ENV{_imatest_load_filebase} = "load_thread_$tnum";
     my $outto = doeval($ghreal{'load_thread_out'});
     my $errto = doeval($ghreal{'load_thread_err'});
@@ -2381,19 +2399,31 @@ sub server_load_thread {
     my $dosql = ($ghreal{'load_execute_sql'} eq $YES);
     dosayif($VERBOSE_ANY, "see also %s and %s and %s and %s",$ENV{$LOAD_THREAD_CLIENT_LOG_ENV},$outto,$errto,$sqlto);
     open(my $msql, ">$sqlto") or croak("failed to open >$sqlto: $ERRNO. CROAK.");
+    $msql->autoflush();
     my $shel = '';
     my $shelkind = $ghreal{'load_thread_execute_with'};
+    my $execext = $TRUE;
     if ($shelkind eq 'mysqlsh') {
         $shel = "$ghmisc{'mysqlsh_base'} --log-file $ENV{$LOAD_THREAD_CLIENT_LOG_ENV} >>$outto 2>>$errto";
     } elsif ($shelkind eq 'mysql') {
         $shel = "$ghmisc{'mysql_base'} >>$outto 2>>$errto";
+    } else {      # self
+        $execext = $FALSE;
     }
-    my $msh = undef;
-    my $wspid = open2(my $msout, $msh, $shel) or croak("Failed (errno: $ERRNO) to start $shel. CROAK.");
-    dosayif($VERBOSE_ANY, "started as pid %s: %s",$wspid,$shel);
-    $msh->autoflush();
-    $msql->autoflush();
-    my $f2read = undef;
+    my $msh;
+    my $wspid;
+    if ($execext) {
+        $wspid = open2(my $msout, $msh, $shel) or croak("Failed (errno: $ERRNO) to start $shel. CROAK.");
+        dosayif($VERBOSE_ANY, "started as pid %s: %s",$wspid,$shel);
+        $msh->autoflush();
+    } else {      # self
+        close(STDOUT);
+        close(STDERR);
+        open (STDOUT, '>>', $outto);
+        open (STDERR, '>>', $errto);
+        STDOUT->autoflush();
+        STDERR->autoflush();
+    }
     my $snum = 0;
     while ($TRUE) {
         my $thistime = time();
@@ -2448,7 +2478,7 @@ sub server_load_thread {
             $tnam = $glstables[int(rand()*$gntables)];
             $stmt = stmt_alter_generate($tnam);
         } else {
-            croak("load_sql_class=$ksql is not supported yet. CROAK.");
+            docroak("load_sql_class=$ksql is not supported yet. CROAK.");
         }
         if ($canexp) {
             my $exp = process_rseq('explain');
@@ -2457,7 +2487,7 @@ sub server_load_thread {
         }
 
         # now send statement for execution
-        if (waitpid($wspid, WNOHANG) == $wspid) {
+        if ($execext and waitpid($wspid, WNOHANG) == $wspid) {
             dosayif($VERBOSE_ANY,"process $wspid has terminated, restarting");
             close($msh);
             $wspid = open2(my $msout, $msh, $shel) or croak("Failed (errno: $ERRNO) to start $shel. CROAK.");
@@ -2465,7 +2495,18 @@ sub server_load_thread {
             $msh->autoflush();
         }
         dosayif($VERBOSE_ANY, "sending to execute stmt #%s",$snum) if ($snum % $ghreal{'report_every_stmt'} == 0);
-        printf($msh "%s;\n", $stmt) if ($dosql);
+        if ($dosql) {
+            if ($execext) {
+                printf($msh "%s;\n", $stmt) if ($dosql);
+            } else {      # self
+                use DBI;
+                use DBD::mysql;
+                my $dsn = "DBI:mysql:host=127.0.0.1;port=4202";
+                my $dbh = DBI->connect($dsn,'rrot','m');
+    docroak("#debugCROAK") if (defined($dbh));
+    docroak("#debugCROAKn");
+            }
+        }
         ++$ghsql2stats{$ksql};
         printf($msql "%s;\n", $stmt);
 
@@ -2694,7 +2735,7 @@ my $trc = $RC_OK;
 $ghreal{$TEST_DURATION} = process_rseq($TEST_DURATION);
 if ($ghreal{'server_terminate'} eq $YES) {
     $trc = start_server_termination_thread();
-    croak("failed to start server termination thread. CROAK.") if ($trc != $RC_OK);
+    docroak("failed to start server termination thread. CROAK.") if ($trc != $RC_OK);
 }
 my $tlod = $ghreal{'load_threads'};
 dosayif($VERBOSE_ANY,"starting test load threads: %s",$tlod);
@@ -2706,7 +2747,7 @@ foreach my $elem (@lolod) {
     foreach my $tnum (1..$lok[0]) {
         ++$talnum;
         $trc = start_load_thread($talnum,$lok[1],int(rand()*10000+100));
-        croak("failed to start test load thread. CROAK.") if ($trc != $RC_OK);
+        docroak("failed to start test load thread. CROAK.") if ($trc != $RC_OK);
     }
 }
 

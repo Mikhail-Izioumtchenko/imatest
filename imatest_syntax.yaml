@@ -252,25 +252,21 @@ function_insert_datetime:
 function_insert_decimal:
   mandatory: True
   allowed: Rseq       
-  only_values_allowed: PI(),NOW()
 function_insert_enum:
   mandatory: True
   allowed: Rseq       
 function_insert_floating:
   mandatory: True
   allowed: Rseq       
-  only_values_allowed: PI(),NOW()
 function_insert_integer:
   mandatory: True
   allowed: Rseq       
-  only_values_allowed: PI(),NOW()
 function_insert_json:
   mandatory: True
   allowed: Rseq       
 function_insert_lob:
   mandatory: True
   allowed: Rseq       
-  only_values_allowed: CURRENT_USER,CURRENT_USER(),PI(),NOW()
 function_insert_set:
   mandatory: True
   allowed: Rseq       
@@ -421,8 +417,8 @@ load_thread_err:
   mandatory: True
 load_thread_execute_with:
   mandatory: True
-  allowed: [mysqlsh, mysql, custom]
-  supported: [mysqlsh, mysql]
+  allowed: [mysqlsh, mysql, self]
+  supported: [mysqlsh, mysql, self]
 load_thread_out:
   mandatory: True
 load_thread_sql:

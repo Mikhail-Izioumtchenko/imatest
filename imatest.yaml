@@ -1,29 +1,32 @@
 ---
 # todo SELECT expression, mix value/fun, @COL with datatype, ASC/DESC per col. Do we have multicol ind?
+create_server: True
+#load_thread_execute_with: self
 load_thread_out: qw(/dev/null)
 load_thread_err: qw(/dev/null)
 load_thread_sql: qw(/dev/null)
-load_threads: 2
-#load_threads: 10
-test_duration_seconds: 21381
+#load_threads: 1
+load_threads: 10
+test_duration_seconds: 640
 load_sql_class: INSERT:0.9,UPDATE:0.8,DELETE:0.01,CHECK:0.05,SELECT:0.9,ALTER!INSEL
-load_max_stmt: 000
-report_every_stmt: 1000
+load_max_stmt: 16000
+report_every_stmt: 5006
 server_termination_how: shutdown:0.1,shutkill:0.1,kill:0.5,sigkill:0.9,sigstop
 mysql_static_cnf: |
 init_stop_server: No
-schemas: 3
-tables_per_schema: 11
+schemas: 1
+tables_per_schema: 4
+server_termination_every_seconds: 30-40:0.1,225-765
 
-#
-define: &functions_character CONCAT(@SELF;@COL),CONCAT(@STSELF;@COL),CONCAT(@SELF;@SELF),PI(),NOW(),ASCII(@COL),ASCII(@SELF),HEX(@COL),HEX(@SELF),BIN(@COL),BIT_LENGTH(@COL),BIT_LENGTH(@SELF)
-define: &functions_datetime NOW(),ADDDATE(@SELF;1),ADDTIME(@SELF;1)
+# 
+define: &functions_character CONCAT(@SELF;@COL_character),CONCAT(@SELF;@SELF),PI(),NOW(),ASCII(@COL_integer),ASCII(@SELF),HEX(@COL_lob),HEX(@SELF),BIN(@COL),BIT_LENGTH(@COL),BIT_LENGTH(@SELF),CHAR(@COL),CHAR_LENGTH(@SELF),CHAR_LENGTH(@COL),CHARSET(@COL_character),CHARSET(@COL_text),COERCIBILITY(@COL),COLLATION(@COL),CONCAT_WS(@SELF,@SELF,@SELF)
+define: &functions_datetime ADDDATE(@COL_timestamp;1),ADDDATE(@COL_datetime;1),NOW(),ADDDATE(@SELF;1),ADDTIME(@SELF;1)
 define: &functions_datetime_insert NOW()
-define: &functions_lob CURRENT_USER,CURRENT_USER(),PI(),NOW(),ASCII(@COL),ASCII(@SELF),HEX(@COL),HEX(@SELF),AES_ENCRYPT(@COL;""),AES_DECRYPT(@SELF;""),AES_ENCRYPT(@SELF;""),BIN(@COL),BIT_LENGTH(@COL),BIT_LENGTH(@SELF)
-define: &functions_lob_insert CURRENT_USER,CURRENT_USER(),PI(),NOW()
-define: &functions_numeric PI(),NOW(),ASCII(@COL),ASCII(@SELF),HEX(@COL),HEX(@SELF),ABS(@COL),ACOS(@SELF),ASIN(@SELF),ASIN(@COL),ATAN(@SELF),ATAN(@COL),BIN(@COL),BIN(@SELF),BIT_COUNT(@SELF),BIT_LENGTH(@COL),BIT_LENGTH(@SELF)
-define: &functions_numeric_insert PI(),NOW()
-define: &functions_virtual PI(),CONCAT(@COL;@COL),CONCAT(@FPI(};@COL),ASCII(@COL),HEX(@COL),ABS(@COL),ACOS(@COL),ADDDATE(@COL;1),ADDTIME(@COL;1),AES_ENCRYPT(@COL;""),AES_DECRYPT(@COL;""),AES_ENCRYPT(@COL;""),ASIN(@COL),ASIN(@COL),ATAN(@COL),BIN(@COL),BIT_COUNT(@COL),BIT_LENGTH(@COL)
+define: &functions_lob CURRENT_USER,CURRENT_USER(),PI(),NOW(),ASCII(@COL_varchar),ASCII(@SELF),HEX(@COL),HEX(@SELF),AES_ENCRYPT(@COL;""),AES_DECRYPT(@SELF;""),AES_ENCRYPT(@SELF;""),BIN(@COL),BIT_LENGTH(@COL),BIT_LENGTH(@SELF),CHAR(@COL),CHAR_LENGTH(@SELF),CHAR_LENGTH(@COL),CHARSET(@COL_character),CHARSET(@COL_text),COERCIBILITY(@COL),COLLATION(@COL),COMPRESS(@COL),MD5(@COL)
+define: &functions_lob_insert CURRENT_USER,CURRENT_USER(),PI(),NOW(),RAND()
+define: &functions_numeric PI(),NOW(),ASCII(@COL),ASCII(@SELF),HEX(@COL),HEX(@SELF),ABS(@COL_integer),ACOS(@SELF),ASIN(@SELF),ASIN(@COL),ATAN(@SELF),ATAN(@COL),BIN(@COL),BIN(@SELF),BIT_COUNT(@SELF),BIT_LENGTH(@COL),BIT_LENGTH(@SELF),CEIL(@SELF),CEIL(@COL),CHAR_LENGTH(@SELF),CHAR_LENGTH(@COL),COERCIBILITY(@COL),RAND()
+define: &functions_numeric_insert PI(),NOW(),RAND()
+define: &functions_virtual PI(),CONCAT(@COL_varchar;@COL_character),CONCAT(@FPI(};@COL),ASCII(@COL),HEX(@COL),ABS(@COL),ACOS(@COL),ADDDATE(@COL;1),ADDTIME(@COL;1),AES_ENCRYPT(@COL;""),AES_DECRYPT(@COL;""),AES_ENCRYPT(@COL;""),ASIN(@COL),ASIN(@COL),ATAN(@COL),BIN(@COL),BIT_COUNT(@COL),BIT_LENGTH(@COL),CEIL(@COL),CHAR(@COL),CHAR_LENGTH(@COL),COERCIBILITY(@COL),COLLATION(@COL),COMPRESS(@COL),MD5(@COL),CONCAT_WS(@COL_character,@COL_character,@COL_character)
 
 # todo: see imatest.pl, but some here
 # on values kinds and syntax see comments imatest_syntax.yaml
@@ -99,7 +102,7 @@ server_terminate: Yes
 # see comments on Rseq in imatest_syntax.yaml
 # the test will terminate the server every about 60 seconds
 # this sleep is when the server is running
-server_termination_every_seconds: 55-165
+server_termination_every_seconds: 125-665
 # terminate server like so. kill is mysqlsh builtin kill whatever that is. dba.killSandboxInstance
 server_termination_how: shutdown!shutkill,kill,sigkill,sigstop
 # this and similar is evaluated at server termination time

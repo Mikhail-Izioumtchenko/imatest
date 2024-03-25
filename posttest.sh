@@ -22,8 +22,10 @@ pass=`$CAT "$IMAPAS"`
 ./count1sa.sh "$port" $schemas
 ./checktables1sa.sh "$port" $schemas
 ./usems.sh "$port"
-./logmine.sh "$taport" | $GREP -i 'CROAK|oaks|oaked at|ignals'
+./logmine.sh "$taport" | $GREP -i 'undefined|CROAK|oaks|oaked at|ignals|yntax'
 
+$DF -h /mnt/c
 $ECHO -n "Remove -rf /tmp/* ? "
 $READ ans
 [ "$ans" = 'y' ] && $RM -rfv /tmp/*
+$DF -h /mnt/c
