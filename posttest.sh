@@ -16,14 +16,20 @@ schemas="$*"
 base="$IMAPORTBASE"
 taport="$(($port + $base))"
 pass=`$CAT "$IMAPAS"`
+lof="/tmp/`$BASENAME $0`.tmp"
 
-./logmine.sh "$taport" 2>&1 | $LESS
+$PERL logmine.pl /root/mysql-sandboxes/*/sandboxdata/error.log /tmp/*log /tmp/*out 2>&1 | $TEE "$lof" | $LESS
 ./startms.sh "$port"
 ./count1sa.sh "$port" $schemas
 ./checktables1sa.sh "$port" $schemas
 ./usems.sh "$port"
-./logmine.sh "$taport" | $GREP -i 'undefined|CROAK|oaks|oaked at|ignals|yntax'
 
+$ECHO "signals and croaks START"
+$GREP -i 'signal|croak' "$lof"
+$ECHO "signals and croaks SHORT"
+$ECHO "signals and croaks END"
+$ECHO "See also $lof"
+$LS -lt /tmp
 $DF -h /mnt/c
 $ECHO -n "Remove -rf /tmp/* ? "
 $READ ans

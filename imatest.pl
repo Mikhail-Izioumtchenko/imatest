@@ -25,8 +25,10 @@ require 5.032;
 
 # todo
 # watch for load thread termination
+# native client
+# seeds per thread
+# ports per thread
 # as (NULL) desupport
-# croak with date
 # allow multiple destroyer threads
 # REPLACE
 # ANALYZE + histogram
@@ -50,6 +52,7 @@ require 5.032;
 use Carp qw(croak shortmess);
 use Data::Dumper qw(Dumper);
 use DateTime;
+use File::Tee qw(tee);
 use Getopt::Long qw(GetOptions);
 use IO::Handle;
 use IPC::Open2 qw(open2);
@@ -64,7 +67,7 @@ use YAML qw(LoadFile);
 STDOUT->autoflush();
 STDERR->autoflush();
 
-my $version = '2.84';
+my $version = '2.92';
 
 $Data::Dumper::Sortkeys = 1;
 
@@ -124,6 +127,8 @@ my $DECIMAL = 'DECIMAL';
 my $DEFAULT = 'default';
 my $DEFAULTUC = 'DEFAULT';
 my $DESTROY_DESTROY = 'destroy_destroy';
+my $EFAIL = 'EFAIL';
+my $EGOOD = 'EGOOD';
 my $EIGHT = 8;
 my $EMPTY = 'EMPTY';
 my $END = 'END';
@@ -246,7 +251,8 @@ my @ghstcolist = (
                  );
 # end schema.table.column hashes
 my %ghmisc = ();         # e.g. mysqlsh_exec => invocation line prefix
-my @glpids;      # process ids of load threads
+my %ghlpids;      # process ids of load threads => parameters to restart;
+my @gltermpids;      # process ids of termination threads
 
 # used to generate JSON values
 my %gh2json = (
@@ -279,7 +285,7 @@ my %gh2json = (
 '1' => \%ghstc2isautoinc ,
 '3' => \%ghs2pltables ,
 #'4' => \%ghmisc ,
-'6' => \@glpids,
+'6' => \%ghlpids,
 $RAND => 0
 );
 
@@ -630,7 +636,7 @@ sub tlist2file {
     dosayif($VERBOSE_ANY,"is invoked for %s",  $fil);
     dosayif($VERBOSE_MORE, "is invoked for %s to write %s",  $fil, Dumper($pltext));
 
-    open(my $fh, $fil) or croak("failed to open $fil. CROAK.");
+    open(my $fh, $fil) or docroak("failed to open $fil. CROAK.");
     foreach my $lin (@$pltext) {
         printf $fh "%s\n", $lin;
     }
@@ -688,7 +694,7 @@ sub checkscript {
             } 
         }
         foreach my $have (keys(%hsub)) {
-            croak(
+            docroak(
  "$CHECK_SUBKEYS='@{$ghver{$CHECK_SUBKEYS}}' is defined in $CHECKFILE '$ghtest{$CHECKFILE}' but '$have' is not there. CROAK.")
               if (not defined($hcheck{$have}));
         }
@@ -718,7 +724,7 @@ sub checkscript {
         if (defined($vcheck) and $vcheck eq 'doeval') {
             my $ev = doeval($ghtest{$skey});
             if (not defined($ev)) {
-                croak("$skey of $ghtest{$skey} in $testyaml failed to evaluate. CROAK.");
+                docroak("$skey of $ghtest{$skey} in $testyaml failed to evaluate. CROAK.");
             }
             $ghreal{$skey} = $ev;
             dosayif($VERBOSE_MORE, "by doeval set %s to '%s' of ref %s",$skey,$ev,ref($ev));
@@ -727,7 +733,7 @@ sub checkscript {
         if (defined($vcheck) and $vcheck eq 'doeval_list') {
             my $ev = doeval($ghtest{$skey}, $TRUE);
             if (not defined($ev)) {
-                croak("$skey of $ghtest{$skey} in $testyaml failed to evaluate. CROAK.");
+                docroak("$skey of $ghtest{$skey} in $testyaml failed to evaluate. CROAK.");
             }
             $ghreal{$skey} = $ev;
             dosayif($VERBOSE_MORE, "by doeval_list set %s to '%s' of ref %s",$skey,$ev,ref($ev));
@@ -763,17 +769,23 @@ sub checkscript {
 sub buildmisc {
     my $password = readfile($ghreal{'passfile'});
     chop($password);
-    my $port = $ghreal{'ports'} + $ghreal{'xportoffset'};
-    my $myport = $ghreal{'ports'} + $ghreal{'mportoffset'};
-    $ENV{'_imatest_port_rel'} = $ghreal{'ports'};
+    $ghreal{'password'} = $password;
+    my $port_destructive = $ghreal{'ports_destructive'} + $ghreal{'xportoffset'};
+    my $myport_destructive = $ghreal{'ports_destructive'} + $ghreal{'mportoffset'};
+    my $port_load = $ghreal{'ports_load'} + $ghreal{'xportoffset'};
+    my $myport_load = $ghreal{'ports_load'} + $ghreal{'mportoffset'};
+    $ENV{'_imatest_port_destructive_rel'} = $ghreal{'ports_destructive'};
+    $ENV{'_imatest_port_load_rel'} = $ghreal{'ports_load'};
     # absolute old (not x) port number
-    $ENV{'_imatest_port_abs'} = $ghreal{'ports'} + $ghreal{'mportoffset'};
+    $ENV{'_imatest_port_destructive_abs'} = $ghreal{'ports_destructive'} + $ghreal{'mportoffset'};
+    $ghreal{'_imatest_port_load_abs'} = $ghreal{'ports_load'} + $ghreal{'mportoffset'};
+    $ENV{'_imatest_port_load_abs'} = $ghreal{'_imatest_port_load_abs'};
     $ghmisc{'mysqlsh_base'} = sprintf(
 "%s --host=%s --port=%s --user=%s --password=%s --sqlx --show-warnings=true --result-format=json --quiet-start=2 --log-sql=all --verbose=1",
-                               $ghreal{'mysqlsh'},$ghreal{'hosts'},$port,$ghreal{'user'},$password);
+                               $ghreal{'mysqlsh'},$ghreal{'hosts'},$port_destructive,$ghreal{'user'},$password);
     $ghmisc{'mysql_base'} = sprintf(
 "%s --host=%s --port=%s --user=%s --password=%s --force --compression-algorithms=zstd --no-beep --unbuffered --quick  --batch --verbose",
-                               $ghreal{'mysql'},$ghreal{'hosts'},$myport,$ghreal{'user'},$password);
+                               $ghreal{'mysql'},$ghreal{'hosts'},$myport_load,$ghreal{'user'},$password);
     $ghmisc{$MYSQLSH_RUN_FILE} = "$ghmisc{'mysqlsh_base'} --force --log-file $ENV{$LOAD_THREAD_CLIENT_LOG_ENV} --file";
     $ghmisc{$MYSQLSH_EXEC} = "$ghmisc{'mysqlsh_base'} --log-file $ENV{$LOAD_THREAD_CLIENT_LOG_ENV} --execute";
     $ENV{'_imatest_mysql_static_cnf'} = join(' ',split("\n",$ghreal{'mysql_static_cnf'}));
@@ -930,7 +942,8 @@ sub descrcol {
     $dt = lc($dt); #todo at origin
     my $subvaldt = "value_generate_$dt";
     my $subvaldtclass = "value_generate_$dtclass";
-    my $subval = defined($ghvgsub{$subvaldt})? $subvaldt : $subvaldtclass;
+    # todo fix this
+    my $subval = defined($ghvgsub{$subvaldt})? $subvaldt : (defined($ghvgsub{$subvaldtclass})? $subvaldtclass : 'value_generate_smallint');
     my $fundt = "function_${kind}_$dt";
     my $fundtclass = "function_${kind}_$dtclass";
     my $fun = defined($ghreal{$fundt})? $fundt : $fundtclass;
@@ -951,7 +964,7 @@ sub dooper {
         $op =~ s/N=/!=/g;
         if ($op =~ /o\@p/) {
             $op =~ s/o\@p//;
-            croak("Prefix operator '$op' is not + or - for $haveop") if ($op ne '+' and $op ne '-');
+            docroak("Prefix operator '$op' is not + or - for $haveop") if ($op ne '+' and $op ne '-');
             $termval = "$op$termval";
             $op = process_rseq($haveop);
             $op =~ s/MINUS/-/g; # todo maybe parm to process
@@ -966,7 +979,7 @@ sub dooper {
     } else {
         $rc = $termval;
     }
-    croak("dooper() rc '$rc' wrong. CROAK.") if ($rc =~ /MINUS/ or $rc =~ /N=/);
+    docroak("dooper() rc '$rc' wrong. CROAK.") if ($rc =~ /MINUS/ or $rc =~ /N=/);
     return $rc;
 }
 
@@ -991,13 +1004,13 @@ sub build_expression {
             my $termkind = process_rseq("${kind}_term_kind");
             my $termval = '';
             if ($termkind eq 'value') {
-                croak("$subval() is not defined. CROAK.") if (not defined($ghvgsub{$subval})); # todo internalise
+                docroak("$subval() is not defined. CROAK.") if (not defined($ghvgsub{$subval})); # todo internalise
                 $termval = $ghvgsub{$subval}->($colnam,$kind);
             } else {      # function
                 $termval = defined($ghreal{$fun})? process_rseq($fun) : 'NULL';
                 if ($kind eq $DEFAULT and $termval eq 'NULL' and not $cannull) {
                     # fallback to value
-                    croak("$subval() is not defined. CROAK.") if (not defined($ghvgsub{$subval})); # todo internalise
+                    docroak("$subval() is not defined. CROAK.") if (not defined($ghvgsub{$subval})); # todo internalise
                     $termval = $ghvgsub{$subval}->($colnam,$kind);
                 }
                 if ($termval =~ /\@F/) {
@@ -1028,19 +1041,19 @@ sub build_expression {
                     # or search eval for undefined?
                     $termval = defined($evexpr)? $evexpr : 'NULL';
                     if ($kind eq $DEFAULT and $termval eq 'NULL' and not $cannull) {
-                        croak("unrechable code for $kind:$colnam, NULL for NOT NULL. CROAK.");
+                        docroak("unrechable code for $kind:$colnam, NULL for NOT NULL. CROAK.");
                     }
                 }
             }
-            croak("Empty term for $kind:$colnam. CROAK.") if ($termval eq '');
-            croak("Unexpected non empty exlev '$exlev' for $kind:$colnam:$item/$len undef op") if ($exlev ne '' and not defined($haveop));
+            docroak("Empty term for $kind:$colnam. CROAK.") if ($termval eq '');
+            docroak("Unexpected non empty exlev '$exlev' for $kind:$colnam:$item/$len undef op") if ($exlev ne '' and not defined($haveop));
             $exlev .= dooper($haveop,$termval,$item);
         }
-        croak("Empty term for $kind:$colnam len $len. CROAK.") if ($exlev eq '');
+        docroak("Empty term for $kind:$colnam len $len. CROAK.") if ($exlev eq '');
         if ($dep > 1) {
             $exlev = "($exlev)";
         }
-        croak("Unexpected non empty expr '$expr' for $kind:$colnam:$level/$dep undef op") if ($expr ne '' and not defined($haveop));
+        docroak("Unexpected non empty expr '$expr' for $kind:$colnam:$level/$dep undef op") if ($expr ne '' and not defined($haveop));
         $expr .= dooper($haveop,$exlev,$level);
     }
 
@@ -1049,7 +1062,7 @@ sub build_expression {
     if (defined($ghreal{$ppnam}) and rand() < $ghreal{$ppnam}) {
         $expr = "($expr)";
     }
-    croak("expr '$expr' wrong. CROAK.") if ($expr =~ /N=/ or $expr eq '');
+    docroak("expr '$expr' wrong. CROAK.") if ($expr =~ /N=/ or $expr eq '');
     return $expr;
 }
 
@@ -1475,7 +1488,7 @@ sub db_create {
                 }
             }
             dosayif($VERBOSE_ANY," we have %s good tables, forgot %s bad tables",$gntables,$badtables);
-            croak("Cannot proceed, no good tables. CROAK.") if ($gntables == 0);
+            docroak("Cannot proceed, no good tables. CROAK.") if ($gntables == 0);
         }
     }
     dosayif($VERBOSE_ANY," returning %s",  $rc);
@@ -1605,7 +1618,7 @@ sub stmt_select_generate {
 # returns: value as string suitable to add to VALUES
 sub value_generate_decimal {
     my ($col,$kind) = @ARG;
-    croak("kind is not defined. CROAK.") if (not defined($kind));
+    docroak("kind is not defined. CROAK.") if (not defined($kind));
     my $bas = process_rseq('decimal_value');
     my $mas = defined($ghstc2len{$col})? $ghstc2len{$col} : $bas;
     $bas = $mas if ($bas > $mas and rand() < process_rseq($VKCHAR));
@@ -1624,7 +1637,7 @@ sub value_generate_numeric {
 # returns: value as string suitable to add to VALUES
 sub value_generate_int {
     my ($col,$kind) = @ARG;
-    croak("kind is not defined. CROAK.") if (not defined($kind));
+    docroak("kind is not defined. CROAK.") if (not defined($kind));
     my $value = process_rseq('value_int');
     if ($ghstc2unsigned{$col}) {
         $value = -$value if (rand() < $ghreal{$NUMBER_REVERSE_SIGN_ILLEGITIMATE_P});
@@ -1638,7 +1651,7 @@ sub value_generate_int {
 # returns: value as string suitable to add to VALUES
 sub value_generate_tinyint {
     my ($col,$kind) = @ARG;
-    croak("kind is not defined. CROAK.") if (not defined($kind));
+    docroak("kind is not defined. CROAK.") if (not defined($kind));
     my $value = process_rseq('value_tinyint');
     if ($ghstc2unsigned{$col}) {
         $value = -$value if (rand() < $ghreal{$NUMBER_REVERSE_SIGN_ILLEGITIMATE_P});
@@ -1652,7 +1665,7 @@ sub value_generate_tinyint {
 # returns: value as string suitable to add to VALUES
 sub value_generate_bigint {
     my ($col,$kind) = @ARG;
-    croak("kind is not defined. CROAK.") if (not defined($kind));
+    docroak("kind is not defined. CROAK.") if (not defined($kind));
     my $value = process_rseq('value_bigint');
     if ($ghstc2unsigned{$col}) {
         $value = -$value if (rand() < $ghreal{$NUMBER_REVERSE_SIGN_ILLEGITIMATE_P});
@@ -1666,7 +1679,7 @@ sub value_generate_bigint {
 # returns: value as string suitable to add to VALUES
 sub value_generate_bit {
     my ($col,$kind) = @ARG;
-    croak("kind is not defined. CROAK.") if (not defined($kind));
+    docroak("kind is not defined. CROAK.") if (not defined($kind));
     my $value = process_rseq('value_bit');
     my $valmax = defined($ghstc2len{$col})? 2**$ghstc2len{$col}-1 : $value;
     $value = $valmax if ($value > $valmax and rand() < process_rseq($VKCHAR));
@@ -1678,7 +1691,7 @@ sub value_generate_bit {
 # returns: value as string suitable to add to VALUES
 sub value_generate_smallint {
     my ($col,$kind) = @ARG;
-    croak("kind is not defined. CROAK.") if (not defined($kind));
+    docroak("kind is not defined. CROAK.") if (not defined($kind));
     my $value = process_rseq('value_smallint');
     if ($ghstc2unsigned{$col}) {
         $value = -$value if (rand() < $ghreal{$NUMBER_REVERSE_SIGN_ILLEGITIMATE_P});
@@ -1692,7 +1705,7 @@ sub value_generate_smallint {
 # returns: value as string suitable to add to VALUES
 sub value_generate_mediumint {
     my ($col,$kind) = @ARG;
-    croak("kind is not defined. CROAK.") if (not defined($kind));
+    docroak("kind is not defined. CROAK.") if (not defined($kind));
     my $value = process_rseq('value_mediumint');
     if (not defined($ghstc2unsigned{$col}) or $ghstc2unsigned{$col} == $TRUE) { #todo consider
         $value = -$value if (rand() < $ghreal{$NUMBER_REVERSE_SIGN_ILLEGITIMATE_P});
@@ -1706,7 +1719,7 @@ sub value_generate_mediumint {
 # returns: value as string suitable to add to VALUES
 sub value_generate_float {
     my ($col,$kind) = @ARG;
-    croak("kind is not defined. CROAK.") if (not defined($kind));
+    docroak("kind is not defined. CROAK.") if (not defined($kind));
     my $exp = process_rseq('float_value_exp');
     my $value = $exp eq $EMPTY? value_generate_decimal($col,$kind) : sprintf("%sE%s",rand(),$exp);
     $value = -$value if (rand() < $ghreal{$NUMBER_REVERSE_SIGN_LEGITIMATE_P});
@@ -1717,7 +1730,7 @@ sub value_generate_float {
 # returns: value as string suitable to add to VALUES
 sub value_generate_double {
     my ($col,$kind) = @ARG;
-    croak("kind is not defined. CROAK.") if (not defined($kind));
+    docroak("kind is not defined. CROAK.") if (not defined($kind));
     my $exp = process_rseq('double_value_exp');
     my $value = $exp eq $EMPTY? value_generate_decimal($col,$kind) : sprintf("%sE%s",rand(),$exp);
     $value = -$value if (rand() < $ghreal{$NUMBER_REVERSE_SIGN_LEGITIMATE_P});
@@ -1728,7 +1741,7 @@ sub value_generate_double {
 # returns: value as string suitable to add to VALUES
 sub value_generate_char {
     my ($col,$kind) = @ARG;
-    croak("kind is not defined. CROAK.") if (not defined($kind));
+    docroak("kind is not defined. CROAK.") if (not defined($kind));
     my $valen = process_rseq('value_char_len');
     my $len = defined($ghstc2len{$col})? $ghstc2len{$col} : 0;
     $valen = $len if ($len >= 1 and $valen > $len and rand() < process_rseq($VKCHAR));
@@ -1742,7 +1755,7 @@ sub value_generate_char {
 # returns: value as string suitable to add to VALUES
 sub value_generate_varbinary {
     my ($col,$kind) = @ARG;
-    croak("kind is not defined. CROAK.") if (not defined($kind));
+    docroak("kind is not defined. CROAK.") if (not defined($kind));
     my $valen = process_rseq('value_varbinary_len');
     my $len = defined($ghstc2len{$col})? $ghstc2len{$col} : 0;
     $valen = $len if ($len >= 1 and $valen > $len and rand() < process_rseq($VKCHAR));
@@ -1756,7 +1769,7 @@ sub value_generate_varbinary {
 # returns: value as string suitable to add to VALUES
 sub value_generate_binary {
     my ($col,$kind) = @ARG;
-    croak("kind is not defined. CROAK.") if (not defined($kind));
+    docroak("kind is not defined. CROAK.") if (not defined($kind));
     my $valen = process_rseq('value_binary_len');
     my $len = defined($ghstc2len{$col})? $ghstc2len{$col} : 0;
     $valen = $len if ($len >= 1 and $valen > $len and rand() < process_rseq($VKCHAR));
@@ -1770,7 +1783,7 @@ sub value_generate_binary {
 # returns: value as string suitable to add to VALUES
 sub value_generate_tinyblob {
     my ($col,$kind) = @ARG;
-    croak("kind is not defined. CROAK.") if (not defined($kind));
+    docroak("kind is not defined. CROAK.") if (not defined($kind));
     my $valen = process_rseq('value_tinylob_len');
     my $len = defined($ghstc2len{$col})? $ghstc2len{$col} : 0;
     $valen = $len if ($len >= 1 and $valen > $len and rand() < process_rseq($VKCHAR));
@@ -1784,7 +1797,7 @@ sub value_generate_tinyblob {
 # returns: value as string suitable to add to VALUES
 sub value_generate_longblob {
     my ($col,$kind) = @ARG;
-    croak("kind is not defined. CROAK.") if (not defined($kind));
+    docroak("kind is not defined. CROAK.") if (not defined($kind));
     my $valen = process_rseq('value_longlob_len');
     my $len = defined($ghstc2len{$col})? $ghstc2len{$col} : 0;
     $valen = $len if ($len >= 1 and $valen > $len and rand() < process_rseq($VKCHAR));
@@ -1798,7 +1811,7 @@ sub value_generate_longblob {
 # returns: value as string suitable to add to VALUES
 sub value_generate_datetime {
     my ($col,$kind) = @ARG;
-    croak("kind is not defined. CROAK.") if (not defined($kind));
+    docroak("kind is not defined. CROAK.") if (not defined($kind));
     my ($year,$month,$day) = value_generate_date($col,$kind,$FALSE);
     my ($hour,$minute,$sec,$micr) = value_generate_time($col,$kind,$TRUE);
     my $value = sprintf("%04s-%02s-%02s %02s:%02s:%02s",$year,$month,$day,$hour,$minute,$sec);
@@ -1814,7 +1827,7 @@ sub value_generate_datetime {
 sub value_generate_time {
     my $col = $ARG[0];
     my $kind = $ARG[1];
-    croak("kind is not defined. CROAK.") if (not defined($kind));
+    docroak("kind is not defined. CROAK.") if (not defined($kind));
     my $retlist = (defined($ARG[2]) and $ARG[2] == $TRUE)? $TRUE : $FALSE;
     my $hor = $retlist? process_rseq('datetime_hour_value') :  process_rseq('time_hour_value');
     my $mit = process_rseq('datetime_minute_value');
@@ -1829,7 +1842,7 @@ sub value_generate_time {
         $value = "'$value'";
         return $value;
     }
-    croak('internal error: reached unreachable code. CROAK.');
+    docroak('internal error: reached unreachable code. CROAK.');
 }
 
 # 1: schema.table.column
@@ -1839,7 +1852,7 @@ sub value_generate_time {
 sub value_generate_date {
     my $col = $ARG[0];
     my $kind = $ARG[1];
-    croak("kind is not defined. CROAK.") if (not defined($kind));
+    docroak("kind is not defined. CROAK.") if (not defined($kind));
     my $ists = defined($ARG[2])? $ARG[2] : undef;
     my $month = process_rseq('datetime_month_value');
     my $day = process_rseq('datetime_day_value');
@@ -1851,7 +1864,7 @@ sub value_generate_date {
         my $value = sprintf("'%04d-%02d-%02d'",$year,$month,$day);
         return $value;
     }
-    croak('internal error: reached unreachable code. CROAK.');
+    docroak('internal error: reached unreachable code. CROAK.');
 }
 
 # 1: schema.table.column
@@ -1872,7 +1885,7 @@ sub value_generate_timestamp {
 # returns: value as string suitable to add to VALUES
 sub value_generate_multipolygon {
     my ($col,$kind) = @ARG;
-    croak("kind is not defined. CROAK.") if (not defined($kind));
+    docroak("kind is not defined. CROAK.") if (not defined($kind));
     my $value = '';
     my $len = process_rseq('value_multipolygon_len');
     for my $n (1..$len) {
@@ -1890,7 +1903,7 @@ sub value_generate_multipolygon {
 # returns: value as string suitable to add to VALUES
 sub value_generate_multipoint {
     my ($col,$kind) = @ARG;
-    croak("kind is not defined. CROAK.") if (not defined($kind));
+    docroak("kind is not defined. CROAK.") if (not defined($kind));
     my $value = '';
     my $len = process_rseq('value_multipoint_len');
     for my $n (1..$len) {
@@ -1908,7 +1921,7 @@ sub value_generate_multipoint {
 # 3: if TRUE return raw data
 sub value_generate_polygon {
     my ($col,$inkind) = ($ARG[0],$ARG[1]);
-    croak("inkind is not defined. CROAK.") if (not defined($inkind));
+    docroak("inkind is not defined. CROAK.") if (not defined($inkind));
     my $raw = (defined($ARG[2]) and $ARG[2]);
     my $value = '';
     my $dep = process_rseq('value_polygon_size');
@@ -1964,7 +1977,7 @@ sub value_generate_polygon {
 # returns: value as string suitable to add to VALUES
 sub value_generate_multilinestring {
     my ($col,$kind) = @ARG;
-    croak("kind is not defined. CROAK.") if (not defined($kind));
+    docroak("kind is not defined. CROAK.") if (not defined($kind));
     my $value = '';
     my $len = process_rseq('value_multilinestring_len');
     for my $n (1..$len) {
@@ -1983,7 +1996,7 @@ sub value_generate_multilinestring {
 sub value_generate_linestring {
     my $col = $ARG[0];
     my $kind = $ARG[1];
-    croak("kind is not defined. CROAK.") if (not defined($kind));
+    docroak("kind is not defined. CROAK.") if (not defined($kind));
     my $raw = defined($ARG[2])? $ARG[2] : $FALSE;
     my $value = '';
     my $len = process_rseq('value_linestring_len');
@@ -2003,7 +2016,7 @@ sub value_generate_linestring {
 sub value_generate_point {
     my $col = $ARG[0];
     my $kind = $ARG[1];
-    croak("kind is not defined. CROAK.") if (not defined($kind));
+    docroak("kind is not defined. CROAK.") if (not defined($kind));
     my $raw = (defined($ARG[2]) and $ARG[2]);
     my $value = sprintf("%s %s",process_rseq($VALUE_POINT_X),process_rseq($VALUE_POINT_Y));
     my $srid = defined($ghstc2srid{$col})? $ghstc2srid{$col} : $V4326;
@@ -2017,13 +2030,13 @@ sub value_generate_point {
 # returns: value as string suitable to add to VALUES
 sub value_generate_geometrycollection {
     my ($col,$kind) = @ARG;
-    croak("kind is not defined. CROAK.") if (not defined($kind));
+    docroak("kind is not defined. CROAK.") if (not defined($kind));
     my $value = '';
     my $len = process_rseq('value_multigeometry_len');
     for my $n (1..$len) {
         my $subkind = process_rseq('multigeometry_kind');
         my $subval = "value_generate_".lc($subkind);
-        croak("value_generate_$subval() is not defined. CROAK.") if (not defined($ghvgsub{$subval}));
+        docroak("value_generate_$subval() is not defined. CROAK.") if (not defined($ghvgsub{$subval}));
         my $termval = $ghvgsub{$subval}->($col,$kind,$TRUE);
         $value .= ", $kind$termval";
     }
@@ -2042,9 +2055,9 @@ sub value_generate_geomcollection {
 # returns: value as string suitable to add to VALUES
 sub value_generate_geometry {
     my ($col,$kind) = @ARG;
-    croak("kind is not defined. CROAK.") if (not defined($kind));
+    docroak("kind is not defined. CROAK.") if (not defined($kind));
     my $subkind = 'value_generate_'.lc(process_rseq('geometry_kind'));
-    croak("$subkind() is not defined. CROAK.") if (not defined($ghvgsub{$subkind}));
+    docroak("$subkind() is not defined. CROAK.") if (not defined($ghvgsub{$subkind}));
     my $value = $ghvgsub{$subkind}->($col,$kind);
     return $value;
 }
@@ -2053,7 +2066,7 @@ sub value_generate_geometry {
 # returns: value as string suitable to add to VALUES
 sub value_generate_json {
     my ($col,$inkind) = @ARG;
-    croak("inkind is not defined. CROAK.") if (not defined($inkind));
+    docroak("inkind is not defined. CROAK.") if (not defined($inkind));
     my $value = "{}";
     my $kind = process_rseq('value_json_kind');
     if ($kind eq 'SIMPLEML') {
@@ -2093,7 +2106,7 @@ sub value_generate_json {
 # returns: value as string suitable to add to VALUES
 sub value_generate_year {
     my ($col,$kind) = @ARG;
-    croak("kind is not defined. CROAK.") if (not defined($kind));
+    docroak("kind is not defined. CROAK.") if (not defined($kind));
     my $value = process_rseq('year_value');
     return $value;
 }
@@ -2102,7 +2115,7 @@ sub value_generate_year {
 # returns: value as string suitable to add to VALUES
 sub value_generate_set {
     my ($col,$kind) = @ARG;
-    croak("kind is not defined. CROAK.") if (not defined($kind));
+    docroak("kind is not defined. CROAK.") if (not defined($kind));
     my $len = process_rseq('datatype_set_value_len');
     $len = $ghstc2len{$col} if (defined($ghstc2len{$col}) and $len > $ghstc2len{$col} and rand() < process_rseq($VKCHAR));
     my $value = '';
@@ -2118,7 +2131,7 @@ sub value_generate_set {
 # returns: value as string suitable to add to VALUES
 sub value_generate_enum {
     my ($col,$kind) = @ARG;
-    croak("kind is not defined. CROAK.") if (not defined($kind));
+    docroak("kind is not defined. CROAK.") if (not defined($kind));
     my $len = defined($ghstc2len{$col})? $ghstc2len{$col} : 3; #todo consider parm
     my $num = int(rand()*$len)+1;
     my $value = "\"v$num\"";
@@ -2136,7 +2149,7 @@ sub value_generate_mediumtext {
 # returns: value as string suitable to add to VALUES
 sub value_generate_mediumblob {
     my ($col,$kind) = @ARG;
-    croak("kind is not defined. CROAK.") if (not defined($kind));
+    docroak("kind is not defined. CROAK.") if (not defined($kind));
     my $valen = process_rseq('value_mediumlob_len');
     my $len = defined($ghstc2len{$col})? $ghstc2len{$col} : 0;
     $valen = $len if ($len >= 1 and $valen > $len and rand() < process_rseq($VKCHAR));
@@ -2150,7 +2163,7 @@ sub value_generate_mediumblob {
 # returns: value as string suitable to add to VALUES
 sub value_generate_blob {
     my ($col,$kind) = @ARG;
-    croak("kind is not defined. CROAK.") if (not defined($kind));
+    docroak("kind is not defined. CROAK.") if (not defined($kind));
     my $valen = process_rseq('value_lob_len');
     my $len = defined($ghstc2len{$col})? $ghstc2len{$col} : 0;
     $valen = $len if ($len >= 1 and $valen > $len and rand() < process_rseq($VKCHAR));
@@ -2182,7 +2195,7 @@ sub value_generate_text {
 # returns: value as string suitable to add to VALUES
 sub value_generate_varchar {
     my ($col,$kind) = @ARG;
-    croak("kind is not defined. CROAK.") if (not defined($kind));
+    docroak("kind is not defined. CROAK.") if (not defined($kind));
     my $valen = process_rseq('value_varchar_len');
     my $len = defined($ghstc2len{$col})? $ghstc2len{$col} : 0;
     $valen = $len if ($len >= 1 and $valen > $len and rand() < process_rseq($VKCHAR));
@@ -2206,7 +2219,7 @@ sub build_insert_values {
             next;
         }
         # consider NULL
-        croak("undefined autoinc info for '$colnam' with '@{$plcols}'") if (not defined($ghstc2isautoinc{$colnam}));
+        docroak("undefined autoinc info for '$colnam' with '@{$plcols}'") if (not defined($ghstc2isautoinc{$colnam}));
         if ($ghstc2isautoinc{$colnam}) {
             if (rand() >= $ghreal{'autoinc_explicit_value_p'}) {
                 $values .= ', NULL';
@@ -2369,6 +2382,7 @@ sub internalise {
 sub server_load_thread {
     my $tnum = $ARG[0];
     my $tkind = $ARG[1];
+    my $rseed = $ARG[2];
     my $starttime = time();
     my $howlong = $ghreal{$TEST_DURATION};
     my $maxcount = $ghreal{'load_max_stmt'};
@@ -2377,6 +2391,27 @@ sub server_load_thread {
     my $txnstmt = 0;
     my $txnstart = 0;
     my $ec = $EC_OK;
+    my %herr2count = ();      # Eerr->count includes E0 and EFAIL
+    my %herrerrstr2count = ();      # Eerr errstr->count includes E0 and EFAIL
+    my %herrkind2count = ();      # Eerr kind->count this includes no error as E0 and any error total as EFAIL
+    my %hhaserrkind2count = ();      # Eerr kind->count this includes only no error as E0 and any error total as EFAIL
+    my %herrstmt2count = ();      # Eerr stmt->count for errors only
+
+    sub load_report {
+        dosayif($VERBOSE_ANY, " load thread %s statistics: %s",$tnum,Dumper(\%ghsql2stats));
+        dosayif($VERBOSE_ANY, "   thread %s error counts: %s",$tnum,Dumper(\%herr2count));
+        dosayif($VERBOSE_ANY, "   thread %s error msg counts: %s",$tnum,Dumper(\%herrerrstr2count));
+        dosayif($VERBOSE_ANY, "   thread %s error stmt kind counts: %s",$tnum,Dumper(\%herrkind2count));
+        dosayif($VERBOSE_ANY, "   thread %s error stmt kind short counts: %s",$tnum,Dumper(\%hhaserrkind2count));
+        foreach my $key (sort(keys(%herrstmt2count))) {
+            #next if (not $key =~ /^$EFAIL/);
+            #next if ($key =~ /^($EFAIL|$EGOOD)/);
+            my $val = $herrstmt2count{$key};
+            next if ($val <= 1);
+            dosayif($VERBOSE_ANY, "   thread %s error stmt text counts >1: %s %s",$tnum,$key,$val);
+        }
+        dosayif($VERBOSE_ANY, "   thread %s END error stmt text counts >1 if any.",$tnum);
+    }
 
     # adjust load thread parameters
     if ($tkind ne '') {
@@ -2398,31 +2433,43 @@ sub server_load_thread {
     $ENV{$LOAD_THREAD_CLIENT_LOG_ENV} = doeval($ghreal{$LOAD_THREAD_CLIENT_LOG});
     my $dosql = ($ghreal{'load_execute_sql'} eq $YES);
     dosayif($VERBOSE_ANY, "see also %s and %s and %s and %s",$ENV{$LOAD_THREAD_CLIENT_LOG_ENV},$outto,$errto,$sqlto);
-    open(my $msql, ">$sqlto") or croak("failed to open >$sqlto: $ERRNO. CROAK.");
+    open(my $msql, ">$sqlto") or docroak("failed to open >$sqlto: $ERRNO. CROAK.");
     $msql->autoflush();
     my $shel = '';
     my $shelkind = $ghreal{'load_thread_execute_with'};
     my $execext = $TRUE;
+    my $dsn;
+    my $dbh;
     if ($shelkind eq 'mysqlsh') {
         $shel = "$ghmisc{'mysqlsh_base'} --log-file $ENV{$LOAD_THREAD_CLIENT_LOG_ENV} >>$outto 2>>$errto";
     } elsif ($shelkind eq 'mysql') {
         $shel = "$ghmisc{'mysql_base'} >>$outto 2>>$errto";
     } else {      # self
+        $SIG{'__WARN__'} = sub {1;};
+        close(STDOUT);
+        open (STDOUT, '>>', $outto);      # do append since the name does not have process id
+        tee (STDERR, '>>', $errto);
+        STDOUT->autoflush();
+        STDERR->autoflush();
+        dosayif($VERBOSE_ANY, "random seed is %s for this %s load thread #%s", $rseed, $tkind, $tnum);
+        use DBI;
+        use DBD::mysql;
+        $dsn = "DBI:mysql:host=127.0.0.1;port=$ghreal{'_imatest_port_load_abs'}";
+        $dbh = DBI->connect($dsn,$ghreal{'user'},$ghreal{'password'},{'PrintWarn' => 0,
+          'TraceLevel' => 0, 'RaiseError' => 0, 'mysql_server_prepare' => 1});
+        docroak("semiCROAK: failed to connect to $dsn") if (not defined($dbh));
+        DBI->trace(0);
+        $dbh->trace(0);
         $execext = $FALSE;
     }
     my $msh;
     my $wspid;
     if ($execext) {
-        $wspid = open2(my $msout, $msh, $shel) or croak("Failed (errno: $ERRNO) to start $shel. CROAK.");
+        $wspid = open2(my $msout, $msh, $shel) or docroak("Failed (errno: $ERRNO) to start $shel. CROAK.");
         dosayif($VERBOSE_ANY, "started as pid %s: %s",$wspid,$shel);
         $msh->autoflush();
     } else {      # self
-        close(STDOUT);
-        close(STDERR);
-        open (STDOUT, '>>', $outto);
-        open (STDERR, '>>', $errto);
-        STDOUT->autoflush();
-        STDERR->autoflush();
+        1; #debug
     }
     my $snum = 0;
     while ($TRUE) {
@@ -2490,21 +2537,60 @@ sub server_load_thread {
         if ($execext and waitpid($wspid, WNOHANG) == $wspid) {
             dosayif($VERBOSE_ANY,"process $wspid has terminated, restarting");
             close($msh);
-            $wspid = open2(my $msout, $msh, $shel) or croak("Failed (errno: $ERRNO) to start $shel. CROAK.");
+            $wspid = open2(my $msout, $msh, $shel) or docroak("Failed (errno: $ERRNO) to start $shel. CROAK.");
             dosayif($VERBOSE_ANY, "restarted as pid %s: %s",$wspid,$shel);
             $msh->autoflush();
         }
-        dosayif($VERBOSE_ANY, "sending to execute stmt #%s",$snum) if ($snum % $ghreal{'report_every_stmt'} == 0);
+        if ($snum % $ghreal{'report_every_stmt'} == 0) {
+            dosayif($VERBOSE_ANY, "sending to execute stmt #%s",$snum);
+            load_report();
+        }
         if ($dosql) {
             if ($execext) {
                 printf($msh "%s;\n", $stmt) if ($dosql);
             } else {      # self
-                use DBI;
-                use DBD::mysql;
-                my $dsn = "DBI:mysql:host=127.0.0.1;port=4202";
-                my $dbh = DBI->connect($dsn,'rrot','m');
-    docroak("#debugCROAK") if (defined($dbh));
-    docroak("#debugCROAKn");
+                #my $rc = $dbh->do('volk');
+                #my $rc = $dbh->do('SELECT 1');
+                my $rc = $dbh->do($stmt);
+                $rc = 'UNDEFINED' if (not defined($rc));
+                #docroak("#debugCROAK-not-good+$stmt+") if (not defined($rc));
+                my $err = $dbh->err();
+                my $errstr = $dbh->errstr();
+                if ($errstr ne '') {
+                    #my $newrc = $dbh->do('SELECT 1');
+                    #$newrc = 'UNDEFINED' if (not defined($newrc));
+                    #my $newerr = $dbh->err();
+                    #my $newerrstr = $dbh->errstr();
+                    dosayif($VERBOSE_MORE, "rc '%s' err '%s' errstr '%s' stmt '%s'", $rc,$err,$errstr,$stmt);
+                    ++$herr2count{"E$err"};
+                    ++$herr2count{$EFAIL};
+                    ++$herrerrstr2count{"E$err $errstr"};
+                    ++$herrerrstr2count{"$EFAIL $errstr"};
+                    ++$herrkind2count{"E$err $ksql"};
+                    ++$herrkind2count{"$EFAIL $ksql"};
+                    ++$hhaserrkind2count{"E$err $ksql"};
+                    ++$hhaserrkind2count{"$EFAIL $ksql"};
+                    ++$herrstmt2count{"E$err $stmt"};
+                    ++$herrstmt2count{"$EFAIL $stmt"};
+                    $herr2count{$EGOOD} = 0 if (not defined($herr2count{$EGOOD}));
+                    $herrerrstr2count{"$EGOOD $errstr"} = 0 if (not defined($herrerrstr2count{"$EGOOD $errstr"}));
+                    $herrkind2count{"$EGOOD $ksql"} = 0 if (not defined($herrkind2count{"$EGOOD $ksql"}));
+                    $hhaserrkind2count{"$EGOOD $ksql"} = 0 if (not defined($hhaserrkind2count{"$EGOOD $ksql"}));
+                    $herrstmt2count{"$EGOOD $stmt"} = 0 if (not defined($herrstmt2count{"$EGOOD $stmt"}));
+                    #dosayif($VERBOSE_ANY, "NEW rc '%s' err '%s' errstr '%s' stmt '%s'", $newrc,$newerr,$newerrstr,'SELECT 1');
+   #docroak("#debugCROAK-some-implemented-connected+$rc+$err+$errstr+$stmt+");
+                } else {
+                    ++$herr2count{"$EGOOD"};
+                    ++$herrerrstr2count{"$EGOOD $errstr"};
+                    ++$herrkind2count{"$EGOOD $ksql"};
+                    ++$hhaserrkind2count{"$EGOOD $ksql"};
+                    ++$herrstmt2count{"$EGOOD $stmt"};
+                    $herr2count{$EFAIL} = 0 if (not defined($herr2count{$EFAIL}));
+                    $herrerrstr2count{"$EFAIL $errstr"} = 0 if (not defined($herrerrstr2count{"$EFAIL $errstr"}));
+                    $herrkind2count{"$EFAIL $ksql"} = 0 if (not defined($herrkind2count{"$EFAIL $ksql"}));
+                    $hhaserrkind2count{"$EFAIL $ksql"} = 0 if (not defined($hhaserrkind2count{"$EFAIL $ksql"}));
+                    $herrstmt2count{"$EFAIL $stmt"} = 0 if (not defined($herrstmt2count{"$EFAIL $stmt"}));
+                }
             }
         }
         ++$ghsql2stats{$ksql};
@@ -2527,10 +2613,10 @@ sub server_load_thread {
         my $ms = process_rseq('txn_sleep_after_ms',$TRUE);
         dosleepms($ms);
     }
-    close $msh;
+    close $msh if (defined($msh));
     close $msql;
     dosayif($VERBOSE_ANY, " load thread %s exiting at %s with exit code %s after executing %s statements",$tnum,time(),$ec,$snum);
-    dosayif($VERBOSE_ANY, " load thread %s statistics: %s",$tnum,Dumper(\%ghsql2stats));
+    load_report();
     dosayif($VERBOSE_ANY, " see also %s and %s and %s and %s",$ENV{$LOAD_THREAD_CLIENT_LOG_ENV},$outto,$errto,$sqlto);
     exit $ec;
 }
@@ -2608,11 +2694,11 @@ sub start_load_thread {
             srand($rseed);
             $ghmisc{$RSEED} = $rseed;
             dosayif($VERBOSE_ANY, "random seed is %s for this %s load thread #%s", $rseed, $tkind, $tnum);
-            server_load_thread($tnum,$tkind);
+            server_load_thread($tnum,$tkind,$rseed);
         }
         dosayif($VERBOSE_ANY, " forked thread %s with pid=%s",$tnum,$pid);
-        push(@glpids,$pid);
-        $rc = $RC_ERROR if (not defined($pid) or $pid < 0);
+        $ghlpids{$pid} = [$tnum,$tkind,$rseed];
+	$rc = $RC_ERROR if (not defined($pid) or $pid < 0);
     } 
     dosayif($VERBOSE_ANY, " returning %s %s",  $rc, $GHRC{$rc});
     return $rc;
@@ -2627,7 +2713,7 @@ sub start_server_termination_thread {
             server_termination_thread();
         }
         dosayif($VERBOSE_ANY, " forked thread with pid=%s",  $pid);
-        push(@glpids,$pid);
+        push(@gltermpids,$pid);
         $rc = $RC_ERROR if (not defined($pid) or $pid < 0);
     } 
     dosayif($VERBOSE_ANY, " returning %s %s",  $rc, $GHRC{$rc});
@@ -2642,6 +2728,10 @@ sub init_db {
     dosayif($VERBOSE_ANY,"invoked");
     $rc = $RC_ZERO if $ghasopt{$DRYRUN};
 
+    my $subec = $ghasopt{$DRYRUN}? 0 : doeval("system(\"$ghreal{$SERVER_START} wait $ghreal{'server_start_timeout'}\")");
+    dosayif($VERBOSE_ANY,"execution (--%s=%s of %s of '%s' resulted in exit code %s",
+      $DRYRUN,$ghasopt{$DRYRUN},$SERVER_START,$ghreal{$SERVER_START},$subec);
+
     my @lcnf = map {"SET PERSIST_ONLY $_;"} split("\n",$ghreal{'mysql_initial_cnf'});
     foreach my $sets (@lcnf) {
         my $com = "$ghmisc{$MYSQLSH_EXEC} '$sets'";
@@ -2654,12 +2744,11 @@ sub init_db {
         my $ec = doeval("system(\"$com\")");
         $ec >>= $EIGHT;
         dosayif($VERBOSE_ANY,"exit code %s for %s",$ec,$com);
+        $subec = $ghasopt{$DRYRUN}? 0 : doeval("system(\"$ghreal{$SERVER_START} wait $ghreal{'server_start_timeout'}\")");
+        dosayif($VERBOSE_ANY,"execution (--%s=%s of %s of '%s' resulted in exit code %s",
+          $DRYRUN,$ghasopt{$DRYRUN},$SERVER_START,$ghreal{$SERVER_START},$subec);
     }
 
-    my $subec = $ghasopt{$DRYRUN}? 0 : doeval("system(\"$ghreal{$SERVER_START} wait $ghreal{'server_start_timeout'}\")");
-    dosayif($VERBOSE_ANY,"execution (--%s=%s of %s of '%s' resulted in exit code %s",
-      $DRYRUN,$ghasopt{$DRYRUN},$SERVER_START,$ghreal{$SERVER_START},$subec);
-  
     if ($ghreal{$CREATE_DB} eq $STRING_TRUE) {
         $subrc = db_create();
     } else {
@@ -2726,11 +2815,11 @@ if ($ghreal{'init_remove'} eq $YES) {
 
 my $recreated = process_recreate();
 
-if ($ghreal{$CREATE_DB} eq $STRING_TRUE and $recreated != $RC_ERROR) {
+if ($recreated != $RC_ERROR) {
     init_db();
 }
 
-# todo here we run test
+# now we run test
 my $trc = $RC_OK;
 $ghreal{$TEST_DURATION} = process_rseq($TEST_DURATION);
 if ($ghreal{'server_terminate'} eq $YES) {
@@ -2741,24 +2830,50 @@ my $tlod = $ghreal{'load_threads'};
 dosayif($VERBOSE_ANY,"starting test load threads: %s",$tlod);
 my @lolod = split(/,/,$tlod);
 my $talnum = 0;
+my @lseed = ();
+@lseed = split(/,+/,$ghreal{'load_thread_random_seeds'}) if ($ghreal{'load_thread_random_seeds'} ne '0');
 foreach my $elem (@lolod) {
     my @lok = split('X',$elem);
     push(@lok,'') if (scalar(@lok) < 2);
     foreach my $tnum (1..$lok[0]) {
+        my $rseed = scalar(@lseed) > $talnum? $lseed[$talnum] : int(rand()*1000000+100);
         ++$talnum;
-        $trc = start_load_thread($talnum,$lok[1],int(rand()*10000+100));
+        $trc = start_load_thread($talnum,$lok[1],$rseed);
         docroak("failed to start test load thread. CROAK.") if ($trc != $RC_OK);
     }
 }
 
-# sleep while test is running
+# sleep while test is running while checking for child threads
 my $slep = $ghreal{$TEST_DURATION};
-dosayif($VERBOSE_ANY,"will sleep for %s seconds",$slep);
-dosleep($slep);
+my $interval = 10;
+dosayif($VERBOSE_ANY,"will sleep for %s seconds checking for threads every %s seconds",$slep,$interval);
+my $end = time() + $slep;
+my $now = time();
+while ($now < $end) {
+    foreach my $pid (keys(%ghlpids)) {
+        my $sub = waitpid($pid, WNOHANG);
+        if ($sub == $pid) {
+            dosayif($VERBOSE_ANY,"semiCROAK load thread process id $pid has unexpectedly terminated, restarting");
+            my ($tnum,$tkind,$rseed) = @{$ghlpids{$pid}};
+            my $new = fork();
+            if ($new == 0) {
+                srand($rseed);
+                $ghmisc{$RSEED} = $rseed;
+                dosayif($VERBOSE_ANY, "random seed is %s for this %s load thread #%s", $rseed, $tkind, $tnum);
+                server_load_thread($tnum,$tkind,$rseed);
+            }
+            dosayif($VERBOSE_ANY, " restarted load thread: forked thread %s with pid=%s and rseed %ss",$tnum,$new,$rseed);
+            $ghlpids{$new} = $ghlpids{$pid};
+            delete($ghlpids{$pid});
+        }
+    }
+    dosleep($interval);
+    $now = time();
+}
 
-# kill load threads
-dosayif($VERBOSE_ANY,"eliminating child processes %s","@glpids");
-foreach my $pid (@glpids) {
+# kill load and termination threads
+dosayif($VERBOSE_ANY,"eliminating child processes");
+foreach my $pid (keys(%ghlpids), @gltermpids) {
     my $sub = waitpid($pid, WNOHANG);
     if ($sub != $pid) {
         kill('KILL', $pid);

@@ -421,6 +421,8 @@ load_thread_execute_with:
   supported: [mysqlsh, mysql, self]
 load_thread_out:
   mandatory: True
+load_thread_random_seeds:
+  mandatory: True
 load_thread_sql:
   mandatory: True
 load_threads:
@@ -463,7 +465,9 @@ pk_autoinc_p:
 pk_first_p:
   mandatory: True
   allowed: probability
-ports:
+ports_load:
+  mandatory: True
+ports_destructive:
   mandatory: True
 operator_decimal:
   mandatory: True

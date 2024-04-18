@@ -5,6 +5,7 @@
 ### IMACLUSTERNAME: cluster name
 me="$0"
 portst="${1}"
+forhelp="$1"
 
 . `pwd`/imavars.dot
 me="`$BASENAME $0`"
@@ -12,6 +13,13 @@ ima_say "$me : starting as $0 $@"
 
 base="$IMAPORTBASE"
 clun="$IMACLUNAME"
+
+[ -z "$forhelp" -o "$forhelp" = 'h' -o "$forhelp" = 'help' ] && {
+  $ECHO "Usage: $0 relative_ports_as_1-3,5"
+  $ECHO "       Create InnoDB cluster, all instances must already exist."
+  $ECHO "       Port base is $base, cluster name is $clun"
+  $EXIT 1
+}
 
 fil="$IMATMPDIR/`$BASENAME $0 .sh`.js"
 portlist="`ima_tolist $portst`"

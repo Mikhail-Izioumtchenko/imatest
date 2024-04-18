@@ -17,8 +17,8 @@ base="$IMAPORTBASE"
 
 [ -z "$forhelp" -o "$forhelp" = 'h' -o "$forhelp" = 'help' ] && {
   $ECHO "Usage: $0 relative_ports_as_1-3,5 [wait [wait_timeout_seconds]]"
-  $ECHO "       to start relevant instances."
-  $ECHO "       port base is $base"
+  $ECHO "       To start relevant instances."
+  $ECHO "       Port base is $base"
   $EXIT 1
 }
 
