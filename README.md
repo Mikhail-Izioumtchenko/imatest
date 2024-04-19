@@ -65,6 +65,10 @@ User's guide:
 
 FAQ:
 
+Q: how much is 2 by 2:
+
+4.
+
 Q1: why perl?
 
 Rapid Application Development. Would be nice to rewrite in Go eventually.
