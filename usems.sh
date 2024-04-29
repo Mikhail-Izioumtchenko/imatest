@@ -37,3 +37,4 @@ for port in $portlist ; do
     ima_say "$me : now for $port ($taport), $som: "`$LS -al $myd`
   }
 done
+$myd --version

@@ -1,7 +1,7 @@
 #!/bin/sh
 ### check multiple instances
 ### 1: mandatory comma delimited list of relative ports or ranges
-### 2: optional, if wait, we will wait untill at leas readonly
+### 2: optional, if wait, we will wait until at least readonly
 ### 3: wait timeout in seconds
 ### IMAPORTBASE port number base
 ### exit code 2: all readwrite
@@ -10,19 +10,32 @@
 portst="$1"
 dowait="$2"
 timeout="$3"
+forhelp="$1"
 
 . `pwd`/imavars.dot
 me=`$BASENAME $0`
+exitok='2'
+exitro='3'
+exitx='1'
+
+[ -z "$forhelp" -o "$forhelp" = 'h' -o "$forhelp" = 'help' ] && {
+  $ECHO "Usage: $0 relative_ports_as_1-3,5 [wait [wait_timeout_seconds]]"
+  $ECHO "  to check instances state."
+  $ECHO "Exit codes:"
+  $ECHO "  $exitok: all instances are readwrite"
+  $ECHO "  $exitro: some instances are readonly"
+  $ECHO "  $exitx: some instances are broken"
+  $ECHO "If wait is specified we will wait until all instances are at least readonly."
+  $EXIT 1
+}
+
 ima_say "$me : started as $0 $@"
 
 base="$IMAPORTBASE"
 portlist="`ima_tolist $portst`"
 
-exitok='2'
 finec="$exitok"
-exitro='3'
 hasro=''
-exitx='1'
 
 hasx=''
 cocod=''

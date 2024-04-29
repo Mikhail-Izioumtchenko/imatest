@@ -217,7 +217,7 @@ sub process_mysqld_error_log {
     my ($fil, $kind, $plfil) = @ARG;
     dosayif($VERBOSE_ANY, "+START %s %s\n", $kind, $fil);
     my @l2dump = sort(keys(%ghmsg2ignore));
-    dosayif($VERBOSE_ANY, "Will ignore messages %s\n", Dumper(\@l2dump));
+    dosayif($VERBOSE_ANY, "Will ignore messages %s\n", join(' ',sort(@l2dump)));
     dosayif($VERBOSE_ANY, "End ignore messages list\n");
     my %hkind2cnt = ();
     my %hkind2first = ();

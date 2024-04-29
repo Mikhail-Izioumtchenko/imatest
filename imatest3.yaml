@@ -1,32 +1,27 @@
 ---
 # todo SELECT expression, mix value/fun, @COL with datatype, ASC/DESC per col. Do we have multicol ind?
+#create_server: True
 load_thread_execute_with: self
-#destructive_thread_out: qw(/dev/null)
-#destructive_thread_err: qw(/dev/null)
 #load_thread_out: qw(/dev/null)
 #load_thread_err: qw(/dev/null)
-#load_thread_sql: qw(/dev/null)
-load_threads: 2
+load_thread_sql: qw(/dev/null)
+#load_threads: 2
 load_threads: 1Xb2,1
-#load_thread_random_seeds: 817250,102580
 load_thread_random_seeds: 0
-destructive_thread_random_seeds: 0
-test_duration_seconds: 1800
-load_thread_restart: no
-load_sql_class: INSERT:0.9,UPDATE:0.8,DELETE:0.001,CHECK:0.05,SELECT:0.999,ALTER!INSEL
-load_sql_class_k_b2: INSERT!UPDATE:0.5,DELETE:0.01,CHECK:0.05,SELECT:0.5!ALTER!INSEL
-load_max_stmt: 10
+test_duration_seconds: 300
+load_sql_class: INSERT:0.9,UPDATE:0.8,DELETE:0.01,CHECK:0.05,SELECT:0.9!ALTER!INSEL
+load_sql_class_k_b2: INSERT:0.1,UPDATE:0.5,DELETE:0.01,CHECK:0.05,SELECT:0.5!ALTER!INSEL
+load_max_stmt: 1000
 #load_max_stmt_k_b2: 100
-report_every_stmt: 1500
+report_every_stmt: 500
 #report_every_stmt_k_b2: 10
 server_termination_how: shutdown:0.1,shutkill:0.1,kill:0.5,sigkill:0.9,sigstop
-destructive_threads: 1Xb2,1
-port_destructive: 2
-port_destructive_k_b2: 3
-port_load: 2
-port_load_k_b2: 3
+mysql_static_cnf: |
+init_stop_server: Yes
+ports_destructive: 3
+ports_load: 3
+ports_load_k_b2: 3
 schemas: 1
-tables_per_schema: 16
 tables_per_schema: 1
 server_terminate: No
 server_termination_every_seconds: 30-140:0.9,225-250
@@ -52,13 +47,24 @@ define: &functions_virtual PI(),CONCAT(@COL_varchar;@COL_character),CONCAT(@FPI(
 # exception: keys ending in _k_.+ where .+ is not expected to contain another _k_
 #   followed by any of strict_exceptions
 strict: True
-strict_exceptions: [ "ro", "ddl", "b2", "3" ]
+strict_exceptions: [ "ro", "ddl", "b2" ]
 
 # TO_CHECK_FILE file against which contents of the test file are checked. Absolute path is OK.
 to_check_file: imatest_syntax.yaml
 
+# Do we create test sandbox anew. It may already exist in which case it is NOT destroyed and recreated.
+create_server: False
 # create database, may run generated SQL even if something already exists
 create_db: True
+init_stop_server: Yes
+# after server is stopped if it is stopped. todo improve me
+init_remove: No
+init_remove_pattern: $ENV{SANDBOXDIR}."/*/*/core ".$ENV{_imatest_tmpdir}."/".$ENV{_imatest_load_filebase}."*.* ".$ENV{_imatest_tmpdir}."/load_thread*.*"
+
+# destroy sandbox, datadir and all
+teardown: False
+# teardown how to
+destroy_destroy: $ENV{IMADESTROYMANY} $ENV{_imatest_port_destructive_rel},$ENV{_imatest_port_load_rel}
 
 # test threads are killed by the driving thread. 
 # mysqld is left as is. todo: shutdown optionally
@@ -69,9 +75,9 @@ test_duration_seconds: 901
 
 # single, InnoDBCluster etc
 config: single
-# ports are relative.
-port_destructive: 3
-port_load: 2
+# single port for now, ports are relative.
+ports_destructive: 3
+ports_load: 2
 hosts: 127.0.0.1
 # offset port -> x protocol port, 2 -> 4202 -> 4302
 mportoffset: 4200
@@ -88,17 +94,14 @@ user: $ENV{IMAROOT}
 passfile: $ENV{IMAPAS}
 tmpdir: defined($ENV{IMATMPDIR})? $ENV{IMATMPDIR} : qw(/tmp)
 
+# MySQL configuration, static for sandbox creation just | for EMPTY
+mysql_static_cnf: |
+  core_file
+
 # MySQL configuration, for SET PERSIST_ONLY then restart
 #mysql_initial_cnf: |
-mysql_initial_cnf_targets: 0,3
-mysql_initial_cnf_ports: 2
 mysql_initial_cnf: |
    log_error_verbosity=3
-   innodb_buffer_pool_size=33554432
-mysql_initial_cnf_ports_k_3: 3
-mysql_initial_cnf_k_3: |
-   log_error_verbosity=3
-   innodb_buffer_pool_size=67108864
 #  innodb_buffer_pool_size=50000000
 #  innodb_buffer_pool_in_core_file=OFF
 
@@ -134,12 +137,10 @@ server_start_timeout: 70
 # 201
 load_threads: 1
 # evaluated immediately before using the file
-destructive_thread_out: $ENV{_imatest_tmpdir}.'/'.$ENV{_imatest_destructive_filebase}.'.out'
-destructive_thread_err: $ENV{_imatest_tmpdir}.'/'.$ENV{_imatest_destructive_filebase}.'.out'
-load_thread_out: $ENV{_imatest_tmpdir}.'/'.$ENV{_imatest_load_filebase}.'.out'
-load_thread_err: $ENV{_imatest_tmpdir}.'/'.$ENV{_imatest_load_filebase}.'.out'
-load_thread_sql: $ENV{_imatest_tmpdir}.'/'.$ENV{_imatest_load_filebase}.'.sql'
-load_thread_client_log: $ENV{_imatest_tmpdir}.'/'.$ENV{_imatest_load_filebase}.'.log'
+load_thread_out: $ENV{_imatest_tmpdir}.'/'.$ENV{_imatest_load_filebase}.'-3.out'
+load_thread_err: $ENV{_imatest_tmpdir}.'/'.$ENV{_imatest_load_filebase}.'-3.out'
+load_thread_sql: $ENV{_imatest_tmpdir}.'/'.$ENV{_imatest_load_filebase}.'-3.sql'
+load_thread_client_log: $ENV{_imatest_tmpdir}.'/'.$ENV{_imatest_load_filebase}.'-3.log'
 load_thread_execute_with: mysql
 # 201
 load_execute_sql: Yes
@@ -179,7 +180,7 @@ tables_per_schema: 8!1-4:0.2,5-9:0.4,5-10
 # single %s replaced with table number
 table_name_format: tt%s!test_%s_table,test_table_longer_name_%09d
 
-tables_create_sql: $ENV{_imatest_tmpdir}.'/create_tables.sql'
+tables_create_sql: $ENV{_imatest_tmpdir}.'/create_tables-3.sql'
 
 # table properties. EMPTY means do not specify
 table_autoextend_size: 4M:0.2,8M:0.2,12M:0.2,16M:0.2,20M:0.1,EMPTY
@@ -410,6 +411,7 @@ value_polygon_size: 1:0.8,2:0.5,3-8
 value_polygon_kind: RIGHT,SAME,MIRROR,STRANGE
 # todo substruct for SQL for load thread kind
 # ANY -> x_thread_any not mandatory
+# (re)creation, executed with system()
+create_create: $ENV{IMACREATEMANY} $ENV{_imatest_port_destructive_rel},$ENV{_imatest_port_load_rel} $ENV{_imatest_mysql_static_cnf}
 # start many instances sequentially
-# todo here fixme
-server_start: $ENV{IMASTARTMANY} $ENV{_imatest_port_destructive_rel}
+server_start: $ENV{IMASTARTMANY} $ENV{_imatest_port_destructive_rel},$ENV{_imatest_port_load_rel}

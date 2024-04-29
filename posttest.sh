@@ -27,6 +27,7 @@ $PERL logmine.pl /root/mysql-sandboxes/*/sandboxdata/error.log /tmp/*log /tmp/*o
 $ECHO "signals and croaks START"
 $GREP -i 'signal|croak' "$lof"
 $ECHO "signals and croaks SHORT"
+$GREP -i 'signal|croak' "$lof" | $GREP -v semi
 $ECHO "signals and croaks END"
 $ECHO "See also $lof"
 $LS -lt /tmp

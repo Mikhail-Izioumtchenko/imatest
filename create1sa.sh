@@ -12,6 +12,7 @@ mopt=''
 [ "$#" -gt 3 ] && {
   shift 3
   mopt="$*"
+  mopt='right' && mopt='innodb_buffer_pool_size=16M disable_log_bin default_authentication_plugin=mysql_native_password'
 }
 
 . `pwd`/imavars.dot
@@ -19,6 +20,9 @@ mopt=''
 [ -z "$forhelp" -o "$forhelp" = 'h' -o "$forhelp" = 'help' ] && {
   $ECHO "Usage: $0 absolute_port_std_protocol absolute_port_X_protocol init|noinit [mysqldOptions]..."
   $ECHO "       Create one sandbox, optionally create a small dataset, stop sandbox."
+  $ECHO "If mysqldOptions are specified as right then the options in Example 1 below are used."
+  $ECHO "Example 1: $0 4204 4304 noinit innodb_buffer_pool_size=16M disable_log_bin default_authentication_plugin=mysql_native_password"
+  $ECHO "Example 2: $0 4204 4304 init right"
   $EXIT 1
 }
 

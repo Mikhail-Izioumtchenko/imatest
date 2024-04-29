@@ -72,13 +72,6 @@ config:
   mandatory: True
   allowed: [single, group, chain, InnoDBCluster, ClusterSet, ReplicationSet]
   supported: [single]
-create_create:
-  mandatory: True
-create_server:
-  mandatory: True
-  allowed: [True, False]
-  supported: [True, False]
-  needs_on_true: [create_create]
 create_db:
   mandatory: True
   allowed: [True, False]
@@ -217,7 +210,13 @@ default_term_kind:
 delete_where_all_p:
   mandatory: True
   allowed: probability
-destroy_destroy:
+destructive_thread_err:
+  mandatory: True
+destructive_thread_out:
+  mandatory: True
+destructive_thread_random_seeds:
+  mandatory: True
+destructive_threads:
   mandatory: True
 double_value_exp:
   mandatory: True
@@ -361,16 +360,6 @@ index_visibility:
   mandatory: True
   allowed: Rseq       
   only_values_allowed: VISIBLE,INVISIBLE,EMPTY
-init_remove:
-  mandatory: True
-  allowed: [Yes, No]
-  supported: [Yes, No]
-init_remove_pattern:
-  mandatory: True
-init_stop_server:
-  mandatory: True
-  allowed: [Yes, No]
-  supported: [Yes, No]
 insert_default_p:
   mandatory: True
   allowed: probability
@@ -421,6 +410,10 @@ load_thread_execute_with:
   supported: [mysqlsh, mysql, self]
 load_thread_out:
   mandatory: True
+load_thread_restart:
+  mandatory: True
+  allowed: [yes, no]
+  supported: [yes, no]
 load_thread_random_seeds:
   mandatory: True
 load_thread_sql:
@@ -436,7 +429,9 @@ multigeometry_kind:
   only_values_allowed: GEOMETRY,POINT,LINESTRING,POLYGON
 mysql_initial_cnf:
   mandatory: True
-mysql_static_cnf:
+mysql_initial_cnf_ports:
+  mandatory: True
+mysql_initial_cnf_targets:
   mandatory: True
 mysql:
   mandatory: True
@@ -465,9 +460,9 @@ pk_autoinc_p:
 pk_first_p:
   mandatory: True
   allowed: probability
-ports_load:
+port_load:
   mandatory: True
-ports_destructive:
+port_destructive:
   mandatory: True
 operator_decimal:
   mandatory: True
@@ -615,11 +610,6 @@ tables_per_schema:
   allowed: Rseq       
   mandatory: True
   only_non_negative_integers: True
-teardown:
-  mandatory: True
-  allowed: [True, False]
-  supported: [True, False]
-  needs_on_true: [destroy_destroy]
 test_duration_seconds:
   mandatory: True
   allowed: only_positive_integers
