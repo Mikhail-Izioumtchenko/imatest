@@ -14,7 +14,7 @@
 # #
 # formats are expected to have a single %s inside, this is currently not verified
 # #
-# names start with a-zA-Z_ but inside may have % and similar characters
+# names start with a-zA-Z_ but inside may have % and similar chars
 # EMPTY usually means do not specify whatever in SQL
 # doeval is evaluated on load
 # M will NOT be converted to - for only_values_allowed
@@ -27,10 +27,21 @@ strict:
 autoinc_explicit_value_p:
   mandatory: True
   allowed: probability
+canfull_datatype:
+  mandatory: True
 character_set:
   mandatory: True
   allowed: Rseq
   only_names: True
+check_thread_err:
+  mandatory: True
+check_thread_out:
+  mandatory: True
+check_thread_ports:
+  mandatory: True
+check_thread_sleep:
+  mandatory: True
+  only_positive_integers: True
 column_default_p:
   mandatory: True
   allowed: probability
@@ -51,19 +62,15 @@ column_unique_p:
 column_virtuality:
   mandatory: True
   allowed: Rseq
-  only_values_allowed: VIRTUAL,STORED,EMPTY
+  only_values_allowed: virtual,stored,EMPTY
 column_visibility:
   mandatory: True
   allowed: Rseq
-  only_values_allowed: VISIBLE,INVISIBLE,EMPTY
-columns_per_index:
-  allowed: Rseq       
-  mandatory: True
-  only_non_negative_integers: True
+  only_values_allowed: visible,invisible,EMPTY
 columns_pk:
   allowed: Rseq       
   mandatory: True
-  only_positive_integers: True
+  only_non_negative_integers: True
 columns_non_pk:
   allowed: Rseq       
   mandatory: True
@@ -79,15 +86,13 @@ create_db:
 datatype_binary:
   mandatory: True
   allowed: Rseq       
-  only_values_allowed: BINARY,VARBINARY
+  only_values_allowed: binary,varbinary
 datatype_bit_len:
   mandatory: True
   allowed: Rseq
 datatype_binary_len:
   mandatory: True
   allowed: Rseq
-datatype_canfull:
-  mandatory: True
 datatype_char_len:
   mandatory: True
   allowed: Rseq
@@ -95,21 +100,21 @@ datatype_char_len:
 datatype_character:
   mandatory: True
   allowed: Rseq       
-  only_values_allowed: CHAR,VARCHAR
+  only_values_allowed: char,varchar
 datatype_class:
   mandatory: True
   allowed: Rseq       
-  only_values_allowed: INTEGER,DECIMAL,FLOATING,DATETIME,CHARACTER,BINARY,LOB,ENUMS,JSON,SPATIAL
+  only_values_allowed: integer,decimal,floating,datetime,character,binary,lob,enums,json,spatial
 datatype_class2dt:
   mandatory: True
 datatype_datetime:
   mandatory: True
   allowed: Rseq       
-  only_values_allowed: DATE,DATETIME,TIMESTAMP,TIME,YEAR
+  only_values_allowed: date,datetime,timestamp,time,year
 datatype_decimal:
   allowed: Rseq       
   mandatory: True
-  only_values_allowed: DECIMAL,NUMERIC
+  only_values_allowed: decimal,numeric
 datatype_enum_len:
   allowed: Rseq
   only_non_negative_integers: True
@@ -117,19 +122,19 @@ datatype_enum_len:
 datatype_enums:
   allowed: Rseq       
   mandatory: True
-  only_values_allowed: ENUM,SET
+  only_values_allowed: enum,set
 datatype_floating:
   allowed: Rseq       
   mandatory: True
-  only_values_allowed: FLOAT,DOUBLE
+  only_values_allowed: float,double
 datatype_integer:
   allowed: Rseq       
   mandatory: True
-  only_values_allowed: BIT,TINYINT,SMALLINT,MEDIUMINT,INT,BIGINT
+  only_values_allowed: bit,tinyint,smallint,mediumint,int,bigint
 datatype_lob:
   allowed: Rseq       
   mandatory: True
-  only_values_allowed: TINYBLOB,TINYTEXT,BLOB,TEXT,MEDIUMBLOB,MEDIUMTEXT,LONGBLOB,LONGTEXT
+  only_values_allowed: tinyblob,tinytext,blob,text,mediumblob,mediumtext,longblob,longtext
 datatype_lob_key_len:
   mandatory: True
   allowed: Rseq
@@ -144,7 +149,7 @@ datatype_set_value_len:
 datatype_spatial:
   allowed: Rseq       
   mandatory: True
-  only_values_allowed: GEOMETRY,POINT,LINESTRING,POLYGON,GEOMETRYCOLLECTION,MULTIPOINT,MULTILINESTRING,MULTIPOLYGON
+  only_values_allowed: geometry,point,linestring,polygon,geometrycollection,multipoint,multilinestring,multipolygon
 datatype_varbinary_len:
   mandatory: True
   allowed: Rseq
@@ -216,6 +221,9 @@ destructive_thread_out:
   mandatory: True
 destructive_thread_random_seeds:
   mandatory: True
+destructive_thread_sleep:
+  mandatory: True
+  only_positive_integers: True
 destructive_threads:
   mandatory: True
 double_value_exp:
@@ -224,7 +232,7 @@ double_value_exp:
 explain:
   mandatory: True
   allowed: Rseq       
-  only_values_allowed: EXPLAIN,EXPLAIN_ANALYZE,EMPTY
+  only_values_allowed: explain,explain_analyze,EMPTY
 expression_group:
   mandatory: True
   allowed: Rseq       
@@ -339,13 +347,17 @@ function_where_timestamp:
 geometry_kind:
   mandatory: True
   allowed: Rseq
-  only_values_allowed: POINT,LINESTRING,POLYGON
+  only_values_allowed: point,linestring,polygon
 hosts:
   mandatory: True
 index_direction:
   mandatory: True
   allowed: Rseq       
-  only_values_allowed: ASC,DESC,EMPTY
+  only_values_allowed: asc,desc,EMPTY
+index_part_type:
+  mandatory: True
+  allowed: Rseq       
+  only_values_allowed: column,function
 indexes_per_table:
   mandatory: True
   allowed: Rseq       
@@ -353,13 +365,17 @@ indexes_per_table:
 index_prefix_len:
   mandatory: True
   allowed: Rseq       
+index_prefix_use:
+  mandatory: True
+  allowed: Rseq       
+  only_values_allowed: yes,no
 index_unique_p:
   mandatory: True
   allowed: probability
 index_visibility:
   mandatory: True
   allowed: Rseq       
-  only_values_allowed: VISIBLE,INVISIBLE,EMPTY
+  only_values_allowed: visible,invisible,EMPTY
 insert_default_p:
   mandatory: True
   allowed: probability
@@ -391,23 +407,23 @@ load_alter_kind:
   only_values_allowed: ADD_COL,DROP_COL,ADD_KEY,DROP_KEY,TABLE_EB
 load_execute_sql:
   mandatory: True
-  allowed: [Yes, No]
-  supported: [Yes, No]
+  allowed: [yes, no]
+  supported: [yes, no]
 load_max_stmt:
   mandatory: True
   allowed: only_non_negative_integers
 load_sql_class:
   mandatory: True
   allowed: Rseq
-  only_values_allowed: SELECT,UPDATE,INSERT,DELETE,INSEL,ALTER,CHECK
+  only_values_allowed: select,update,insert,delete,insel,alter,check
 load_thread_client_log:
   mandatory: True
 load_thread_err:
   mandatory: True
 load_thread_execute_with:
   mandatory: True
-  allowed: [mysqlsh, mysql, self]
-  supported: [mysqlsh, mysql, self]
+  allowed: [perl, cpp, python]
+  supported: [perl]
 load_thread_out:
   mandatory: True
 load_thread_restart:
@@ -426,7 +442,7 @@ mportoffset:
 multigeometry_kind:
   mandatory: True
   allowed: Rseq
-  only_values_allowed: GEOMETRY,POINT,LINESTRING,POLYGON
+  only_values_allowed: geometry,point,linestring,polygon
 mysql_initial_cnf:
   mandatory: True
 mysql_initial_cnf_ports:
@@ -451,6 +467,10 @@ number_reverse_sign_illegitimate_p:
 number_reverse_sign_legitimate_p:
   mandatory: True
   allowed: probability
+parts_per_index:
+  allowed: Rseq       
+  mandatory: True
+  only_non_negative_integers: True
 passfile:
   mandatory: True
   allowed: doeval
@@ -462,7 +482,13 @@ pk_first_p:
   allowed: probability
 port_load:
   mandatory: True
-port_destructive:
+ports_destructive:
+  mandatory: True
+ports_destructive_how_many:
+  mandatory: True
+  allowed: Rseq
+  only_positive_integers: True
+port_writer:
   mandatory: True
 operator_decimal:
   mandatory: True
@@ -479,7 +505,7 @@ operator_integer:
 operator_null:
   mandatory: True
   allowed: Rseq
-  only_values_allowed: IS_NULL,IS_NOT_NULL,EMPTY
+  only_values_allowed: is_null,is_not_null,EMPTY
 operator_logical_decimal:
   mandatory: True
   allowed: Rseq
@@ -498,8 +524,8 @@ report_every_stmt:
   allowed: only_positive_integers
 schema_drop_first:
   mandatory: True
-  allowed: [Yes, No]
-  supported: [Yes, No]
+  allowed: [yes, no]
+  supported: [yes, no]
 schema_name_format:
   mandatory: True
   allowed: Rseq       
@@ -520,18 +546,20 @@ select_star_p:
 select_where_all_p:
   mandatory: True
   allowed: probability
-server_start:
+server_check:
+  mandatory: True
+server_restart:
   mandatory: True
 server_start_control:
   mandatory: True
-  allowed: [Yes, No]
-  supported: [Yes, No]
+  allowed: [yes, no]
+  supported: [yes, no]
 server_start_timeout:
   allowed: only_positive_integers
   mandatory: True
 server_terminate:
   mandatory: True
-  only_values_allowed: Yes,No
+  only_values_allowed: yes,no
 server_terminate_kill:
   mandatory: True
 server_terminate_shutdown:
@@ -563,12 +591,15 @@ server_termination_how:
   mandatory: True
   only_values_allowed: shutdown,shutkill,kill,sigkill,sigstop
 server_termination_wait:
-  allowed: Yes, No
-  supported: Yes, No
+  allowed: yes, no
+  supported: yes, no
   mandatory: True
 server_termination_wait_timeout:
-  allowed: only_positive_integers
   mandatory: True
+  allowed: only_positive_integers
+sleep_final:
+  mandatory: True
+  allowed: only_non_negative_integers
 spatial_srid:
   mandatory: True
   allowed: Rseq
@@ -604,8 +635,6 @@ table_stats_persistent:
 table_stats_sample_pages:
   allowed: Rseq       
   mandatory: True
-tables_create_sql:
-  mandatory: True
 tables_per_schema:
   allowed: Rseq       
   mandatory: True
@@ -631,7 +660,7 @@ txn_begin_p:
 txn_end_how:
   mandatory: True
   allowed: Rseq
-  only_values_allowed: COMMIT,ROLLBACK
+  only_values_allowed: commit,rollback
 txn_end_p:
   mandatory: True
   allowed: probability
@@ -653,8 +682,8 @@ txn_sleep_in_ms:
   only_non_negative_integers: True
 txn_use:
   mandatory: True
-  allowed: [Yes, No]
-  supported: [Yes, No]
+  allowed: [yes, no]
+  supported: [yes, no]
 update_column_p:
   mandatory: True
   allowed: probability

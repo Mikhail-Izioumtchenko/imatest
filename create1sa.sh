@@ -3,7 +3,7 @@
 ###   1: mandatory absolute port for standard protocol
 ###   2: mandatory absolute port for X protocol
 ###   3: init|noinit
-###   4...: optional mysqldOptions list 
+###   4...: optional mysqldOptions list or right
 forhelp="$1"
 port="$1"
 portex="$2"
@@ -12,7 +12,7 @@ mopt=''
 [ "$#" -gt 3 ] && {
   shift 3
   mopt="$*"
-  mopt='right' && mopt='innodb_buffer_pool_size=16M disable_log_bin default_authentication_plugin=mysql_native_password'
+  mopt='right' && mopt='innodb_buffer_pool_size=16M disable_log_bin mysql_native_password=ON authentication_policy=mysql_native_password innodb_buffer_pool_dump_at_shutdown=OFF'
 }
 
 . `pwd`/imavars.dot
@@ -21,7 +21,7 @@ mopt=''
   $ECHO "Usage: $0 absolute_port_std_protocol absolute_port_X_protocol init|noinit [mysqldOptions]..."
   $ECHO "       Create one sandbox, optionally create a small dataset, stop sandbox."
   $ECHO "If mysqldOptions are specified as right then the options in Example 1 below are used."
-  $ECHO "Example 1: $0 4204 4304 noinit innodb_buffer_pool_size=16M disable_log_bin default_authentication_plugin=mysql_native_password"
+  $ECHO "Example 1: $0 4204 4304 noinit innodb_buffer_pool_size=16M disable_log_bin mysql_native_password=ON authentication_policy=mysql_native_password innodb_buffer_pool_dump_at_shutdown=OFF"
   $ECHO "Example 2: $0 4204 4304 init right"
   $EXIT 1
 }

@@ -1,35 +1,44 @@
 ---
-# todo SELECT expression, mix value/fun, @COL with datatype, ASC/DESC per col. Do we have multicol ind?
-load_thread_execute_with: self
+create_db: True
+port_writer: 2
+schemas: 1
+tables_per_schema: 32
 #destructive_thread_out: qw(/dev/null)
 #destructive_thread_err: qw(/dev/null)
 #load_thread_out: qw(/dev/null)
 #load_thread_err: qw(/dev/null)
-#load_thread_sql: qw(/dev/null)
-load_threads: 2
-load_threads: 1Xb2,1
+txn_use: yes
+load_thread_sql: qw(/dev/null)
+load_threads: 6Xb2,14
+load_threads: 1
+load_thread_restart: yes
+server_terminate: yes
+test_duration_seconds: 1800
+load_max_stmt: 000
+report_every_stmt: 10000
+# 0 means no check thread
+check_thread_ports: 2
+check_thread_sleep: 10
 #load_thread_random_seeds: 817250,102580
 load_thread_random_seeds: 0
 destructive_thread_random_seeds: 0
-test_duration_seconds: 1800
-load_thread_restart: no
-load_sql_class: INSERT:0.9,UPDATE:0.8,DELETE:0.001,CHECK:0.05,SELECT:0.999,ALTER!INSEL
-load_sql_class_k_b2: INSERT!UPDATE:0.5,DELETE:0.01,CHECK:0.05,SELECT:0.5!ALTER!INSEL
-load_max_stmt: 10
+sleep_final: 30
+load_sql_class: insert:0.5,update:0.8,delete:0.1,check:0.05,select:0.999,alter!insel
+load_sql_class_k_b2: insert:0.1,update:0.1,delete:0.001,check:0.05,select
 #load_max_stmt_k_b2: 100
-report_every_stmt: 1500
 #report_every_stmt_k_b2: 10
-server_termination_how: shutdown:0.1,shutkill:0.1,kill:0.5,sigkill:0.9,sigstop
 destructive_threads: 1Xb2,1
-port_destructive: 2
-port_destructive_k_b2: 3
+destructive_threads: 1
+server_termination_how: shutdown:0.01,shutkill:0.1,kill:0.1,sigkill:0.99,sigstop
+server_termination_how_k_b2: sigkill
+server_termination_every_seconds: 130-140:0.4,225-250
+server_termination_every_seconds_k_b2: 130-140:0.4,225-250
+ports_destructive_how_many: 2:0.5,1
+ports_destructive: 2
+#ports_destructive_k_b2: 3
+destructive_thread_sleep: 5
 port_load: 2
-port_load_k_b2: 3
-schemas: 1
-tables_per_schema: 16
-tables_per_schema: 1
-server_terminate: No
-server_termination_every_seconds: 30-140:0.9,225-250
+#port_load_k_b2: 3
 
 # 
 define: &functions_character CONCAT(@SELF;@COL_character),CONCAT(@SELF;@SELF),PI(),NOW(),ASCII(@COL_integer),ASCII(@SELF),HEX(@COL_lob),HEX(@SELF),BIN(@COL),BIT_LENGTH(@COL),BIT_LENGTH(@SELF),CHAR(@COL),CHAR_LENGTH(@SELF),CHAR_LENGTH(@COL),CHARSET(@COL_character),CHARSET(@COL_text),COERCIBILITY(@COL),COLLATION(@COL),CONCAT_WS(@SELF,@SELF,@SELF)
@@ -41,15 +50,13 @@ define: &functions_numeric PI(),NOW(),ASCII(@COL),ASCII(@SELF),HEX(@COL),HEX(@SE
 define: &functions_numeric_insert PI(),NOW(),RAND()
 define: &functions_virtual PI(),CONCAT(@COL_varchar;@COL_character),CONCAT(@FPI(};@COL),ASCII(@COL),HEX(@COL),ABS(@COL),ACOS(@COL),ADDDATE(@COL;1),ADDTIME(@COL;1),AES_ENCRYPT(@COL;""),AES_DECRYPT(@COL;""),AES_ENCRYPT(@COL;""),ASIN(@COL),ASIN(@COL),ATAN(@COL),BIN(@COL),BIT_COUNT(@COL),BIT_LENGTH(@COL),CEIL(@COL),CHAR(@COL),CHAR_LENGTH(@COL),COERCIBILITY(@COL),COLLATION(@COL),COMPRESS(@COL),MD5(@COL),CONCAT_WS(@COL_character,@COL_character,@COL_character)
 
-# todo: see imatest.pl, but some here
 # on values kinds and syntax see comments imatest_syntax.yaml
-# code rules over comments so when in doubt see code
-# atm one level deep, a sequence of name: value
+# one level deep, a sequence of name: value
 # general test parameters
 # loosely grouped, no requirements on order
 
 # STRICT if True, every key must be described in syntax checker e.g. imatest_syntax.yaml
-# exception: keys ending in _k_.+ where .+ is not expected to contain another _k_
+# exception: keys ending in _k_.+ and .+ is not expected to contain another _k_
 #   followed by any of strict_exceptions
 strict: True
 strict_exceptions: [ "ro", "ddl", "b2", "3" ]
@@ -60,17 +67,10 @@ to_check_file: imatest_syntax.yaml
 # create database, may run generated SQL even if something already exists
 create_db: True
 
-# test threads are killed by the driving thread. 
-# mysqld is left as is. todo: shutdown optionally
-# 201
-test_duration_seconds: 901
-
-# general configuration
-
 # single, InnoDBCluster etc
 config: single
 # ports are relative.
-port_destructive: 3
+ports_destructive: 3
 port_load: 2
 hosts: 127.0.0.1
 # offset port -> x protocol port, 2 -> 4202 -> 4302
@@ -90,7 +90,7 @@ tmpdir: defined($ENV{IMATMPDIR})? $ENV{IMATMPDIR} : qw(/tmp)
 
 # MySQL configuration, for SET PERSIST_ONLY then restart
 #mysql_initial_cnf: |
-mysql_initial_cnf_targets: 0,3
+mysql_initial_cnf_targets: 0
 mysql_initial_cnf_ports: 2
 mysql_initial_cnf: |
    log_error_verbosity=3
@@ -99,173 +99,137 @@ mysql_initial_cnf_ports_k_3: 3
 mysql_initial_cnf_k_3: |
    log_error_verbosity=3
    innodb_buffer_pool_size=67108864
-#  innodb_buffer_pool_size=50000000
-#  innodb_buffer_pool_in_core_file=OFF
 
 # test load
-# test load: shutdown or kill and restart
-# will the test terminate myqld every now and then
-server_terminate: Yes
-# see comments on Rseq in imatest_syntax.yaml
-# the test will terminate the server every about 60 seconds
-# this sleep is when the server is running
-server_termination_every_seconds: 125-665
-# terminate server like so. kill is mysqlsh builtin kill whatever that is. dba.killSandboxInstance
-server_termination_how: shutdown!shutkill,kill,sigkill,sigstop
-# this and similar is evaluated at server termination time
-server_terminate_shutdown: $ENV{IMASTOPMANY} $ENV{_imatest_port_destructive_rel}
+server_terminate_shutdown: $ENV{IMASTOPMANY} $ENV{_imatest_ports_destructive_rel}
 server_terminate_shutkill_before: 1-3,0-10
-server_terminate_kill: $ENV{IMAKILLMANY} $ENV{_imatest_port_destructive_rel}
-server_terminate_sigkill: $ENV{IMAHAKILLMANY} $ENV{_imatest_port_destructive_rel} KILL
-server_terminate_sigstop: $ENV{IMAHAKILLMANY} $ENV{_imatest_port_destructive_rel} STOP
-server_terminate_unstop: $ENV{IMAHAKILLMANY} $ENV{_imatest_port_destructive_rel} CONT
+server_terminate_kill: $ENV{IMAKILLMANY} $ENV{_imatest_ports_destructive_rel}
+server_terminate_sigkill: $ENV{IMAHAKILLMANY} $ENV{_imatest_ports_destructive_rel} KILL
+server_terminate_sigstop: $ENV{IMAHAKILLMANY} $ENV{_imatest_ports_destructive_rel} STOP
+server_terminate_unstop: $ENV{IMAHAKILLMANY} $ENV{_imatest_ports_destructive_rel} CONT
 # sleep this much after server termination BEFORE restarting the server. So it is apart from server_termination_every_seconds
 server_termination_duration: 10-20
 server_termination_duration_on_sigstop: 60,10,20
 # wait till server process diappears
-server_termination_wait: Yes
+server_termination_wait: yes
 server_termination_wait_timeout: 60
 # wait until the server becomes at least readonly
-server_start_control: Yes
+server_start_control: yes
 server_start_timeout: 70
 
-# test load: client threads, comma delimited list of NX[kind], format validity is checked late
-#load_threads: 1Xro,1
-# 201
-load_threads: 1
 # evaluated immediately before using the file
+check_thread_out: $ENV{_imatest_tmpdir}.'/'.$ENV{_imatest_check_filebase}.'.out'
+check_thread_err: $ENV{_imatest_tmpdir}.'/'.$ENV{_imatest_check_filebase}.'.out'
 destructive_thread_out: $ENV{_imatest_tmpdir}.'/'.$ENV{_imatest_destructive_filebase}.'.out'
 destructive_thread_err: $ENV{_imatest_tmpdir}.'/'.$ENV{_imatest_destructive_filebase}.'.out'
 load_thread_out: $ENV{_imatest_tmpdir}.'/'.$ENV{_imatest_load_filebase}.'.out'
 load_thread_err: $ENV{_imatest_tmpdir}.'/'.$ENV{_imatest_load_filebase}.'.out'
 load_thread_sql: $ENV{_imatest_tmpdir}.'/'.$ENV{_imatest_load_filebase}.'.sql'
 load_thread_client_log: $ENV{_imatest_tmpdir}.'/'.$ENV{_imatest_load_filebase}.'.log'
-load_thread_execute_with: mysql
-# 201
-load_execute_sql: Yes
+load_execute_sql: yes
 
-# === load thread parameters ===
-# mostly for internal use e.g. self test. 0 means unlimited.
-#load_max_stmt: 201
-load_max_stmt: 200
-report_every_stmt: 100
-#report_every_stmt_k_ro: 20
-
-#201 todo ro rw
-txn_use: Yes
 # milliseconds, sleep after txn end
-txn_sleep_after_ms: 0-1:0.8,2-4:0.8,5-20:0.8,21-100
-txn_sleep_in_ms: 0:0.8,1-4:0.1,5-100
+txn_sleep_after_ms: 0:0.999,0-1:0.8,2-4:0.8,5-20:0.8,21-100
+txn_sleep_in_ms: 0:0.99,1-4:0.99,5-10000
 # when not in txn
-txn_begin_p: 0.4
+txn_begin_p: 0.5
 # anytime
 txn_end_p: 0.01
-txn_end_how: COMMIT:0.9,ROLLBACK
+txn_end_how: commit:0.9,rollback
 # length is checked simultaneously
-txn_maxlength_ms: 100-200:0.01,1000-2000:0.1,3000-100000
-txn_maxlength_stmt: 1-2:0.01,1-10:0.1,1-1000
+txn_maxlength_ms: 10000-30000:0.1,100-200:0.01,1000-2000:0.99,3000-100000
+txn_maxlength_stmt: 10-100:0.5,10-1000:0.5,1-2:0.9,1-10:0.9,1-1000
 
-# database structure
-# database structure: # of schemas to create
-schemas: 1!1-3:0.5,7-9
-# drop schema before creation
-schema_drop_first: Yes
+schema_drop_first: yes
 # single %s replaced with schema number
-#schema_name_format: ts%s,test_%s_schema,test_schema_longer_name_%09d
 schema_name_format: gts%s
-# 201
-#tables_per_schema: 4!1-4:0.2,5-9:0.4,5-10
-tables_per_schema: 8!1-4:0.2,5-9:0.4,5-10
 # single %s replaced with table number
 table_name_format: tt%s!test_%s_table,test_table_longer_name_%09d
 
-tables_create_sql: $ENV{_imatest_tmpdir}.'/create_tables.sql'
-
-# table properties. EMPTY means do not specify
 table_autoextend_size: 4M:0.2,8M:0.2,12M:0.2,16M:0.2,20M:0.1,EMPTY
-table_autoinc: 1-10:0.01,1000-2000:0.01,EMPTY
-table_compression: EMPTY:0.9,ZLIB:0.5,LZ4:0.1,NONE
-table_row_format: EMPTY:0.5,DYNAMIC:0.5,COMPACT:0.5,REDUNDANT:0.1,COMPRESSED1:0.1,COMPRESSED2:0.1,COMPRESSED8:0.1,COMPRESSED16:0.1,COMPRESSED4
-table_stats_auto_recalc: 0,1,EMPTY
-table_stats_persistent: 0:0.1,1:0.5,EMPTY
-table_stats_sample_pages: 1:0.1,5-40:0.3,999:0.1,EMPTY
+table_autoinc: 1-10:0.001,1000-2000:0.001,EMPTY
+table_compression: EMPTY:0.9,ZLIB:0.5,LZ4:0.5,NONE
+table_row_format: EMPTY:0.5,DYNAMIC:0.5,COMPACT:0.2,REDUNDANT:0.2,COMPRESSED1:0.3,COMPRESSED2:0.3,COMPRESSED8:0.3,COMPRESSED16:0.3,COMPRESSED4
+table_stats_auto_recalc: 1:0.5,0:0.01,EMPTY
+table_stats_persistent: 0:0.01,1:0.8,EMPTY
+table_stats_sample_pages: 1:0.1,1-40:0.9,1-999:0.1,EMPTY
 
-# table columns and indexes
-# only if we find an integer column. No floating autoincs
-# probability 0 to 1.0
-table_has_autoinc_p: 0.6
-pk_autoinc_p: 0.8
-columns_pk: 1:0.8,2:0.8,3-12
-columns_non_pk: 4-8:0.8,0:0.1,1-8:0.8,10-40
-column_pk_name_format: pk%s!primary_key_column_%09d
-column_non_pk_name_format: col%s!__col%s,test_%s_column_abc123defaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-pk_first_p: 0.8
-indexes_per_table: 0:0.2,1:0.5,2-5:0.8,6-62:0.1,1-3
+table_has_autoinc_p: 0.1
+pk_autoinc_p: 0.99
+columns_pk: 1:0.9,1-2:0.9,0-19
+columns_non_pk: 0:0.01,0-8:0.9,0-40
+column_pk_name_format: pk%s
+column_non_pk_name_format: col%02d
+pk_first_p: 0.99
+indexes_per_table: 0:0.2,0-1:0.5,0-5:0.9,0-65:0.01,0-4 
 # ALL means include all columns in any index
-columns_per_index: 1:0.5,2:0.5,3-4:0.5,5-10:0.9,ALL:0.1,1
-index_unique_p: 0.3
-# when we must
-index_prefix_len: 1-10,100-110,254-258,765-769,3070-3072
-index_visibility: VISIBLE,INVISIBLE,EMPTY
-index_direction: EMPTY:0.7,DESC:0.6,ASC
-fulltext_index_p: 0.05
+parts_per_index: 1:0.9,1-2:0.9,1-4:0.9,1-10:0.9,ALL:0.1,1 
+index_part_type: column:0.99,function
+index_unique_p: 0.1
+index_prefix_len: 1-10,1-110,1-258,1-769,1-3092
+# when we can but not mandatory
+index_prefix_use: yes:0.01,no 
+index_visibility: visible,invisible,EMPTY
+index_direction: EMPTY:0.9,desc:0.99,asc
+fulltext_index_p: 0.001 
 
-# NOT_NULL will become NOT NULL
-column_null: NOT_NULL:0.3,EMPTY:0.9,NULL
-column_unique_p: 0.05
-column_virtuality: VIRTUAL:0.1,STORED:0.2,EMPTY
+column_null: not_null:0.8,EMPTY:0.9,null
+column_unique_p: 0.2
+column_virtuality: virtual:0.5,stored:0.5,EMPTY 
 
 # counted independently from pk and non pk
-virtual_columns_per_table: 0:0.9,1:0.8,2-4:0.9,5-100:0.1,0
+virtual_columns_per_table: 0:0.99,1:0.9,1-4:0.9,1-100:0.1,0 
 virtual_expression_length: 1-3
-virtual_expression_depth: 1-2
-virtual_term_kind: function,value #todo expression?
-select_where_all_p: 0.2
-select_count_star_p: 0.1
-select_star_p: 0.5
-select_column_p: 0.5
-insert_expression_depth: 1-2
-insert_expression_length: 1-2
-insert_term_kind: function,value
-insert_default_p: 0.5
-update_expression_depth: 1-2
-update_expression_length: 1-2
-update_term_kind: function,value
-update_column_p: 0.2
-update_default_p: 0.01
-update_where_all_p: 0.1
+virtual_expression_depth: 1:0.99,2
+virtual_term_kind: function,value
+
+select_where_all_p: 0.01
+select_count_star_p: 0.01
+select_star_p: 0.9
+select_column_p: 0.8
+
+insert_expression_depth: 1:0.99,2
+insert_expression_length: 1:0.9,1-2:0.9,1-3
+insert_term_kind: value:0.9,function
+insert_default_p: 0.9
+
+update_expression_depth: 1:0.99,2
+update_expression_length: 1:0.9,1-2:0.9,1-3
+update_term_kind: function:0.1,value
+update_column_p: 0.1
+update_default_p: 0.001
+update_where_all_p: 0.001
+
 delete_where_all_p: 0.0001
+
 default_expression_length: 1-2
-default_expression_depth: 1-2
+default_expression_depth: 1:0.99,1-2
 default_parenthesis_p: 0.99
-default_expression_term: CONSTANT:0.5,FUNCTION:0.9,COLUMN
-default_term_kind: function,value
-column_default_p: 0.2
-where_all_by_no_where_p: 0.1
-where_logical_length: 1-4
-where_logical_depth: 1-2
-where_expression_depth: 1-2
+default_expression_term: CONSTANT:0.99,FUNCTION:0.9,COLUMN
+default_term_kind: function:0.05,value
+column_default_p: 0.1
+
+where_all_by_no_where_p: 0.01
+where_logical_length: 1-2:0.9,1-4
+where_logical_depth: 1:0.9,2
+where_expression_depth: 1:0.99,2
 where_expression_length: 1-3
 where_expression_not_p: 0.1
 where_term_kind: function,value
-where_column_p: 0.3
+where_column_p: 0.2
 
-# 201
-load_sql_class: INSERT:0.9,UPDATE:0.8,DELETE:0.05,CHECK:0.5,SELECT:0.9,ALTER!INSEL
 load_alter_length: 1
 load_alter_kind: TABLE_EB:0.1,ADD_COL:0.8,DROP_COL!ADD_KEY,DROP_KEY
 
-#here
-# for F1A function_1A below is used
-explain: EXPLAIN:0.05,EXPLAIN_ANALYZE:0.1,EMPTY
-operator_null: EMPTY,IS_NULL,IS_NOT_NULL
+explain: explain_analyze:0.001,explain:0.001,EMPTY
+operator_null: EMPTY:0.9,is_not_null:0.9,is_null
 operator_logical: AND,OR
-expression_term: CONSTANT:0.1,COLUMN:0.5,FUNCTION
-expression_group: EMPTY:1,PARENTHESIS:0.9,FUNCTION
-insert_parenthesis_p: 0.3
-update_parenthesis_p: 0.3
-virtual_parenthesis_p: 0.3
-where_parenthesis_p: 1
+expression_term: CONSTANT:0.5,COLUMN:0.8,FUNCTION
+expression_group: EMPTY:0.9,PARENTHESIS:0.9,FUNCTION
+insert_parenthesis_p: 0.001
+update_parenthesis_p: 0.001
+virtual_parenthesis_p: 0.001
+where_parenthesis_p: 0.001
 #
 function_insert_datetime: *functions_datetime_insert
 function_insert_decimal: *functions_numeric_insert
@@ -311,26 +275,28 @@ function_where_set: value_generate_set@S(@QSTSELF;"where")
 function_where_floating: *functions_numeric
 function_where_integer: *functions_numeric
 function_where_lob: *functions_lob
+#here
 
-column_visibility: EMPTY:0.9,INVISIBLE:0.2,VISIBLE
-null_legitimate_p: 0.6
-null_illegitimate_p: 0.05
+column_visibility: EMPTY:0.99,invisible:0.01,visible
+null_legitimate_p: 0.01
+null_illegitimate_p: 0.001
 autoinc_explicit_value_p: 0.001
 
 # like many other values this is hardcoded inside imatest.pl
-datatype_class: INTEGER,DECIMAL,FLOATING,CHARACTER,BINARY,LOB,ENUMS,DATETIME,JSON,SPATIAL
+datatype_class: character:0.5,integer:0.2,decimal:0.2,floating:0.2,datetime:0.5,binary:0.1,enums:0.1,json:0.2,lob:0.9,spatial 
 # mind the format
-datatype_class2dt: INTEGER:TINYINT-SMALLINT-MEDIUMINT-BIGINT-INT-BIT,SPATIAL:POLYGON-MULTIPOLYGON-GEOMETRYCOLLECTION-GEOMCOLLECTION-POINT-MULTILINESTRING-MULTIPOINT-GEOMETRY-LINESTRING,DECIMAL:DECIMAL-NUMERIC,FLOATING:FLOAT-DOUBLE,CHARACTER:CHAR-VARCHAR,BINARY:BINARY-VARBINARY,LOB:TINYBLOB-TINYTEXT-BLOB-TEXT-MEDIUMBLOB-MEDIUMTEXT-LONGBLOB-LONGTEXT,ENUMS:ENUM-SET,DATETIME:DATETIME-DATE-TIMESTAMP-TIME-YEAR,JSON:JSON
-datatype_integer: TINYINT:0.01,SMALLINT:0.1,MEDIUMINT:0.01,BIGINT:0.5,INT:0.9,BIT
-datatype_spatial: POLYGON,MULTIPOLYGON,GEOMETRYCOLLECTION,POINT,MULTILINESTRING,MULTIPOINT,GEOMETRY,LINESTRING
-datatype_decimal: DECIMAL:0.9,NUMERIC
-datatype_floating: FLOAT,DOUBLE
-datatype_character: CHAR,VARCHAR
-datatype_binary: BINARY,VARBINARY
-datatype_lob: TINYBLOB,TINYTEXT,BLOB,TEXT,MEDIUMBLOB,MEDIUMTEXT,LONGBLOB,LONGTEXT
-datatype_enums: ENUM:0.9,SET
-datatype_datetime: DATETIME:0.2,DATE:0.3,TIMESTAMP:0.7,TIME:0.5,YEAR
-datatype_canfull: CHAR,VARCHAR,TINYTEXT,TEXT,MEDIUMTEXT,LONGTEXT
+datatype_class2dt: integer:tinyint-smallint-mediumint-bigint-int-bit,spatial:polygon-multipolygon-geometrycollection-geomcollection-point-multilinestring-multipoint-geometry-linestring,decimal:decimal-numeric,floating:float-double,character:char-varchar,binary:binary-varbinary,lob:tinyblob-tinytext-blob-text-mediumblob-mediumtext-longblob-longtext,enums:enum-set,datetime:datetime-date-timestamp-time-year,json:json
+datatype_integer: tinyint:0.1,smallint:0.1,mediumint:0.1,bigint:0.2,int:0.9,bit
+#datatype_spatial: point 
+datatype_spatial: polygon,multipolygon,geometrycollection,point,multilinestring,multipoint,geometry,linestring 
+datatype_decimal: decimal:0.99,numeric
+datatype_floating: float:0.9,double
+datatype_character: char:0.2,varchar
+datatype_binary: binary:0.1,varbinary
+datatype_lob: tinyblob,tinytext,blob,text,mediumblob,mediumtext,longblob,longtext
+datatype_enums: enum:0.9,set
+datatype_datetime: datetime:0.1,date:0.1,timestamp:0.9,time:0.1,year
+canfull_datatype: char,varchar,tinytext,text,mediumtext,longtext
 
 integer_unsigned_p: 0.3
 number_reverse_sign_legitimate_p: 0.2
@@ -341,75 +307,74 @@ value_bit: 1-4:0.5,5-60:0.8,61-68
 # sign is reversed separately, see *reverse_sign*
 value_tinyint: 0-4:0.5,5-100:0.5,101-150:0.5,250-258
 value_json_kind: SIMPLEML,FROMSCRIPT,REFARRAY,SCALAR,REFHASH
-value_json_len: 0:0.01,1-100:0.2,100-1000:0.5,10000-20000:0.1,100-1000000
+value_json_len: 0:0.01,1-100:0.5,100-1000:0.9,10000-20000:0.9,100-1000000
 # appears in a for loop
 value_json_small_len: 0:0.1,1:0.1,2-10:0.9,11-1000
-value_smallint: 0-100:0.5,10000-20000:0.5,32200-32300:0.1,1-80000
-#here
-value_mediumint: 0-100:0.5,10000-20000:0.5,8388000-8389000:0.5,16777000-16778000
-value_int: 0-100:0.5,10000-20000:0.5,2047483000-2047484000
+value_smallint: 0-100:0.5,0-200:0.9,0-300:0.9,10000-20000:0.5,32200-32300:0.1,1-80000
+value_mediumint: 0-100:0.5,10000-20000:0.9,8388000-8389000:0.5,16777000-16778000
+value_int: 0-100:0.5,10000-20000:0.5,10000-1000000:0.9,1-10000000:0.9,2047483000-2047484000
 # todo better separate for unsigned
-value_bigint: 0-100:0.5,10000-20000:0.5,9123372036854776000-9123372036854776000
+value_bigint: 0-100:0.5,10000-20000:0.9,1-9123372036854:0.9,9123372036854776000-9123372036854776000
 decimal_whole: 3-8:0.5,EMPTY:0.2,9-59:0.8,60-65
 decimal_part: EMPTY:0.2,0-2:0.5,3-8:0.5,9-28:0.5,29-30
 # also applies to numeric. This is not what we insert. Rather it is 10 POW this * rand(). This may change, see code if matters.
 # todo exp adjust
-decimal_value: 1:0.01,0:0.2,0-2:0.5,3-6:0.8,7-28:0.5,29-62
+decimal_value: 1:0.01,0:0.2,0-2:0.5,3-6:0.9,7-14:0.9,1-62
 # EMPTY means no exponent, then we will use a decimal_value
-float_value_exp: EMPTY:0.2,0:0.1,1-10:0.5,M35-35:0.5,M40-M37:0.5,37-38
-double_value_exp: EMPTY:0.2,0:0.1,1-10:0.5,M35-35:0.5,M305
+float_value_exp: EMPTY:0.2,0:0.1,1-10:0.9,M35-35:0.9,M40-M37:0.9,37-38
+double_value_exp: EMPTY:0.2,0:0.1,1-10:0.9,M35-35:0.9,M305-100
 datetime_fractional: EMPTY:0.5,0:0.2,1-6
-datetime_fractional_illegal_p: 0
-year_value: 1901-2155:0.5,0:0.1,1969-2039
-datetime_year_value: 1969-2040:0.5,1000-1999
-timestamp_year_value: 1971-2037:0.5,1999-2001:0.5,2002-2025
-datetime_month_value: 1-12
-datetime_day_value: 1-28
-datetime_hour_value: 0-23
+datetime_fractional_illegal_p: 0.01
+year_value: 1901-2155:0.9,0:0.01,1969-2039
+datetime_year_value: 1969-2040:0.9,1000-1999
+timestamp_year_value: 1971-2037:0.9,1999-2001:0.9,2002-2025
+datetime_month_value: 1-12:0.99,0-13
+datetime_day_value: 1-28:0.99,0-32
+datetime_hour_value: 0-23:0.99,M1-25
 time_hour_value: 0-23:0.5,M23-23:0.9,M838-838
-datetime_minute_value: 0-59
-datetime_second_value: 0-59
-datetime_microsecond_value: 0:0.5,1-100:0.5,EMPTY:0.5,499999-500001:0.5,0-999999
-character_set: EMPTY:0.5,utf8mb4:0.2,latin1
-datatype_char_len: 0:0.01,1-10:0.8,11-250:0.05,251-255
-value_char_len: 0:0.1,1-10:0.8,11-250:0.05,251-260
-datatype_varchar_len: 0:0.01,1-10:0.1,11-250:0.5,251-260:0.1,261-16383:0.1,100
-value_varchar_len: 0:0.1,1-10:0.1,11-250:0.5,251-260:0.1,261-5000:0.1,65000-70000
+datetime_minute_value: 0-59:0.99,M1-61
+datetime_second_value: 0-59:0.99,M1-61
+datetime_microsecond_value: 0:0.5,1-100:0.5,EMPTY:0.5,499999-500001:0.5,0-999999:0.9,M2-1000005
+character_set: EMPTY:0.5,utf8mb4:0.5,latin1
+datatype_char_len: 0:0.01,1-10:0.8,11-250:0.9,0-260
+value_char_len: 0:0.1,1-10:0.9,11-250:0.9,251-260
+datatype_varchar_len: 0:0.01,1-10:0.5,11-250:0.9,251-260:0.1,261-16383
+value_varchar_len: 0:0.1,1-10:0.9,11-250:0.9,251-260:0.9,261-5000:0.9,65000-70000
 # adjust generated value to column length, applies to binary and blob as well
 value_kchar_length_adjust_p: 0.99
-datatype_binary_len: EMPTY:0.1,0:0.01,1-10:0.8,11-250:0.05,251-255
-value_binary_len: 0:0.1,1-10:0.8,11-250:0.05,251-260
-datatype_varbinary_len: 0:0.01,1-10:0.1,11-250:0.5,251-260:0.1,261-5000:0.1,65000-65535
-value_varbinary_len: 0:0.1,1-10:0.1,11-250:0.5,251-260:0.1,261-5000:0.1,65000-70000
-datatype_lob_key_len: 1-255
+datatype_binary_len: EMPTY:0.1,0:0.01,1-10:0.9,11-250:0.9,1-255
+value_binary_len: 0:0.1,1-10:0.9,1-250:0.9,1-260
+datatype_varbinary_len: 0:0.01,1-10:0.9,1-250:0.9,1-260:0.9,1-5000:0.9,1-75535
+value_varbinary_len: 0:0.1,1-10:0.9,1-250:0.9,1-260:0.9,1-5000:0.9,1-70000
+datatype_lob_key_len: 1-255:0.9,1-500
 # applies to both text and binary
-value_tinylob_len: 0:0.01,1-100:0.5,101-255
-value_lob_len: 0:0.01,1-100:0.5,10000-20000:0.1,25000-35000
-value_mediumlob_len: 0:0.01,1-100:0.5,10000-20000:0.1,8388000-8389000:0.01,6777000-6778000:0.01,1-1000
-value_longlob_len: 0:0.01,1-100:0.5,10000-20000:0.1,2147483000-2147484000:0.01,4294967000-4294968000:0.01,1-10
-datatype_enum_len: 1-10:0.5,11-25:0.9,25-26:0.9,27-65000
-datatype_set_len: 1-10:0.8,11-60:0.5,61-64
-datatype_set_value_len: 1:0.2,2:0.5,1-10:0.8,11-60:0.5,61-70
+value_tinylob_len: 0:0.01,1-100:0.9,1-255:0.9,1-300
+value_lob_len: 0:0.01,1-100:0.9,1-20000:0.9,1-35000
+value_mediumlob_len: 0:0.01,1-100:0.9,1-20000:0.9,1-8389000:0.9,1-6778000
+value_longlob_len: 0:0.01,1-100:0.9,1-20000:0.9,1-2147484000:0.9,1-4294968000
+datatype_enum_len: 1-10:0.9,1-25:0.9,1-26:0.99,1-65000
+datatype_set_len: 1-10:0.9,1-60:0.9,1-64
+datatype_set_value_len: 1:0.9,2:0.9,1-10:0.9,1-60:0.9,1-70
 # M will NOT become -
-geometry_kind: POINT,LINESTRING,POLYGON
-multigeometry_kind: POINT,LINESTRING,POLYGON
+geometry_kind: point,linestring,polygon
+multigeometry_kind: point,linestring,polygon
 # WKT, allowed max chars when we build the value
-value_spatial_len: 100-1000:0.5,10000-20000:0.1,8388000-8389000:0.1,16777000-16778000:0.1,100-200
-spatial_srid: 4326:0.5,0:0.5,32761:0.5,EMPTY
-value_point_x: M90-90
-value_point_y: M180-180
-value_linestring_len: 2:0.2,3-8:0.5,2-300:0.1,2-8
-value_multilinestring_len: 1-2:0.2,3-8:0.5,2-300:0.1,2-8
-value_multipolygon_len: 1-2:0.2,3-8:0.5,2-300:0.1,2-8
-value_multipoint_len: 1-2:0.2,3-8:0.5,2-300:0.1,2-8
-value_multigeometry_len: 1-2:0.2,3-8:0.5,2-300:0.1,2-8
+value_spatial_len: 100-1000:0.5,10000-20000:0.9,100-8389000:0.1,100-16778000:0.1,100-200
+spatial_srid: 4326:0.9,0:0.9,32761:0.01,EMPTY
+value_point_x: M90-90:0.9,M92-92
+value_point_y: M180-180:0.9,M182-182
+value_linestring_len: 2:0.2,3-8:0.9,2-8:0.9,2-200
+value_multilinestring_len: 1-2:0.2,3-8:0.9,2-8:0.9,2-300
+value_multipolygon_len: 1-2:0.2,3-8:0.9,2-8:0.9,2-300
+value_multipoint_len: 1-2:0.2,3-8:0.9,2-8:0.9,2-300
+value_multigeometry_len: 1-2:0.2,3-8:0.9,2-8:0.9,2-300
 # vertices
-value_polygon_len: 3:0.2,3-8:0.5,3-300:0.1,4-6
+value_polygon_len: 3:0.2,3-8:0.9,4-6:0.9,3-300
 # rings
-value_polygon_size: 1:0.8,2:0.5,3-8
+value_polygon_size: 1:0.9,2:0.9,3-8
 value_polygon_kind: RIGHT,SAME,MIRROR,STRANGE
-# todo substruct for SQL for load thread kind
-# ANY -> x_thread_any not mandatory
 # start many instances sequentially
-# todo here fixme
-server_start: $ENV{IMASTARTMANY} $ENV{_imatest_port_destructive_rel}
+server_restart: $ENV{IMASTARTMANY} $ENV{_imatest_ports_destructive_rel}
+# check many instances sequentially
+server_check: $ENV{IMACHECKMANY} $ENV{_imatest_ports_check_rel}
+load_thread_execute_with: perl

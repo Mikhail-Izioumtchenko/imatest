@@ -18,20 +18,31 @@ taport="$(($port + $base))"
 pass=`$CAT "$IMAPAS"`
 lof="/tmp/`$BASENAME $0`.tmp"
 
-$PERL logmine.pl /root/mysql-sandboxes/*/sandboxdata/error.log /tmp/*log /tmp/*out 2>&1 | $TEE "$lof" | $LESS
+tomine="/root/mysql-sandboxes/*/sandboxdata/error.log /tmp/*log /tmp/*out"
+$PERL logmine.pl $tomine 2>&1 | $TEE "$lof" | $LESS
 ./startms.sh "$port"
+$ECHO ""
 ./count1sa.sh "$port" $schemas
+$ECHO ""
 ./checktables1sa.sh "$port" $schemas
+$ECHO ""
 ./usems.sh "$port"
 
+$ECHO ""
 $ECHO "signals and croaks START"
-$GREP -i 'signal|croak' "$lof"
+hom=`$GREP -i 'signal|croak' $tomine | $GREP -v hakill1sa.sh | $WC -l`
+[ "$hom" -gt 10 ] && $GREP -i 'signal|croak' $tomine | $GREP -v hakill1sa.sh | $LESS || $GREP -i 'signal|croak' $tomine | $GREP -v hakill1sa.sh
+$ECHO ""
 $ECHO "signals and croaks SHORT"
-$GREP -i 'signal|croak' "$lof" | $GREP -v semi
+$GREP -i 'signal|croak' $tomine | $GREP -v hakill1sa.sh | $GREP -v semi
 $ECHO "signals and croaks END"
+$ECHO ""
 $ECHO "See also $lof"
-$LS -lt /tmp
+$ECHO ""
+$LS -lt /tmp | $GREP -v '_thread|\.fin|\.out|\.tmp|\.sh\.sql'
+$ECHO "and some '_thread|\.fin|\.out|\.tmp|\.sh\.sql'"
 $DF -h /mnt/c
+$ECHO ""
 $ECHO -n "Remove -rf /tmp/* ? "
 $READ ans
 [ "$ans" = 'y' ] && $RM -rfv /tmp/*

@@ -24,7 +24,7 @@ baseex="$IMAPORTMXBASE"
   $ECHO "       Create multiple sandboxes. init is default."
   $ECHO "       Port base is $base, X port base is $baseex"
   $ECHO "If mysqldOptions are specified as right then the options in Example 1 below are used."
-  $ECHO "Example 1: $0 4 noinit innodb_buffer_pool_size=16M disable_log_bin default_authentication_plugin=mysql_native_password"
+  $ECHO "Example 1: $0 4 noinit innodb_buffer_pool_size=16M disable_log_bin mysql_native_password=ON authentication_policy=mysql_native_password innodb_buffer_pool_dump_at_shutdown=OFF"
   $ECHO "Example 2: $0 4 init right"
   $EXIT 1
 }

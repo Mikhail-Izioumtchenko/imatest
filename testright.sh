@@ -1,8 +1,11 @@
 #!/bin/bash
-#seeds="--seed 7"
-verbose="${1:-0}"
+ports="${1:-2}"
+forhelp="$1"
+verbose="${2:-0}"
 seeds=""
-[ -z "$2" ] || seeds="--seed $2"
-echo "verbose=$verbose and seeds=$seeds", Usage: $0 [verbose_N [--seed N]]
+[ -z "$3" ] || seeds="--seed $3"
+echo "Usage: $0 [ports_rel [verbose_N [--seed N]]]"
+echo "  so ports=$ports verbose=$verbose and seeds=$seeds"
+[ "$forhelp" = 'h' -o "$forhelp" = '-help' -o "$forhelp" = '-h' -o "$forhelp" = 'help' ] && exit 1
 sleep 3
-./stopms.sh 2 wait;\rm -r /root/mysql-sandboxes/*/sandboxdata/error.log /tmp/*;./startms.sh 2 wait;./imatest.sh now --test imatest.yaml --verbose "$verbose" --nodry-run $seeds 2>&1|tee /tmp/imatest.out
+./hakillms.sh "$ports" 9 wait;\rm -r /root/mysql-sandboxes/*/sandboxdata/error.log /tmp/*;./startms.sh "$ports" wait;./imatest.sh now --test imatest.yaml --verbose "$verbose" --nodry-run $seeds 2>&1|tee /tmp/test.out; ./stopms.sh "$ports" wait
