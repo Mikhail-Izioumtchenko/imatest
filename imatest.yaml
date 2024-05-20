@@ -1,21 +1,23 @@
 ---
-create_db: True
+create_db: yes
 port_writer: 2
-schemas: 1
-tables_per_schema: 32
+schemas: 3
+tables_per_schema: 4
+tables_per_schema: 23
 #destructive_thread_out: qw(/dev/null)
 #destructive_thread_err: qw(/dev/null)
 #load_thread_out: qw(/dev/null)
 #load_thread_err: qw(/dev/null)
 txn_use: yes
 load_thread_sql: qw(/dev/null)
-load_threads: 6Xb2,14
 load_threads: 1
+load_threads: 8Xb2,16
 load_thread_restart: yes
-server_terminate: yes
-test_duration_seconds: 1800
+server_terminate: no
+test_duration_seconds: 180
 load_max_stmt: 000
 report_every_stmt: 10000
+rediscover_every_seconds: 60-70
 # 0 means no check thread
 check_thread_ports: 2
 check_thread_sleep: 10
@@ -23,17 +25,17 @@ check_thread_sleep: 10
 load_thread_random_seeds: 0
 destructive_thread_random_seeds: 0
 sleep_final: 30
-load_sql_class: insert:0.5,update:0.8,delete:0.1,check:0.05,select:0.999,alter!insel
-load_sql_class_k_b2: insert:0.1,update:0.1,delete:0.001,check:0.05,select
-#load_max_stmt_k_b2: 100
-#report_every_stmt_k_b2: 10
+sleep_on_assert: 6
+terminate_on_assert: yes
+load_sql_class: insert:0.5,sot:0.5,sop:0.5,analyze:0.5,optimize:0.5,checksum:0.5,replace:0.1,insel:0.1,alter:0.1,update:0.8,delete:0.1,check:0.05,select #debug
+load_sql_class_k_b2: insert:0.1,insel:0.1,replace:0.1,update:0.1,delete:0.001,check:0.01,alter:0.1,select
 destructive_threads: 1Xb2,1
 destructive_threads: 1
 server_termination_how: shutdown:0.01,shutkill:0.1,kill:0.1,sigkill:0.99,sigstop
 server_termination_how_k_b2: sigkill
-server_termination_every_seconds: 130-140:0.4,225-250
-server_termination_every_seconds_k_b2: 130-140:0.4,225-250
-ports_destructive_how_many: 2:0.5,1
+server_termination_every_seconds: 120-480:0.5,540-600
+server_termination_every_seconds_k_b2: 300-360
+ports_destructive_how_many: 1
 ports_destructive: 2
 #ports_destructive_k_b2: 3
 destructive_thread_sleep: 5
@@ -79,9 +81,6 @@ xportoffset: 4300
 
 # this and similar will be evaluated once at startup, doeval in inatest_syntax.yaml
 # environment is set im imatest.sh in fact in imatest.dot
-# mysqlsh executable
-mysqlsh: $ENV{MYSQLSH}
-mysql: $ENV{MYSQL}
 # user that runs test SQL, all of it
 user: $ENV{IMAROOT}
 # user that runs test SQL, all of it
@@ -133,6 +132,7 @@ txn_sleep_after_ms: 0:0.999,0-1:0.8,2-4:0.8,5-20:0.8,21-100
 txn_sleep_in_ms: 0:0.99,1-4:0.99,5-10000
 # when not in txn
 txn_begin_p: 0.5
+txn_begin_how: work,ro,rw #debug
 # anytime
 txn_end_p: 0.01
 txn_end_how: commit:0.9,rollback
@@ -163,14 +163,14 @@ column_non_pk_name_format: col%02d
 pk_first_p: 0.99
 indexes_per_table: 0:0.2,0-1:0.5,0-5:0.9,0-65:0.01,0-4 
 # ALL means include all columns in any index
-parts_per_index: 1:0.9,1-2:0.9,1-4:0.9,1-10:0.9,ALL:0.1,1 
-index_part_type: column:0.99,function
+parts_per_index: 1:0.9,1-2:0.9,1-4:0.9,1-10:0.9,ALL:0.1,1  
+index_part_type: function:0.01,column
 index_unique_p: 0.1
 index_prefix_len: 1-10,1-110,1-258,1-769,1-3092
 # when we can but not mandatory
 index_prefix_use: yes:0.01,no 
-index_visibility: visible,invisible,EMPTY
-index_direction: EMPTY:0.9,desc:0.99,asc
+index_visibility: EMPTY:0.99,invisible:0.9,visible
+part_direction: EMPTY:0.99,desc:0.9,asc
 fulltext_index_p: 0.001 
 
 column_null: not_null:0.8,EMPTY:0.9,null
@@ -184,9 +184,9 @@ virtual_expression_depth: 1:0.99,2
 virtual_term_kind: function,value
 
 select_where_all_p: 0.01
-select_count_star_p: 0.01
-select_star_p: 0.9
+select_how: all:0.1,count:0.1,columns
 select_column_p: 0.8
+select_distinct_p: 0.8 #debug
 
 insert_expression_depth: 1:0.99,2
 insert_expression_length: 1:0.9,1-2:0.9,1-3
@@ -218,8 +218,11 @@ where_expression_not_p: 0.1
 where_term_kind: function,value
 where_column_p: 0.2
 
-load_alter_length: 1
-load_alter_kind: TABLE_EB:0.1,ADD_COL:0.8,DROP_COL!ADD_KEY,DROP_KEY
+load_alter_length: 1-2
+load_alter_kind: TABLE_EB:0.3,ADD_COL:0.3,DROP_COL!ADD_KEY,DROP_KEY #debug
+load_analyze_local_p: 0.5 #debug
+load_check_quick_p: 0.5 #debug
+load_optimize_local_p: 0.5 #debug
 
 explain: explain_analyze:0.001,explain:0.001,EMPTY
 operator_null: EMPTY:0.9,is_not_null:0.9,is_null
@@ -258,7 +261,6 @@ function_update_timestamp: *functions_datetime
 # QSTSELF is "schema.table.col"
 function_update_enum: value_generate_enum@S(@QSTSELF;"update")
 function_update_set: value_generate_set@S(@QSTSELF;"update")
-# todo some col kind, col of type
 function_update_decimal: *functions_numeric
 function_update_floating: *functions_numeric
 function_update_integer: *functions_numeric
@@ -296,7 +298,6 @@ datatype_binary: binary:0.1,varbinary
 datatype_lob: tinyblob,tinytext,blob,text,mediumblob,mediumtext,longblob,longtext
 datatype_enums: enum:0.9,set
 datatype_datetime: datetime:0.1,date:0.1,timestamp:0.9,time:0.1,year
-canfull_datatype: char,varchar,tinytext,text,mediumtext,longtext
 
 integer_unsigned_p: 0.3
 number_reverse_sign_legitimate_p: 0.2
@@ -324,7 +325,6 @@ decimal_value: 1:0.01,0:0.2,0-2:0.5,3-6:0.9,7-14:0.9,1-62
 float_value_exp: EMPTY:0.2,0:0.1,1-10:0.9,M35-35:0.9,M40-M37:0.9,37-38
 double_value_exp: EMPTY:0.2,0:0.1,1-10:0.9,M35-35:0.9,M305-100
 datetime_fractional: EMPTY:0.5,0:0.2,1-6
-datetime_fractional_illegal_p: 0.01
 year_value: 1901-2155:0.9,0:0.01,1969-2039
 datetime_year_value: 1969-2040:0.9,1000-1999
 timestamp_year_value: 1971-2037:0.9,1999-2001:0.9,2002-2025

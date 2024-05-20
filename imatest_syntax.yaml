@@ -27,8 +27,6 @@ strict:
 autoinc_explicit_value_p:
   mandatory: True
   allowed: probability
-canfull_datatype:
-  mandatory: True
 character_set:
   mandatory: True
   allowed: Rseq
@@ -81,8 +79,8 @@ config:
   supported: [single]
 create_db:
   mandatory: True
-  allowed: [True, False]
-  supported: [True, False]
+  allowed: [yes, no]
+  supported: [yes, no]
 datatype_binary:
   mandatory: True
   allowed: Rseq       
@@ -160,9 +158,6 @@ datatype_varchar_len:
 datetime_fractional:
   mandatory: True
   allowed: Rseq
-datetime_fractional_illegal_p:
-  mandatory: True
-  allowed: probability
 datetime_day_value:
   mandatory: True
   allowed: Rseq
@@ -350,10 +345,6 @@ geometry_kind:
   only_values_allowed: point,linestring,polygon
 hosts:
   mandatory: True
-index_direction:
-  mandatory: True
-  allowed: Rseq       
-  only_values_allowed: asc,desc,EMPTY
 index_part_type:
   mandatory: True
   allowed: Rseq       
@@ -405,6 +396,12 @@ load_alter_kind:
   mandatory: True
   allowed: Rseq
   only_values_allowed: ADD_COL,DROP_COL,ADD_KEY,DROP_KEY,TABLE_EB
+load_analyze_local_p:
+  mandatory: True
+  allowed: probability
+load_check_quick_p:
+  mandatory: True
+  allowed: probability
 load_execute_sql:
   mandatory: True
   allowed: [yes, no]
@@ -412,10 +409,13 @@ load_execute_sql:
 load_max_stmt:
   mandatory: True
   allowed: only_non_negative_integers
+load_optimize_local_p:
+  mandatory: True
+  allowed: probability
 load_sql_class:
   mandatory: True
   allowed: Rseq
-  only_values_allowed: select,update,insert,delete,insel,alter,check
+  only_values_allowed: select,update,insert,delete,insel,alter,check,replace,analyze,checksum,optimize,sot,sop
 load_thread_client_log:
   mandatory: True
 load_thread_err:
@@ -449,12 +449,6 @@ mysql_initial_cnf_ports:
   mandatory: True
 mysql_initial_cnf_targets:
   mandatory: True
-mysql:
-  mandatory: True
-  allowed: doeval
-mysqlsh:
-  mandatory: True
-  allowed: doeval
 null_illegitimate_p:
   mandatory: True
   allowed: probability
@@ -467,6 +461,10 @@ number_reverse_sign_illegitimate_p:
 number_reverse_sign_legitimate_p:
   mandatory: True
   allowed: probability
+part_direction:
+  mandatory: True
+  allowed: Rseq       
+  only_values_allowed: asc,desc,EMPTY
 parts_per_index:
   allowed: Rseq       
   mandatory: True
@@ -519,6 +517,10 @@ operator_logical:
   mandatory: True
   allowed: Rseq
   only_values_allowed: AND,OR
+rediscover_every_seconds:
+  mandatory: True
+  allowed: Rseq
+  only_non_negative_integers: True
 report_every_stmt:
   mandatory: True
   allowed: only_positive_integers
@@ -532,17 +534,16 @@ schema_name_format:
   only_names: True
 schemas:
   mandatory: True
-  allowed: Rseq
-  only_positive_integers: True
 select_column_p:
   mandatory: True
   allowed: probability
-select_count_star_p:
+select_distinct_p:
   mandatory: True
   allowed: probability
-select_star_p:
+select_how:
   mandatory: True
-  allowed: probability
+  allowed: Rseq
+  only_values_allowed: all,count,columns
 select_where_all_p:
   mandatory: True
   allowed: probability
@@ -559,7 +560,8 @@ server_start_timeout:
   mandatory: True
 server_terminate:
   mandatory: True
-  only_values_allowed: yes,no
+  allowed: [yes, no]
+  supported: [yes, no]
 server_terminate_kill:
   mandatory: True
 server_terminate_shutdown:
@@ -600,6 +602,9 @@ server_termination_wait_timeout:
 sleep_final:
   mandatory: True
   allowed: only_non_negative_integers
+sleep_on_assert:
+  mandatory: True
+  allowed: only_non_negative_integers
 spatial_srid:
   mandatory: True
   allowed: Rseq
@@ -636,9 +641,9 @@ table_stats_sample_pages:
   allowed: Rseq       
   mandatory: True
 tables_per_schema:
-  allowed: Rseq       
   mandatory: True
-  only_non_negative_integers: True
+terminate_on_assert:
+  mandatory: True
 test_duration_seconds:
   mandatory: True
   allowed: only_positive_integers
@@ -654,6 +659,10 @@ tmpdir:
 to_check_file:
   mandatory: True
   allowed: Rseq       
+txn_begin_how:
+  mandatory: True
+  allowed: Rseq
+  only_values_allowed: ro,rw,work
 txn_begin_p:
   mandatory: True
   allowed: probability

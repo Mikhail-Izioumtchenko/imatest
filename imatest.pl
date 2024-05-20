@@ -4,48 +4,38 @@ use English;
 
 require 5.032;
 
+# mind start execution. Execution starts HERE.
+
 # style: flexible, mostly per perldoc perlstyle. Follow suit.
 # M1. mandatory: no tabs, 4 blanks indentation
 # M2. mandatory: no case statement, no camelCase
 # 2. desirable: should look like C. Postfix if is OK and is preferred over postfix unless. 
-# 3. so postfix if and unless are discouraged. If specified, should be on the same line as statement, if|unless (condition)
-# 4. no postfix except for if and unless
 # 5. blocks in {} even where a single statement after while or similar is allowed
-# 6. desirable: single quotes unless string interpolation is used. So 'abc' not "abc".
 # 7. comments start with single #, indent with code if on separate line
 # 8. do avoid OO, do not use constant
 # 9. 1+2 is OK, 1<2 is better written as 1 < 2
-# 10. lowercase names except constants which should be all UPPERCASE
-# 11. desirable: single return per sub but see value_generate_time() for treatment of unreachable code
+# 10. lowercase names except pseudo constants which should be all UPPERCASE
 # 12. use not and or for logical ops, instead of && etc.
 # 13. longnamesnounderscores are fine, names_with are also OK
 # 14. important: names of variables in the same scope should differ in at least two characters
-# 15. important: array names start with l, hash names, with h. Globals start with g e.g. @glist
-# 16. max source code line length is 143
+# 15. important: array names start with l, hash names, with h. Intended globals start with g e.g. @glist
+# 16. max source code line len is 143
 
 # perl features
 # do not use shuffle()
 # always sort(keys(%h))
 
-# todo
+#todo
 # flag file to start tracing
-# REPLACE
-# ANALYZE + histogram
-# CHECKSUM
-# OPTIMIZE
+# on duplicate key update
+# limit order by group by having except union intersect join subqueries
+# LOCK INSTANCE FOR BACKUP UNLOCK INSTANCE
+# LOCK TABLES UNLOCK TABLES
+# ANALYZE histogram
 # FLUSH
 # LOCK
-# count distinct etc
-# optional server shutdown in the end
-# dry but less dry
-# database discovery
-# check 'x' for constants
-# how group by
-# more robust values esp. update 
 # savepoints
-# ddl
 # set
-# confuser syntax
 
 use Carp qw(croak shortmess);
 use Data::Dumper qw(Dumper);
@@ -68,7 +58,7 @@ use DBD::mysql;
 STDOUT->autoflush();
 STDERR->autoflush();
 
-my $version = '5.9';
+my $version = '5.11';
 
 $Data::Dumper::Sortkeys = 1;
 
@@ -105,6 +95,7 @@ my %GHRC = (
 my $CHECK_RW = 2;
 my $CHECK_RO = 3;
 my $CHECK_DOWN = 1;
+my $CHECK_ASSERT = 4;
 my $EC_OK = 0;
 my $EC_ERROR = 1;
 
@@ -116,28 +107,20 @@ my $DEC_RANGE_MARKER = 'D';
 my $INT_RANGE_MARKER = 'I';
 my $NEG_MARKER = 'M';
 
-my $ALTER = 'alter';
-my $BEGIN = 'begin';
 my $CHARACTER_SET = 'character_set';
 my $CHECK_SUBKEYS = '_2levelkeys';
-my $CREATE_DB = 'create_db';
 my $DATETIME = 'datetime';
 my $DATATYPE_LOB_KEY_LEN = 'datatype_lob_key_len';
 my $DECIMAL = 'decimal';
 my $DEFAULT = 'default';
-my $EFAIL = 'EFAIL';
-my $EGOOD = 'EGOOD';
 my $EIGHT = 8;
 my $EMPTY = 'EMPTY';
-my $END = 'END';
 my $EXPRESSION_GROUP = 'expression_group';
 my $INTEGER = 'integer';
 my $JSON = 'json';
 my $LOAD_THREAD_CLIENT_LOG = 'load_thread_client_log';
 my $LOAD_THREAD_CLIENT_LOG_ENV = '_imatest_client_log';
 my $LOB = 'lob';
-my $MYSQLSH_RUN_FILE = 'mysqlsh_run_file';
-my $MYSQLSH_EXEC = 'mysqlsh_exec';
 my $NEEDS_ON_TRUE = 'needs_on_true';
 my $NO = 'no';
 my $NUMBER_REVERSE_SIGN_LEGITIMATE_P = 'number_reverse_sign_legitimate_p';
@@ -161,8 +144,6 @@ my $STRING_TRUE = 'True';
 my $SUPPORTED = 'supported';
 my $TEST_DURATION = 'test_duration_seconds';
 my $UKIND = '_k_';
-my $UPDATE = 'update';
-my $UPDATE_COLUMN_P = 'update_column_p';
 my $V3072 = 3072;
 my $V4326 = 4326;
 my $VALUE_POINT_X = 'value_point_x';
@@ -176,7 +157,8 @@ my @LOPT = ("$DRYRUN!", "$HELP!", "$TESTYAML=s", "$SEE_ALSO=s", "$SEED=i", "$VER
 my %HDEFOPT = ("$DRYRUN" => 0, $HELP => 0, $VERBOSE => 0, $VERSION => 0);      # option defaults
 
 # globals of sorts
-my $gdbh;
+my $gdbh;      # writer port
+my %ghdbh = ();      # config ports
 my $gstrj;
 my $gdosayoff = 2;
 my %ghasopt = ();      # resulting options values hash
@@ -194,9 +176,9 @@ my @glstables = ();         # list of all schema.table. Used to get table to run
 # end schema related
 
 # start table related
-my %ghst2cols = ();      ## schema.table => ref array column names
+my %ghst2cols = ();      ## schema.table => ref array column names or :expr
 my %ghst2pkcols = ();      ## schema.table => ref array pk column names
-my %ghst2createtable = ();      ## schema.table => CREATE TABLE without CREATE TABLE name itself, USED by ALTER
+my %ghst2createtable = ();      ## schema.table => CREATE TABLE
 my %ghst2nvcols = ();      ## schema.table => ref array column names for non virtual columns USED DML
 my %ghst2aes = ();      ## schema.table => autoextend size or -1 for not specified
 my %ghst2charset = ();      ## schema.table => default charset mandatory
@@ -227,27 +209,28 @@ my @ghstlist = (
 # end schema.table hashes
 
 # schema.table.index including :primary
-my %ghsti2cols = ();    # schema.table.index => ref list column names
 my %ghsti2kind = ();    # schema.table.index => kind: primary unique key fulltext spatial
-# todo functional etc
-my %ghsti2lens = ();    # schema.table.index => ref array col prefix length or -1 if no length
+my %ghsti2cols = ();    # schema.table.index => ref list column names
+my %ghsti2cotype = ();  # schema.table.index => ref array col type: 0 col 1 col(N) 2 expr
+my %ghsti2lens = ();    # schema.table.index => ref array col prefix length or expr for functional or -1 if just column
 my @ghstilist = (
 \%ghsti2cols,
 \%ghsti2lens,
+\%ghsti2cotype,
 \%ghsti2kind
                 );
 
 # start schema.table.column hashes
 my %ghstc2class = ();      # schema.table.column => column datatype class
-my %ghstc2just = ();      # schema.table.column => column datatype, just it USED
-my %ghstc2len = ();      # schema.table.column => column length or scale 5 5,2 if specified or -1 todo
+my %ghstc2just = ();      # schema.table.column => column datatype, just it
+my %ghstc2len = ();      # schema.table.column => column length or scale 5 5,2 if specified or -1
 my %ghstc2charset = ();      # schema.table.column => column charset if shown or :EMPTY
 my %ghstc2collate = ();      # schema.table.column => column collate if shown or :EMPTY
 my %ghstc2cannull = ();      # schema.table.column => column nullability 1 or 0
 my %ghstc2unsigned = ();      # schema.table.column => column is unsigned 1 unsigned 0 signed or not specified
 my %ghstc2srid = ();      # schema.table.column => SRID or -1
-my %ghstc2canfull = ();      # schema.table.column => can be part of fulltext index USED todo make function
-my %ghstc2isautoinc = ();      # schema.table.column => is autoinc USED
+my %ghstc2canfull = ();      # schema.table.column => can be part of fulltext index
+my %ghstc2isautoinc = ();      # schema.table.column => is autoinc
 my %ghstc2virtual = ();      # schema.table.column => column is virtual 1 stored 2 virtual or 0
 my %ghstc2virtex = ();      # schema.table.column => virtual expression or :EMPTY
 my %ghstc2hasdefault = ();      # schema.table.column => has DEFAULT 1 or 0
@@ -270,8 +253,7 @@ my @ghstcolist = (
                  );
 # end schema.table.column hashes
 
-# todo indexes
-my %ghmisc = ();         # e.g. mysqlsh_exec => invocation line prefix
+my %ghmisc = ();        # 
 my %ghlpids = ();      # process ids of load threads => parameters to restart;
 my %ghchepids = ();      # process ids of check thread => []
 my %ghtermpids = ();      # process ids of termination threads => parameters to restart
@@ -558,7 +540,6 @@ sub process_rseq {
     }
     # process cutoff
     if ($val =~ /!/) {
-        # todo oversimiplified
         $val =~ s/:[.0-9]+!/!/;
         $val =~ s/!.*//;
         $ghtest{$skey} = $val;
@@ -814,14 +795,6 @@ sub buildmisc {
     my $myport_load = $ghreal{'port_load'} + $ghreal{'mportoffset'};
     $ENV{'_imatest_ports_destructive_rel'} = $ghreal{'ports_destructive'};
     $ENV{'_imatest_port_load_rel'} = $ghreal{'port_load'};
-    $ghmisc{'mysqlsh_base'} = sprintf(
-"%s --host=%s --port=%s --user=%s --password=%s --sqlx --show-warnings=true --result-format=json --quiet-start=2 --log-sql=all --verbose=1",
-                               $ghreal{'mysqlsh'},$ghreal{'hosts'},$port_load,$ghreal{'user'},$password);
-    $ghmisc{'mysql_base'} = sprintf(
-"%s --host=%s --port=%s --user=%s --password=%s --force --compression-algorithms=zstd --no-beep --unbuffered --quick  --batch --verbose",
-                               $ghreal{'mysql'},$ghreal{'hosts'},$myport_load,$ghreal{'user'},$password);
-    $ghmisc{$MYSQLSH_RUN_FILE} = "$ghmisc{'mysqlsh_base'} --force --log-file $ENV{$LOAD_THREAD_CLIENT_LOG_ENV} --file";
-    $ghmisc{$MYSQLSH_EXEC} = "$ghmisc{'mysqlsh_base'} --log-file $ENV{$LOAD_THREAD_CLIENT_LOG_ENV} --execute";
     my @lcla = split(/,/,$ghreal{'datatype_class2dt'});
     foreach my $clas (@lcla) {
         my @l2 = split(/:/,$clas);
@@ -835,31 +808,38 @@ sub buildmisc {
     return $RC_OK;
 }
 
+# all
+# 1: dbh
+# 2: abort on SQL failure
 sub db_discover {
+    my ($dbh,$strict) = @ARG;
     my $rc = $RC_OK;
-    dosayif($VERBOSE_ANY,"%s: invoked");
+    dosayif($VERBOSE_ANY,"invoked");
     if ($ghasopt{$DRYRUN}) {
-        dosayif($VERBOSE_ANY," with %s=%s returning %s", $DRYRUN, 1,  $rc);
+        dosayif($VERBOSE_ANY,"with %s=%s returning %s", $DRYRUN, 1,  $rc);
         return $rc;
     }
 
-    my $com = "$ghmisc{$MYSQLSH_EXEC} 'SHOW SCHEMAS'";
-    my ($ec, $pljson) = readexec($com);
-    if ($ec != $EC_OK) {
-        dosayif($VERBOSE_ANY,"line %s cannot proceed: failed to retrieve schemas, ec %s, json %s",  __LINE__, $ec, Dumper($pljson));
-        usage("cannot proceed: failed to retrieve schemas, exit code $ec", __LINE__);
-        exit $EC_ERROR;
+    my $com = "SHOW SCHEMAS";
+    my $plschemas = getarrayref($com,$dbh,$VERBOSE_ANY);
+    docroak("Failed to execute %s",$com) if (not defined($plschemas) and $strict);
+    my @lschemas = grep {$_ ne 'imaschema' and $_ ne 'sys' and $_ ne 'mysql' and not $_ =~ /^(performance|information)_schema$/}
+                     map {$_->[0]} @$plschemas;
+    docroak("we have no schemas to run test on") if (scalar(@lschemas == 0) and $strict);
+    foreach my $schema (@lschemas) {
+        dosayif($VERBOSE_ANY,"processing schema %s",$schema);
+        my $stmt = "SHOW TABLES FROM $schema";
+        my $pltables = getarrayref($stmt, $dbh,$VERBOSE_ANY);
+        if (not defined($pltables)) {
+            docroak("Failed to execute %s",$stmt) if ($strict);
+            return $RC_ERROR;
+        }
+        my @ltables = map {$_->[0]} @$pltables;
+        for my $tab (@ltables) {
+            table_add("$schema.$tab",$dbh,$strict);
+        }
     }
-    dosayif($VERBOSE_ANY,"exit code %s",$ec);
-    dosayif($VERBOSE_DEV,"exit code %s json %s",$ec,Dumper($pljson));
-    my @ldb = grep {$_ ne 'mysql' and $_ ne 'information_schema' and $_ ne 'performance_schema' and $_ ne 'sys'}
-                map{chop; s/"//g; s/^.* //; $_}
-                  grep {/"Database":/} @$pljson;
-    foreach my $snam (sort(@ldb)) {
-        push(@glschemas,$snam);
-        dosayif($VERBOSE_ANY,"discovered test schema %s",$snam);
-    }
-
+    
     dosayif($VERBOSE_ANY," returning %s",  $rc);
     return $rc;
 }
@@ -912,16 +892,17 @@ my %ghvgsub = (
 # returns: (value_generate_sub function_sub operator)
 sub descrcol {
     my ($kind,$colnam) = @ARG;
-    my $dtclass = $ghstc2class{$colnam}; #todo sub
+    docroak("No datatype class found for column %s",$colnam) if (not defined($ghstc2class{$colnam}));
+    my $dtclass = $ghstc2class{$colnam};
+    docroak("No datatype found for column %s",$colnam) if (not defined($ghstc2just{$colnam}));
     my $dt = $ghstc2just{$colnam};
-    $dtclass = 'integer' if (not defined($dtclass)); # todo report some
-    $dt = 'smallint' if (not defined($dt));
-    $dtclass = lc($dtclass); #todo at origin
-    $dt = lc($dt); #todo at origin
+    $dtclass = lc($dtclass);
+    $dt = lc($dt);
     my $subvaldt = "value_generate_$dt";
     my $subvaldtclass = "value_generate_$dtclass";
-    # todo fix this
-    my $subval = defined($ghvgsub{$subvaldt})? $subvaldt : (defined($ghvgsub{$subvaldtclass})? $subvaldtclass : 'value_generate_smallint');
+    docroak("value_generate_%s nor _%s do not exist for column %s",$subvaldt,$subvaldtclass,$colnam)
+        if (not defined($ghvgsub{$subvaldt}) and not defined($ghvgsub{$subvaldtclass}));
+    my $subval = defined($ghvgsub{$subvaldt})? $subvaldt : $subvaldtclass;
     my $fundt = "function_${kind}_$dt";
     my $fundtclass = "function_${kind}_$dtclass";
     my $fun = defined($ghreal{$fundt})? $fundt : $fundtclass;
@@ -938,14 +919,14 @@ sub dooper {
     my $rc = $termval;
     if (defined($haveop)) {
         my $op = process_rseq($haveop);
-        $op =~ s/MINUS/-/g;
-        $op =~ s/N=/!=/g;
+        $op =~ s/MINUS/-/gi;
+        $op =~ s/N=/!=/gi;
         if ($op =~ /o\@p/) {
             $op =~ s/o\@p//;
             docroak("Prefix operator '%s' is not + or - for %s",$op,$haveop) if ($op ne '+' and $op ne '-');
             $termval = "$op$termval";
             $op = process_rseq($haveop);
-            $op =~ s/MINUS/-/g; # todo maybe parm to process
+            $op =~ s/MINUS/-/gi;
             $op =~ s/N=/!=/g;
         }
         $op =~ s/o\@p?//;
@@ -984,13 +965,13 @@ sub build_expression {
             my $termkind = process_rseq("${kind}_term_kind");
             my $termval = '';
             if ($termkind eq 'value') {
-                docroak("%s() is not defined. CROAK.",$subval) if (not defined($ghvgsub{$subval})); # todo internalise
+                docroak("%s() is not defined. CROAK.",$subval) if (not defined($ghvgsub{$subval}));
                 $termval = $ghvgsub{$subval}->($colnam,$kind);
             } else {      # function
                 $termval = defined($ghreal{$fun})? process_rseq($fun) : 'null';
                 if ($kind eq $DEFAULT and $termval eq 'null' and not $cannull) {
                     # fallback to value
-                    docroak("%s() is not defined. CROAK.",$subval) if (not defined($ghvgsub{$subval})); # todo internalise
+                    docroak("%s() is not defined. CROAK.",$subval) if (not defined($ghvgsub{$subval}));
                     $termval = $ghvgsub{$subval}->($colnam,$kind);
                 }
                 if ($termval =~ /\@F/) {
@@ -1017,8 +998,6 @@ sub build_expression {
                 if ($termval =~ /\@S\(/) {
                     $termval =~ s/\@S//g;
                     my $evexpr = doeval($termval,0,1);      # return scalar, silent
-                    # todo maybe try to check to some degree in checkscript e.g. if undefined sub
-                    # or search eval for undefined?
                     $termval = defined($evexpr)? $evexpr : 'null';
                     if ($kind eq $DEFAULT and $termval eq 'null' and not $cannull) {
                         docroak("unrechable code for %s:%s, NULL for NOT NULL. CROAK.",$kind,$colnam);
@@ -1069,7 +1048,7 @@ sub generate_column_def {
     my ($kind,$colnam) = @ARG;
     my ($schema,$tabl,$cnam) = split(/\./,$colnam);
     my $tnam = "$schema.$tabl";
-    my $canpk = defined($hpgstcol2def{$colnam})? $hpgstcol2def{$colnam} : 1;      # latter for ADD COLUMN, need +p todo
+    my $canpk = 1;
     my $coldef = '';
     $ghstc2isautoinc{$colnam} = 0;
     $ghstc2cannull{$colnam} = 1;
@@ -1081,10 +1060,10 @@ sub generate_column_def {
     my $srid = undef;
     my $tclass = process_rseq('datatype_class');
     my $keylen = undef;
-    my $canunique = $canpk eq "1"? 0 : 1;      # UNIQUE can be added to coldef
+    my $canunique = 1;
     # sink for PK
     if ($tclass eq $SPATIAL or $tclass eq $JSON) {
-        $tclass = $INTEGER if ($canpk);
+        $canpk = 0;
         $canunique = 0;
     }
     # now we have final datatype class
@@ -1127,7 +1106,6 @@ sub generate_column_def {
                     $dt .= " primary key";
                     $ghstc2cannull{$colnam} = 0;
                 } else {
-                    # todo consider edge case of missing in any subsequent index/ autoinc_unique_p ?
                     $dt .= " unique";
                 }
             }
@@ -1162,7 +1140,6 @@ sub generate_column_def {
         $dt = process_rseq('datatype_character');
         $ghstc2just{$colnam} = $dt;
         my $len = $dt eq 'char'? process_rseq('datatype_char_len') : process_rseq('datatype_varchar_len');
-        $len = $V3072 if ($canpk and $len > $V3072);
         $dt .= "($len)";
         $ghstc2len{$colnam} = $len;
         my $cs = process_rseq($CHARACTER_SET);
@@ -1173,15 +1150,12 @@ sub generate_column_def {
         my $len = '';
         if ($dt eq 'binary') {
             $len = process_rseq('datatype_binary_len');
-            if ($canpk) {
-                $keylen = process_rseq($DATATYPE_LOB_KEY_LEN);
-                $keylen = $len if ($len ne $EMPTY and $keylen > $len);
-                $keylen = 1 if ($len eq $EMPTY);
-            }
+            $keylen = process_rseq($DATATYPE_LOB_KEY_LEN);
+            $keylen = $len if ($len ne $EMPTY and $keylen > $len);
+            $keylen = 1 if ($len eq $EMPTY);
         } else {
             $len = process_rseq('datatype_varbinary_len');
         }
-        $len = $V3072 if ($canpk and $len ne $EMPTY and $len > $V3072);
         if ($len ne $EMPTY) {
             $dt .= "($len)";
             $ghstc2len{$colnam} = $len;
@@ -1193,9 +1167,7 @@ sub generate_column_def {
         $dt = process_rseq('datatype_lob');
         $ghstc2just{$colnam} = $dt;
         $ghstc2canfull{$colnam} = 1 if ($dt =~ /text/);
-        if ($canpk) {
-            $keylen = process_rseq($DATATYPE_LOB_KEY_LEN);
-        }
+        $keylen = process_rseq($DATATYPE_LOB_KEY_LEN);
     } elsif ($tclass eq 'enums') {
         $dt = process_rseq('datatype_enums');
         $ghstc2just{$colnam} = $dt;
@@ -1228,12 +1200,6 @@ sub generate_column_def {
         ++$pghavevcols;
         $ghstc2virtual{$colnam} = 1;
         $pgcandefault = 0;
-    } else {
-        if (defined($ghst2nvcols{$tnam})) {
-            push(@{$ghst2nvcols{$tnam}},$cnam);
-        } else {
-            $ghst2nvcols{$tnam} = [$cnam];
-        }
     }
     if (dorand() < $ghreal{'column_unique_p'} and $canunique and $psgneedind > 0) {
         $dt .= " unique";
@@ -1242,7 +1208,7 @@ sub generate_column_def {
     my $vis = process_rseq('column_visibility');
     if (not $canpk) {
         if ($ghstc2isautoinc{$colnam} or $tclass eq $SPATIAL) {
-            $vis =  $EMPTY; # todo allow spatial null
+            $vis =  $EMPTY;
         } else {
             $vis = process_rseq('column_null');
             $ghstc2cannull{$colnam} = ($vis eq 'not_null')? 0 : 1;
@@ -1252,6 +1218,8 @@ sub generate_column_def {
     } else {
         $psgtable_pk .= " , $cnam";
         $psgtable_pk .= "($keylen)" if (defined($keylen));
+        my $dir = process_rseq('part_direction');
+        $psgtable_pk .= " $dir" if ($dir ne $EMPTY);
         $ghstc2cannull{$colnam} = 0;
     }
     if (dorand() < $ghreal{'column_default_p'} and $pgcandefault) {
@@ -1264,11 +1232,12 @@ sub generate_column_def {
     return $coldef;
 }
 
-# 1: stmt
-# 2: dbh
-# returns arrayref or undef
-sub getarrayref {
-    my ($stmt,$dbh) = @ARG;
+# 1: dbh
+# 2: stmt
+# 3: key name string
+# returns hashref or undef
+sub gethashref {
+    my ($dbh,$stmt,$key) = @ARG;
     if ($ghasopt{$DRYRUN}) {
         dosayif($VERBOSE_ANY, "SUCCESS with --dry-run executing %s",$stmt);
         return $RC_OK;
@@ -1277,67 +1246,104 @@ sub getarrayref {
     $SIG{'__WARN__'} = sub {1;};
     my $err = '';
     my $errstr = '';
-    my $rc = $dbh->selectall_arrayref($stmt);
+    my $rc = $dbh->selectall_hashref($stmt,$key);
     if (not defined($rc)) {
         $err = $dbh->err();
         $errstr = $dbh->errstr();
-        dosayif($VERBOSE_ANY, "ERROR %s executing selectall_arrayref %s: %s",$err,$stmt,$errstr);
+        dosayif($VERBOSE_ANY, "ERROR %s executing selectall_hashref %s: %s",$err,$stmt,$errstr);
     } else {
-        dosayif($VERBOSE_ANY, "SUCCESS executing selectall_arrayref %s",$stmt);
+        dosayif($VERBOSE_SOME, "SUCCESS executing selectall_hashref %s",$stmt);
     }
     $SIG{'__WARN__'} = $was;
     return $rc;
 }
 
 # 1: stmt
-# returns RC_OK or RC_ERROR
-sub runreport {
-    my $stmt = $ARG[0];
+# 2: dbh
+# 3: verbosity on error
+# returns arrayref or undef
+sub getarrayref {
+    my ($stmt,$dbh,$vererr) = @ARG;
     if ($ghasopt{$DRYRUN}) {
         dosayif($VERBOSE_ANY, "SUCCESS with --dry-run executing %s",$stmt);
         return $RC_OK;
     }
     my $was = $SIG{'__WARN__'};
     $SIG{'__WARN__'} = sub {1;};
-    my $rc = $gdbh->do($stmt);
+    my $err = '';
+    my $errstr = '';
+    dosayif($VERBOSE_SOME, "about to execute selectall_arrayref %s +%s+",$stmt,$dbh);
+    my $rc = $dbh->selectall_arrayref($stmt);
+    if (not defined($rc)) {
+        $err = $dbh->err();
+        $errstr = $dbh->errstr();
+        dosayif($vererr, "ERROR %s executing selectall_arrayref %s: %s",$err,$stmt,$errstr);
+    } else {
+        dosayif($VERBOSE_SOME, "SUCCESS executing selectall_arrayref %s",$stmt);
+    }
+    $SIG{'__WARN__'} = $was;
+    return $rc;
+}
+
+# 1: stmt
+# 2: dbh
+# 3: verbosity
+# returns RC_OK or RC_ERROR
+sub runreport {
+    my ($stmt,$dbh,$verbose) = @ARG;
+    if ($ghasopt{$DRYRUN}) {
+        dosayif($VERBOSE_ANY, "SUCCESS with --dry-run executing %s",$stmt);
+        return $RC_OK;
+    }
+    my $was = $SIG{'__WARN__'};
+    $SIG{'__WARN__'} = sub {1;};
+    my $rc = $dbh->do($stmt);
     my $err = '';
     my $errstr = '';
     if (not defined($rc)) {
         $rc = $RC_ERROR;
-        $err = $gdbh->err();
-        $errstr = $gdbh->errstr();
-        dosayif($VERBOSE_ANY, "ERROR %s executing %s: %s",$err,$stmt,$errstr);
+        $err = $dbh->err();
+        $errstr = $dbh->errstr();
+        dosayif($verbose, "ERROR %s executing %s: %s",$err,$stmt,$errstr);
     } else {
         $rc = $RC_OK;
-        dosayif($VERBOSE_ANY, "SUCCESS executing %s",$stmt);
+        dosayif($verbose, "SUCCESS executing %s",$stmt);
     }
     $SIG{'__WARN__'} = $was;
     return $rc;
 }
 
 # add schema.table to global structures
-# 1: schema.table
-# 2: CREATE TABLE tnam ( without the part before (
+# 1: schema.table which is expected to exist
+# 2: db handle
+# 3: croak on error
 sub table_add {
-    my ($tnam,$str) = @ARG;
-    push(@glstables,$tnam);
-    $ghst2createtable{$tnam} = $str;
-    my @lstr = split(/\n/,$str);
-
-    foreach my $ph (@ghstlist) {
-        delete $ph->{$tnam} if (defined($ph->{$tnam}));
-    }
-    foreach my $ph (@ghstilist) {
-        foreach my $sti (sort(keys(%$ph))) {
-            delete $ph->{$sti} if ($sti =~ /^$tnam\./);
+    my ($tnam,$dbh,$strict) = @ARG;
+    my $stmt = "SHOW CREATE TABLE $tnam";
+    my $plcre = getarrayref($stmt,$dbh,$VERBOSE_SOME);
+    if (not defined($plcre)) {
+        if ($strict) {
+            docroak("Error executing %s",$stmt);
+        } else {
+            dosayif($VERBOSE_SOME,"Error executing %s",$stmt);
+            return $RC_ERROR;
         }
     }
+    my $str = $plcre->[0]->[1];
+    push(@glstables,$tnam);
+    my ($schema,$table) = split(/\./,$tnam);
+
+    my $inum = 0;
+    forget_table($tnam);
+    $ghst2createtable{$tnam} = $str;
+    $str =~ s/^[^(]*\(/(/;
+    my @lstr = split(/\n/,$str);
+
     my @lcols = ();
     my @lind = ();
     my @lnvcols = ();
     my @lpkcols = ();
 
-    dosayif($VERBOSE_MORE,"CREATE TABLE %s: +%s+",$tnam,$str);
     my $nlin = 0;
     my $incols = 0;
     my $last = '';
@@ -1421,42 +1427,6 @@ sub table_add {
                     $ghstc2hasdefault{$stc} = 0;
                 }
                 docroak("BAD column description for %s, need empty string now: +%s+ dt +%s+ IN %s",$stc,$dt,$coldes,$lin) if ($coldes ne '');
-            } elsif ($lin =~ /^\s*PRIMARY\s+KEY\s+\(\`/) {
-                push(@lind,':primary');
-                my @lpref = ();
-                while ($lin =~ s/\`([^\`]+)`(\(\d+\))?//) {
-                    push(@lpkcols,$1);
-                    push(@lpref,(defined($2)? $2 : -1));
-                }
-                my $ind = "$tnam.:primary";
-                $ghsti2cols{$ind} = \@lpkcols;
-                $ghsti2lens{$ind} = \@lpref;
-                $ghsti2kind{$ind} = 'primary';
-            } elsif ($lin =~ /^\s*(UNIQUE|FULLTEXT|SPATIAL)?\s*KEY\s*\`/) {
-                my $nam = $lin;
-                $nam =~ s/^\s*(UNIQUE|FULLTEXT|SPATIAL)?\s*KEY\s*\`//;
-                $nam =~ /([^\`]+)/;
-                $nam = $1;
-                push(@lind,$nam);
-                $lin =~ s/\`$nam\`//;
-                my @lic = ();
-                my @lpref = ();
-                while ($lin =~ s/\`([^\`]+)`(\([^\)]+\))?//) { # todo support functions
-                    push(@lic,$1);
-                    push(@lpref,(defined($2)? $2 : -1));
-                }
-                my $ind = "$tnam.$nam";
-                $ghsti2cols{$ind} = \@lic;
-                $ghsti2lens{$ind} = \@lpref;
-                if ($lin =~ /^\s*UNIQUE/) {
-                    $ghsti2kind{$ind} = 'unique';
-                } elsif ($lin =~ /^\s*FULLTEXT/) {
-                    $ghsti2kind{$ind} = 'fulltext';
-                } elsif ($lin =~ /^\s*SPATIAL/) {
-                    $ghsti2kind{$ind} = 'spatial';
-                } else {
-                    $ghsti2kind{$ind} = 'key';
-                }
             }
         }
     }
@@ -1479,8 +1449,85 @@ sub table_add {
     $last =~ s/\)//;
     $last =~ s/ENGINE=InnoDB//;
     $last =~ s/\/\*\s?!?\d+\s+\*\///;
+    $last =~ s/AUTO_INCREMENT=[\d]+//g;   # for discovery
     $last =~ s/\s//g;
     docroak("BAD last +%s+ not all eliminated in %s",$last,$str) if ($last ne '');
+
+    # indexes
+    $stmt = "SELECT *, CONCAT(INDEX_NAME,'.',REPEAT('0',5-LENGTH(SEQ_IN_INDEX)),SEQ_IN_INDEX) PART_ID FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = '$schema' AND TABLE_NAME = '$table'";
+    my $key = 'PART_ID';
+    my $phind = gethashref($gdbh,"SELECT *, CONCAT(INDEX_NAME,'.',REPEAT('0',5-LENGTH(SEQ_IN_INDEX)),SEQ_IN_INDEX) PART_ID FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = '$schema' AND TABLE_NAME = '$table'",$key);
+    if (not defined($phind)) {
+        if ($strict) {
+            docroak("For %s failed to gethasref of %s with key column %s",$tnam,$stmt,$key);
+        } else {
+            dosayif($VERBOSE_SOME,"For %s failed to gethasref of %s with key column %s",$tnam,$stmt,$key);
+            return $RC_ERROR;
+        }
+    }
+    
+    my %hiname = ();
+    foreach my $ipart (sort(keys(%$phind))) {
+        my ($iname,$num) = split(/\./,$ipart);
+        ++$hiname{$iname};
+    }
+    @lind = sort(keys(%hiname));
+    foreach my $ind (@lind) {
+        my $sti = "$tnam.$ind";
+        my @lcols = ();
+        my @llen = ();
+        my @lcot = ();
+        my @lparts = sort grep {/^$ind\./} sort(keys(%$phind));
+        foreach my $part (@lparts) {
+            my $phpart = $phind->{$part};
+            if ($phpart->{'INDEX_NAME'} eq 'PRIMARY') {
+                $ghsti2kind{$sti} = 'primary';
+            } elsif ($phpart->{'INDEX_TYPE'} eq 'BTREE') {
+                $ghsti2kind{$sti} = $phpart->{'NON_UNIQUE'} == 0? 'unique' : 'key';
+            } else {
+                $ghsti2kind{$sti} = lc($phpart->{'INDEX_TYPE'});
+            }
+            my $len = -1;
+            my $cot = 0;
+            if (defined($phpart->{'SUB_PART'})) {
+                $len = $phpart->{'SUB_PART'};
+                $cot = 1;
+            }
+            if (defined($phpart->{'EXPRESSION'})) {
+                $len = $phpart->{'EXPRESSION'};
+                $cot = 2;
+            }
+            push(@llen,$len);
+            push(@lcot,$cot);
+            push(@lcols,(defined($phpart->{'COLUMN_NAME'})? $phpart->{'COLUMN_NAME'} : ':expr'));
+            
+        }
+        $ghsti2cols{$sti} = \@lcols;
+        $ghsti2lens{$sti} = \@llen;
+        $ghsti2cotype{$sti} = \@lcot;
+    }
+
+    return $RC_OK;
+}
+
+# 1: schema.table
+sub forget_table {
+    my ($tnam) = @ARG;
+    foreach my $pha (@ghstlist) {
+        foreach my $cnam (sort(keys(%$pha))) {
+            delete($pha->{$cnam}) if ($cnam =~ /^$tnam\./);
+        }
+    }
+    foreach my $ph (@ghstilist) {
+        foreach my $sti (sort(keys(%$ph))) {
+            delete $ph->{$sti} if ($sti =~ /^$tnam\./);
+        }
+    }
+    foreach my $ph (@ghstcolist) {
+        foreach my $sti (sort(keys(%$ph))) {
+            delete $ph->{$sti} if ($sti =~ /^$tnam\./);
+        }
+    }
     return $RC_OK;
 }
 
@@ -1491,6 +1538,9 @@ sub db_create {
     %hpgstcol2def = ();      # obscure pk related see code
 
     my $nschemas = $ghreal{'schemas'};
+    if (not $nschemas =~ /^\d+$/ or $nschemas <= 0) {
+        docroak("For db creation schemas must be a positive integer, not '%s'",$nschemas);
+    }
     dosayif($VERBOSE_ANY," will create %s schemas", $nschemas);
     my @lsesql = ();
     foreach my $sn (1..$nschemas) {
@@ -1502,13 +1552,17 @@ sub db_create {
         push(@lsesql, "CREATE SCHEMA $nam");
     }
     foreach my $stmt (@lsesql) {
-        my $subrc = runreport($stmt);
+        my $subrc = runreport($stmt,$gdbh,$VERBOSE_ANY);
         $rc = $RC_WARNING if ($subrc != $RC_OK);
     }
 
+    my $ntables = $ghreal{'tables_per_schema'};
+    if (not $ntables =~ /^\d+$/ or $ntables <= 0) {
+        docroak("For db creation tables_per_schema must be a positive integer, not '%s'",$ntables);
+    }
     my %hs2ntables = ();
     foreach my $snam (@glschemas) {
-        $hs2ntables{$snam} = process_rseq('tables_per_schema');
+        $hs2ntables{$snam} = $ntables;
     }
     foreach my $snam (@glschemas) {
         # for each table
@@ -1518,6 +1572,7 @@ sub db_create {
             $psgneedind = process_rseq("indexes_per_table");
             my $frm = process_rseq("table_name_format");
             my $tnam = "$snam.".sprintf($frm,$ntab);
+            $ghst2createtable{$tnam} = ':TBD';
             $pghavevcols = 0;
             $pgcanautoinc = 1 if (dorand() < $ghreal{'table_has_autoinc_p'});
             $tsql .= "CREATE TABLE $tnam (";
@@ -1571,11 +1626,9 @@ sub db_create {
             $pgneedvcols = scalar(@lcols)-1 if ($pgneedvcols >= scalar(@lcols));
             if (dorand() < $ghreal{'pk_first_p'}) {
                 dosayif($VERBOSE_DEV," table %s will have pk columns first",$tnam);
-                $ghst2cols{$tnam} = \@lcols;
             } else {
                 dosayif($VERBOSE_DEV,"table %s will NOT have pk columns first",$tnam);
                 @lcols = doshuffle(@lcols);
-                $ghst2cols{$tnam} = \@lcols;
             }
             my $indnum = 0;
             foreach my $cnam (@lcols) {
@@ -1595,7 +1648,7 @@ sub db_create {
             foreach my $inum (1..$psgneedind) {
                 my $needcols = process_rseq('parts_per_index');
                 if ($needcols eq 'ALL') {
-                    $needcols = scalar(@lindcols) <= 16? scalar(@lindcols) : 16; #todo const
+                    $needcols = scalar(@lindcols);
                 }
                 my $fulltext = dorand() < $ghreal{'fulltext_index_p'}? 'FULLTEXT ' : '';
                 my @lhavefull = grep {$ghstc2canfull{"$tnam.$_"}} @lindcols;
@@ -1622,31 +1675,35 @@ sub db_create {
                     my $type = process_rseq('index_part_type');
                     if ($type eq 'column') {
                         $iline .= ", $thiscol";
+                        if (($ghstc2class{$coname} eq 'character' and $type eq 'column' and process_rseq('index_prefix_use') eq 'yes')
+                            or $hpsgcolneedpref{$thiscol}) {
+                            my $lenp = process_rseq('index_prefix_len');
+                            $lenp = $ghstc2len{$coname}
+                              if (dorand() < process_rseq($VKCHAR) and $ghstc2len{$coname} > 0 and $lenp > $ghstc2len{$coname});
+                            $iline .= "($lenp)" if ($lenp ne $EMPTY);
+                        }
                     } else { #function
-                        $iline .= ", (length($thiscol))"; # todo more
+                        $iline .= ", (length($thiscol))"; #todo more
                         $hasfun = 1;
                     }
-                    if (($ghstc2class{$coname} eq 'character' and $type eq 'column' and process_rseq('index_prefix_use') eq 'yes')
-                        or $hpsgcolneedpref{$thiscol}) {
-                        my $lenp = process_rseq('index_prefix_len');
-                        $lenp = $ghstc2len{$coname}
-                          if (dorand() < process_rseq($VKCHAR) and $ghstc2len{$coname} > 0 and $lenp > $ghstc2len{$coname});
-                        $iline .= "($lenp)" if ($lenp ne $EMPTY);
-                    }
+                    my $dir = process_rseq('part_direction');
+                    $iline .= " $dir" if ($dir ne $EMPTY);
                 }
                 my $was = $iline;
                 $iline =~ s/\( *,/(/;
                 $iline .= ")";
-                if (not $iline =~ /\(\)/) {      # marginal case related to spatial todo figure out
+                my $vis = process_rseq('index_visibility');
+                $iline .= " $vis" if ($vis ne $EMPTY);
+                if (not $iline =~ /\(\)/) {
                     $tsql .= $iline;
                 } else {
                     $tsql =~ s/,$//;
                 }
+                
             }
             $tsql .= $tail;
-            $ghst2createtable{$tnam} = $tsql;
-            runreport("DROP TABLE IF EXISTS $tnam");
-            runreport($tsql);
+            runreport("DROP TABLE IF EXISTS $tnam",$gdbh,$VERBOSE_SOME);
+            runreport($tsql,$gdbh,$VERBOSE_SOME);
         }
     }
 
@@ -1654,24 +1711,15 @@ sub db_create {
         # clean up records for tables that failed to create
         dosayif($VERBOSE_ANY,"remove records for tables that failed to create");
         my $badtables = 0;
-        my %hblist = ();
-        foreach my $tnam (sort(keys(%ghst2cols))) {
-            my $plcre = getarrayref("SHOW CREATE TABLE $tnam",$gdbh);
+        foreach my $tnam (sort(keys(%ghst2createtable))) {
+            my $plcre = getarrayref("SHOW CREATE TABLE $tnam",$gdbh,$VERBOSE_SOME);
             if (not defined($plcre)) {
                 ++$badtables;
-                dosayif($VERBOSE_DEV," table %s does not exist, forgetting it",$tnam);
-                delete($ghst2createtable{$tnam});
-                ++$hblist{$tnam};
-                foreach my $pha (@ghstlist) {
-                    foreach my $cnam (sort(keys(%$pha))) {
-                        delete($pha->{$cnam}) if ($cnam =~ /^$tnam\./);
-                    }
-                }
+                dosayif($VERBOSE_ANY," table %s does not exist, forgetting it",$tnam);
+                forget_table($tnam);
             } else {
-                my $str = $plcre->[0]->[1];
-                $str =~ s/^[^(]*\(/(/;
                 ++$gntables;
-                table_add($tnam,$str);
+                table_add($tnam,$gdbh,1);
             }
         }
         dosayif($VERBOSE_ANY," we have %s good tables, forgot %s bad tables",$gntables,$badtables);
@@ -1730,13 +1778,13 @@ sub build_where {
             # choose column to build expression on
             my $sucolnam = $lcols[int(dorand()*$havecols)];
             my $colnam = "$tnam.$sucolnam";
-            my $dtclass = $ghstc2class{$colnam}; #todo sub
+            my $dtclass = $ghstc2class{$colnam};
             my $dt = $ghstc2just{$colnam};
             #croak("$tnam:where:$colnam: no datatype or datatype class for $colnam. CROAK.") if (not defined($dt) or not defined($dtclass));
             $dtclass = 'x' if (not defined($dtclass));
             $dt = 'x' if (not defined($dt));
-            $dtclass = lc($dtclass); #todo at origin
-            $dt = lc($dt); #todo at origin
+            $dtclass = lc($dtclass);
+            $dt = lc($dt);
             my $haveop = defined($ghreal{"operator_logical_$dt"})?
                            "operator_logical_$dt" :
                            (defined($ghreal{"operator_logical_$dtclass"})? "operator_logical_$dtclass" : undef);
@@ -1774,7 +1822,7 @@ sub build_where {
         }
     }
 
-    $expr = pnotnull($expr,'where'); #todo different parameters
+    $expr = pnotnull($expr,'where');
     $expr = "WHERE $expr";
     dosayif($VERBOSE_MORE, "build_where return");
     return $expr;
@@ -1790,7 +1838,7 @@ sub table_columns_subset {
     @lcall = @{$ghst2cols{$tnam}} if (scalar(@lcall) == 0);
     my @lc = grep {dorand() < $ghreal{$parm}} @lcall;
     push(@lc,$lcall[0]) if (scalar(@lc) == 0);
-    my $rc = $kind eq $UPDATE? \@lc : join(',',@lc);
+    my $rc = $kind eq 'update'? \@lc : join(',',@lc);
     return $rc;
 }
 
@@ -1800,15 +1848,40 @@ sub table_get {
     return $tnam;
 }
 
-# returns statement
+# returns statement, subkind
 sub stmt_select_generate {
-    my $stmt = 'select';
+    my $stmt = 'SELECT';
+    my $sub = 'SEL';
+    if (dorand() < $ghreal{'select_distinct_p'}) {
+        $stmt .= ' DISTINCT';
+        $sub .= 'D';
+    }
     # determine schema.table
     my $tnam = table_get();
-    my $tosel = dorand() < process_rseq('select_star_p')? '*' : table_columns_subset($tnam,$SELECT_COLUMN_P,'select');
+    my $tosel = process_rseq('select_how');
+    if ($tosel eq 'all') {
+        $tosel = '*';
+        $sub .= 'S';
+    } elsif ($tosel eq 'count') {
+        $tosel = 'COUNT(*)';
+        $sub .= 'C';
+    } else {
+        $tosel = table_columns_subset($tnam,$SELECT_COLUMN_P,'select');
+    }
     $stmt .= " $tosel FROM $tnam";
     my $wher = build_where($tnam,'select_where_all_p');
     $stmt .= " $wher";
+    return $stmt,$sub;
+}
+
+# returns statement
+sub stmt_insel_generate {
+    # determine schema.table
+    my $tnam = table_get();
+    my $stmt .= " INSERT into $tnam SELECT * FROM $tnam";
+    my $wher = build_where($tnam,'select_where_all_p');
+    $stmt .= " $wher";
+    #docroak("#debug+%s+",$stmt);
     return $stmt;
 }
 
@@ -1881,7 +1954,7 @@ sub value_generate_bit {
     my $value = process_rseq('value_bit');
     my $valmax = defined($ghstc2len{$col})? 2**$ghstc2len{$col}-1 : $value;
     $value = $valmax if (dorand() < process_rseq($VKCHAR) and $value > $valmax);
-    $value = abs($value); #todo workaround need bugfix
+    $value = abs($value);
     return $value;
 }
 
@@ -2462,7 +2535,7 @@ sub stmt_update_generate {
     # determine schema.table
     my $tnam = table_get();
     dosayif($VERBOSE_MORE, "tnam %s",$tnam);
-    my $plcols = table_columns_subset($tnam,$UPDATE_COLUMN_P,$UPDATE);
+    my $plcols = table_columns_subset($tnam,'update_column_p','update');
     my $n = 0;
     foreach my $col (@$plcols) {
         dosayif($VERBOSE_MORE, "go build_expression for %s","$tnam.$col");
@@ -2479,7 +2552,20 @@ sub stmt_update_generate {
 
 # returns statement
 sub stmt_insert_generate {
-    my $stmt = 'insert into ';
+    my $stmt = 'INSERT into ';
+    # determine schema.table
+    my $tnam = table_get();
+    # https://bugs.mysql.com/?id=113951&edit=2
+    my @lcols = @{$ghst2nvcols{$tnam}};
+    $stmt .= " $tnam (".join(',',@lcols).')';
+    my $values = build_insert_values($tnam,\@lcols);
+    $stmt .= " VALUES ($values)";
+    return $stmt;
+}
+
+# returns statement
+sub stmt_replace_generate {
+    my $stmt = 'REPLACE into ';
     # determine schema.table
     my $tnam = table_get();
     # https://bugs.mysql.com/?id=113951&edit=2
@@ -2498,11 +2584,12 @@ sub mstime {
 }
 
 # 1: schema.table
-# returns statement
+# returns statement, subtype
 sub stmt_alter_generate {
     my $tnam = $ARG[0];
     my $stmt = '';
     my $len = process_rseq('load_alter_length');
+    my $subt = "ALTER$len";
     for my $clausen (1..$len) {
         my $kind = process_rseq('load_alter_kind');
         if ($kind eq 'DROP_COL') {
@@ -2510,73 +2597,20 @@ sub stmt_alter_generate {
             my @lcols = @{$ghst2cols{$tnam}};
             my $cnam = $lcols[int(dorand()*scalar(@lcols))];
             $stmt .= "DROP COLUMN $cnam, ";
+            $subt .= 'dC';
         } elsif ($kind eq 'ADD_COL') {
             my $colnam = sprintf("%s.added_col_%s",$tnam,int(dorand()*1000));
             my $coldef = generate_column_def('alter_table',$colnam); #todo const
             $stmt .= "ADD COLUMN $coldef, ";
+            $subt .= 'aC';
         } elsif ($kind eq 'TABLE_EB') {
-            $stmt = "ENGINE=InnoDB";
-            last;
+            $stmt .= "ENGINE=InnoDB, ";
+            $subt .= 'eB';
         }
     }
     $stmt =~ s/, *$//;
     $stmt = "ALTER TABLE $tnam $stmt";
-    return $stmt;
-}
-
-# 1: schema.table
-# returns CREATE TABLE without the CREATE TABLE schema.table prefix
-sub tnam2ct {
-    my $tnam = $ARG[0];
-    my $com = "$ghmisc{$MYSQLSH_EXEC} 'SHOW CREATE TABLE $tnam'";
-    my ($ec, $pljson) = readexec($com);
-    $gstrj = join('',@$pljson);
-    $gstrj =~ s/\\n//gms;
-    my $psome = doeval('decode_json($gstrj)',0,1);      # silent
-    return undef if (not defined($psome));
-    my $str = $psome->{"Create Table"};
-    $str =~ s/^[^(]*\(/(/;
-    return $str;
-}
-
-# 1: schema.table
-# 2: CREATE TABLE without prefix
-sub internalise {
-    my ($tnam,$ctnew) = @ARG;
-    $ghst2createtable{$tnam} = $ctnew;
-    $ctnew =~ s/\(/,/;
-    my @lcoldefs = split(/, +`/,$ctnew);
-    shift(@lcoldefs);
-    my @lcols = ();
-    my @lnvcols = ();
-    foreach my $coline (@lcoldefs) {
-        my @l2 = split(/` +/,$coline);
-        push(@lcols,$l2[0]);
-        my $cnam = "$tnam.$l2[0]";
-        my $tail = $l2[1];
-        $ghstc2cannull{$cnam} = ($tail =~ / not null/i)? 0 : 1;
-        $ghstc2unsigned{$cnam} = ($tail =~ / unsigned/i)? 1 : 0;
-        $ghstc2isautoinc{$cnam} = ($tail =~ / auto_increment/i? 1 : 0);
-        $ghstc2hasdefault{$cnam} = ($tail =~ / $DEFAULT /i? 1 : 0);
-        if ($tail =~ / generated always as /i) {
-            push(@lnvcols,$l2[0]);
-            $ghstc2virtual{$cnam} = 1;
-        } else {
-            $ghstc2virtual{$cnam} = 0;
-        }
-        $tail =~ / srid +([0-9]+) +/i;
-        $ghstc2srid{$cnam} = defined($1)? $1 : 0;
-        $tail =~ /\(([0-9]+)\)/;
-        $ghstc2len{$cnam} = defined($1)? $1 : 0;
-        $tail =~ s/[ (].*//;
-        $ghstc2just{$cnam} = $tail;
-        $ghstc2class{$cnam} = lc($ghdt2class{$tail});
-        $ghstc2canfull{$cnam} = (",$ghreal{'canfull_datatype'}," =~ /,$tail,/)? 1 : 0;
-        $ghstc2just{$cnam} = lc($ghstc2just{$cnam});
-    }
-    $ghst2cols{$tnam} = \@lcols;
-    $ghst2nvcols{$tnam} = \@lnvcols;
-    return;
+    return ($stmt,$subt);
 }
 
 sub hdump {
@@ -2624,9 +2658,9 @@ sub server_load_thread {
     my $txnstmt = 0;
     my $txnstart = 0;
     my $ec = $EC_OK;
-    my %herr2count = ();      # Eerr->count includes E0 and EFAIL
+    my %herr2count = ();      # Eerr->count includes EFAIL and such
     my %herr2errstr = ();      # Eerr -> errstr ! stmt last
-    my %herrkind2count = ();      # Eerr kind errstr ->count this includes no error as E0 and any error total as EFAIL
+    my %herrkind2count = ();      # Eerr kind errstr ->count
 
     sub msg_adjust_simple {
         my $msg = $ARG[0];
@@ -2634,15 +2668,24 @@ sub server_load_thread {
         $rc =~ s/at row\s[0-9]*/at row N/g;
         $rc =~ s/entry\s'[^']*'/entry CONST/g;
         $rc =~ s/key\s'[^']*'/key KEYNAME/g;
-        $rc =~ s/value:\s'[^']*'/value VALUE/g;
+        $rc =~ s/value:\s?'?[^']*'?/value VALUE/g;
+        $rc =~ s/[iI]ncorrect\s+[^\s]+\s+value/Incorrect TYPE value/g;
         $rc =~ s/range in\s'[^']*'/range in EXPR/g;
         $rc =~ s/column\s'[^']*'/column COLNAME/g;
-        $rc =~ s/from column [a-zA-Z0-9_] at /from column COLNAME at/g;
+        $rc =~ s/check the manual that corresponds to your MySQL server version for the right syntax/RTFM/g;
+        $rc =~ s/for\s+CAST\s+to\s+[^\s]+\s+from\s+column\s+[^s]+/for CAST to TYPE from column COLNAME/g;
+        $rc =~ s/[^\s]+\s+(UNSIGNED\s+)?value is out of range/TYPE value is out of range/g;
+        $rc =~ s/in\s+\'[^\']*\'/in PLACE/g;
+        $rc =~ s/from column [\s+] at /from column COLNAME at/g;
         $rc =~ s/Column\s'[^']*'/Column COLNAME/g;
+        $rc =~ s/\s+DROP\s+'[^']*'/ DROP COLNAME/g;
+        $rc =~ s/arguments\s+to\s+[^\s]*/arguments to FUNC/g;
         $rc =~ s/Field\s'[^']*'/Field COLNAME/g;
         $rc =~ s/syntax to use near '.*$/syntax to use near HERE/g;
-        $rc =~ s/out of range in function [^ ]+\./out of range in function GEOFUN/g;
-        $rc =~ s/(Longitude|Latitude) /LONGLAT /g;
+        $rc =~ s/out of range in function [^ ]+\./out of range in function GEOFUNC/;
+        $rc =~ s/(Longitude|Latitude)\s+[\d.-]+\s+/LONGLAT VALUE /;
+        $rc =~ s/within\s+[\(\)\[\]\d,\s.-]+/within RANGE/;
+        $rc =~ s/Truncated Incorrect TYPE value VALUE.*/Truncated Incorrect TYPE value VALUE/;
         return $rc;
     }
 
@@ -2698,6 +2741,50 @@ sub server_load_thread {
         dosayif($VERBOSE_ANY, "- --- thread %s ERROR STMT KIND COUNTS: %s",$tnum,hdump(\%herrkind2count,1));
     }
 
+# 1: stmt
+# 2: rc from exec
+# 3: err
+# 4: errstr
+# 5: ksql eq alter
+# 6: subtype eq same ksql or ALTER_DROP etc
+    sub docount {
+        my ($stmt,$rc,$err,$errstr,$qsql,$kup1) = @ARG;
+        docroak("No qsql for %s",$stmt) if (not defined($qsql) or $qsql eq '');
+        docroak("No kup1 for %s",$stmt) if (not defined($kup1) or $kup1 eq '');
+        $qsql = uc($qsql);
+        $kup1 = uc($kup1);
+        $kup1 = $kup1 eq $qsql? '' : "$kup1 ->";
+        my $adjstmt = msg_adjust($stmt);
+        my $adjsimple = msg_adjust_simple($errstr);
+        foreach my $ksql ($qsql,$kup1) {
+            next if ($ksql eq '');
+            if (not defined($rc)) {
+                ++$herr2count{"E$err"};
+                ++$herr2count{'EFAIL'};
+                ++$herr2count{'ETOTL'};
+                $herr2errstr{"E$err"} = "$errstr ! $stmt";
+                ++$herrkind2count{"E$err $ksql $adjsimple"};
+                ++$herrkind2count{"E$err * TOTL $adjsimple"};
+                ++$herrkind2count{"EFAIL $ksql"};
+                ++$herrkind2count{"ETOTL $ksql"};
+                $herr2count{'ETOTL'} = 0 if (not defined($herr2count{'ETOTL'}));
+                $herrkind2count{"ETOTL $ksql"} = 0 if (not defined($herrkind2count{"ETOTL $ksql"}));
+                $herr2count{'EGOOD'} = 0 if (not defined($herr2count{'EGOOD'}));
+                $herrkind2count{"EGOOD $ksql"} = 0 if (not defined($herrkind2count{"EGOOD $ksql"}));
+            } else {
+                ++$herr2count{'EGOOD'};
+                ++$herr2count{'ETOTL'};
+                ++$herrkind2count{"EGOOD $ksql"};
+                ++$herrkind2count{"ETOTL $ksql"};
+                $herr2count{'EFAIL'} = 0 if (not defined($herr2count{'EFAIL'}));
+                $herr2count{'ETOTL'} = 0 if (not defined($herr2count{'ETOTL'}));
+                $herrkind2count{"EFAIL $ksql"} = 0 if (not defined($herrkind2count{"EFAIL $ksql"}));
+                $herrkind2count{"ETOTL $ksql"} = 0 if (not defined($herrkind2count{"ETOTL $ksql"}));
+            }
+        }
+        return $RC_OK;
+    }
+
     dosayif($VERBOSE_ANY, "%s load thread %s to run for %s seconds",$tkind,$tnum,$howlong);
     $ENV{_imatest_load_filebase} = sprintf("load_thread_%02s",$tnum);
     my $outto = doeval($ghreal{'load_thread_out'});
@@ -2736,6 +2823,8 @@ sub server_load_thread {
         $dbh->trace(0);
     }
     my $snum = 0;
+    my $dlast = time();
+    my $dwait = process_rseq('rediscover_every_seconds');
     while (1) {
         my $thistime = time();
         last if ($thistime >= $lasttime);
@@ -2744,6 +2833,13 @@ sub server_load_thread {
             dosayif($VERBOSE_ANY,"load thread %s pid %s exits after %s statements because of %s",$tkind,$PID,$snum,$finfile);
             load_report('FINAL BY FILE ');
             exit($ec);
+        }
+        if ($thistime - $dlast > $dwait) {
+            dosayif($VERBOSE_ANY,"load thread %s pid %s will rediscover after having waited %s seconds",$tkind,$PID,$dwait);
+            db_discover($dbh,0);
+            $dlast = time();
+            $dwait = process_rseq('rediscover_every_seconds');
+            dosayif($VERBOSE_ANY,"load thread %s pid %s rediscovery complete,next in %s seconds",$tkind,$PID,$dwait);
         }
         ++$snum;
 
@@ -2754,46 +2850,94 @@ sub server_load_thread {
             dosleepms(process_rseq('txn_sleep_in_ms')) if ($txnin);
             $ksql = 'END' if (dorand() < $ghreal{'txn_end_p'});
             if ($txnin and $ksql eq '') {
-                 $ksql = $END if ($snum - $txnstmt > $ghreal{'txn_maxlength_stmt'} or mstime() - $txnstart > $ghreal{'txn_maxlength_ms'});
+                 $ksql = 'END' if ($snum - $txnstmt > $ghreal{'txn_maxlength_stmt'} or mstime() - $txnstart > $ghreal{'txn_maxlength_ms'});
             }
-            if ($ksql ne $END) {
-                $ksql = $BEGIN if (dorand() < $ghreal{'txn_begin_p'} and not $txnin);
+            if ($ksql ne 'END') {
+                $ksql = 'BEGIN' if (dorand() < $ghreal{'txn_begin_p'} and not $txnin);
             } else {
                 $ksql = process_rseq('txn_end_how');
             }
         }
         $ksql = process_rseq('load_sql_class') if ($ksql eq '');
+        my $kup1 = $ksql;
 
         my $canexp = 0;
         my $tnam = '';
         dosayif($VERBOSE_MORE, "-ksql: %s",$ksql);
         if ($ksql eq 'select') {
-            $stmt = stmt_select_generate();
+            ($stmt,$kup1) = stmt_select_generate();
             $canexp = 1;
+        } elsif ($ksql eq 'sop') {
+            ($stmt,$kup1) = stmt_select_generate();
+            $stmt = "SHOW PARSE_TREE $stmt";
+            $kup1 = $ksql;
         } elsif ($ksql eq 'insert') {
             $stmt = stmt_insert_generate();
             $canexp = 1;
-        } elsif ($ksql eq $UPDATE) {
+        } elsif ($ksql eq 'replace') {
+            $stmt = stmt_replace_generate();
+            $canexp = 1;
+        } elsif ($ksql eq 'insel') {
+            $stmt = stmt_insel_generate();
+            $canexp = 1;
+        } elsif ($ksql eq 'update') {
             $stmt = stmt_update_generate();
             $canexp = 1;
         } elsif ($ksql eq 'delete') {
             $stmt = stmt_delete_generate();
             $canexp = 1;
+        } elsif ($ksql eq 'sot') {
+            $stmt = 'SHOW OPEN TABLES';
+        } elsif ($ksql eq 'checksum') {
+            $tnam = table_get();
+            $stmt = "CHECKSUM TABLE $tnam";
         } elsif ($ksql eq 'check') {
             $tnam = table_get();
             $stmt = "$ksql TABLE $tnam";
-        } elsif ($ksql eq $BEGIN) {
+            if (dorand() < $ghreal{'load_check_quick_p'}) {
+                $stmt .= ' QUICK';
+                $kup1 = 'CHECKQ';
+            } else {
+                $kup1 = 'CHECKS';
+            }
+        } elsif ($ksql eq 'optimize') {
+            $tnam = table_get();
+            $stmt = 'OPTIMIZE';
+            $kup1 = 'OPTIM';
+            if (dorand() < $ghreal{'load_optimize_local_p'}) {
+                $stmt .= ' LOCAL';
+                $kup1 .= 'L';
+            } else {
+                $kup1 .= 'G';
+            }
+            $stmt = "$stmt TABLE $tnam";
+        } elsif ($ksql eq 'analyze') {
+            $tnam = table_get();
+            $stmt = 'ANALYZE';
+            $kup1 = 'ANAL';
+            if (dorand() < $ghreal{'load_analyze_local_p'}) {
+                $stmt .= ' LOCAL';
+                $kup1 .= 'L';
+            } else {
+                $kup1 .= 'G';
+            }
+            $stmt = "$stmt TABLE $tnam";
+        } elsif ($ksql eq 'BEGIN') {
+            my $how = process_rseq('txn_begin_how');
+            $kup1 = $how;
             $stmt = 'BEGIN WORK';
+            $stmt = 'SET TRANSACTION READ ONLY' if ($how eq 'ro');
+            $stmt = 'SET TRANSACTION READ WRITE' if ($how eq 'rw');
             $txnin = 1;
             $txnstmt = $snum;
             $txnstart = mstime();
         } elsif ($ksql eq 'commit' or $ksql eq 'rollback') {
-            $stmt = $ksql;
+            $stmt = uc($ksql);
             $txnin = 0;
-        } elsif ($ksql eq $ALTER) {
+        } elsif ($ksql eq 'alter') {
             # determine schema.table
             $tnam = table_get();
-            $stmt = stmt_alter_generate($tnam);
+            ($stmt,$kup1) = stmt_alter_generate($tnam);
         } else {
             docroak("load_sql_class=%s is not supported yet. CROAK.",$ksql);
         }
@@ -2801,6 +2945,7 @@ sub server_load_thread {
         if ($canexp) {
             $exp = process_rseq('explain');
             if ($exp ne $EMPTY) {
+                $kup1 = 'EXPLAIN';
                 $ksql = "${exp}_$ksql";
                 $exp =~ s/_/ /g;
                 $stmt = "$exp $stmt";
@@ -2822,47 +2967,24 @@ sub server_load_thread {
             dosayif($VERBOSE_MORE, "done perl ksql: %s",$ksql);
             docroak("FALSE ERROR RC rc +%s+ err +%s+ errstr +%s+ after %s",(defined($rc)?$rc:'undef'),$err,$errstr,$stmt)
               if (defined($rc) and ($err ne '' or $errstr ne ''));
-            docroak("FALSE ERROR NO RC +%s+ err +%s+ errstr +%s+ after %s",(defined($rc)?$rc:'undef'),$err,$errstr,$stmt)
-              if (not defined($rc) and ($err eq '' or $errstr eq '') and not $serterm);
+            if (not defined($rc) and ($err eq '' or $errstr eq '') and not $serterm) {
+                dosayif($VERBOSE_ANY,"ERROR NO RC THE SERVER MAY HAVE ABORTED +%s+ err +%s+ errstr +%s+ after %s",
+                  (defined($rc)?$rc:'undef'),$err,$errstr,$stmt);
+                $err = '9999';
+                $errstr = 'ERROR NO RC THE SERVER MAY HAVE ABORTED';
+            }
             docroak("PREPARED!+%s+%s+%s+",$err,$errstr,$stmt) if ($err eq '1461');
             dosayif($VERBOSE_MORE, "adjust1 ksql: %s",$ksql);
             dosayif($VERBOSE_MORE, "adjust2 ksql: %s %s",$ksql,$stmt);
-            my $adjstmt = msg_adjust($stmt);
-            my $adjsimple = msg_adjust_simple($errstr);
-            dosayif($VERBOSE_MORE, "done adjust ksql: %s",$ksql);
-            if (not defined($rc)) {
-                $rc = 'UNDEFINED';
-                dosayif($VERBOSE_DEV, "-rc '%s' err '%s' errstr '%s' stmt '%s'", $rc,$err,$errstr,$stmt);
-                ++$herr2count{"E$err"};
-                ++$herr2count{$EFAIL};
-                $herr2errstr{"E$err"} = "$errstr ! $stmt";
-                ++$herrkind2count{"E$err $ksql $adjsimple"};
-                ++$herrkind2count{"$EFAIL $ksql"};
-                $herr2count{$EGOOD} = 0 if (not defined($herr2count{$EGOOD}));
-                $herrkind2count{"$EGOOD $ksql"} = 0 if (not defined($herrkind2count{"$EGOOD $ksql"}));
-            } else {
-                dosayif($VERBOSE_DEV, "-rc '%s' err '%s' errstr '%s' stmt '%s'", $rc,$err,$errstr,$stmt);
-                ++$herr2count{"$EGOOD"};
-                ++$herrkind2count{"$EGOOD $ksql"};
-                $herr2count{$EFAIL} = 0 if (not defined($herr2count{$EFAIL}));
-                $herrkind2count{"$EFAIL $ksql"} = 0 if (not defined($herrkind2count{"$EFAIL $ksql"}));
-            }
+            docount($stmt,$rc,$err,$errstr,$ksql,$kup1);
         }
         dosayif($VERBOSE_MORE, "done ksql: %s",$ksql);
         ++$ghsql2stats{$ksql};
         printf($msql "%s;\n", $stmt);
 
         # now reflect the results in internal structures
-        if ($ksql eq $ALTER) {
-            # if ALTER succeed we do not necessarily get the current state. We will get it after the sever restart if specified
-            # in test parameters
-            my $ctnew = tnam2ct($tnam);
-            if (not defined ($ctnew) or $ctnew eq $ghst2createtable{$tnam}) {
-                dosayif($VERBOSE_MORE, "-ALTER may have failed: %s", $stmt);
-            } else {
-                dosayif($VERBOSE_MORE, "-ALTER may have succeeded: %s", $stmt);
-                internalise($tnam,$ctnew);
-            }
+        if ($ksql eq 'alter') {
+            table_add($tnam,$dbh,0);
         }
 
         # now sleep after txn
@@ -3066,17 +3188,30 @@ sub server_check_thread {
         $hbyport{$port} = 'ASSUMED_UP';
         $hwasbyport{$port} = 'ASSUMED_UP';
     }
+    my $haveassert = 0;
     while (1) {
         my $thistime = time();
         ++$num;
         last if ($thistime >= $lasttime);
         if (-f $finfile) {
-            dosayif($VERBOSE_ANY," check thread pid %s exits because of %s",$PID,$finfile);
+            dosayif($VERBOSE_ANY,"check thread pid %s exits because of %s",$PID,$finfile);
             exit($ec);
+        }
+        if ($haveassert and $ghreal{'terminate_on_assert'} eq 'yes') {
+            my $fintest = "$ghreal{'tmpdir'}/$ghmisc{'_master_pid'}.fin";
+            my $slep = $ghreal{'sleep_on_assert'};
+            dosayif($VERBOSE_ANY,"check thread detected server assert and will sleep %s seconds then force test termination by creating %s",
+              $slep,$fintest);
+              dosleep($slep);
+              # todo sub
+              my $cmd = "$ENV{'TOUCH'} $fintest";
+              my $subec = system($cmd);
+              dosayif($VERBOSE_ANY,"exit code %s for %s",$subec,$cmd);
+              last;
         }
         # now check servers
         my $stat = '';
-        my %hhow = ('RW' => 0, 'RO' => 0, 'DOWN' => 0);
+        my %hhow = ('RW' => 0, 'RO' => 0, 'DOWN' => 0, 'ASSERT' => 0);
         my $rw = 'NONE';
         my $ro = 'NONE';
         my $down = 'NONE';
@@ -3097,6 +3232,10 @@ sub server_check_thread {
             } elsif ($subec == $CHECK_RO) {
                 $expl = 'RO';
                 $ro .= ",$port";
+            } elsif ($subec == $CHECK_ASSERT) {
+                $expl = 'ASSERT';
+                $ro .= ",$port";
+                $haveassert = 1;
             } elsif ($subec == $CHECK_DOWN) {
                 $expl = 'DOWN';
                 $down .= ",$port";
@@ -3171,8 +3310,9 @@ sub init_db {
         my $errstr = DBI->errstr();
         docroak("CROAK: failed to connect to %s: err %s errstr %s",$dsn,$err,$errstr);
     }
-    DBI->trace(0);
+    $ghdbh{$absport} = $gdbh;
     $gdbh->trace(0);
+    DBI->trace(0);
 
     my @ltarg = split(/,+/,$ghreal{'mysql_initial_cnf_targets'});
     foreach my $target (@ltarg) {
@@ -3185,22 +3325,31 @@ sub init_db {
           unless (defined($ghreal{$confarg}));
         my @lports = split(/,+/,$ghreal{$portsarg});
         foreach my $relport (@lports) {
-            my $xport = $relport + $ghreal{'xportoffset'};
-            my @lcnf = map {"SET PERSIST $_;"} split("\n",$ghreal{$confarg});
+            #todo sub
+            my $absport = $relport + $ghtest{'mportoffset'};
+            if (not defined($ghdbh{$absport})) {
+                my $dsn = "DBI:mysql:host=127.0.0.1;port=$absport";
+                dosayif($VERBOSE_ANY, "-port %s dsn is %s for db config", $relport,$dsn);
+                $ghdbh{$absport} = DBI->connect($dsn,$ghreal{'user'},$ghreal{'password'},{'PrintWarn' => 0,
+                  'TraceLevel' => 0, 'RaiseError' => 0, 'mysql_server_prepare' => 0, 'mysql_auto_reconnect' => 1});
+                if (not defined($ghdbh{$absport})) {
+                    my $err = DBI->err();
+                    my $errstr = DBI->errstr();
+                    dosayif($VERBOSE_ANY,"semiCROAK: failed to connect to %s: err %s errstr %s",$dsn,$err,$errstr);
+                }
+                $ghdbh{$absport}->trace(0);
+            }
+            my @lcnf = map {"SET PERSIST $_"} split("\n",$ghreal{$confarg});
             foreach my $sets (@lcnf) {
-                my $toexec = $ghmisc{$MYSQLSH_EXEC};
-                $toexec =~ s/\s--port=[0-9]+\s/ --port=$xport /;
-                my $com = "$toexec '$sets'";
-                my ($ec, $pljson) = readexec($com);
-                dosayif($VERBOSE_ANY,"set mysql_initial_cnf exit code %s for port %s %s, details: %s",$ec,$xport,$com,($ec == $EC_OK? 'none' : Dumper($pljson)));
+                runreport($sets,$ghdbh{$absport},$VERBOSE_ANY);
             }
         }
     }
 
-    if ($ghreal{$CREATE_DB} eq $STRING_TRUE) {
+    if ($ghreal{'create_db'} eq 'yes') {
         $subrc = db_create();
     } else {
-        $subrc = db_discover();
+        $subrc = db_discover($gdbh,1);
     }
     $rc = $subrc if ($rc != $RC_OK and $rc != $RC_ZERO);
 
@@ -3231,6 +3380,7 @@ if (defined($ghasopt{$SEED}) and $ghasopt{$SEED} != 0) {
     $rseed = dosrand();
 };
 $ghmisc{$RSEED} = $rseed;
+$ghmisc{'_master_pid'} = $PID;
 dosayif($VERBOSE_ANY, "random seed is %s for this script version %s", $rseed, $version);
 
 my $phv = doeval("LoadFile('$test_script')") or die "bad yaml in file $test_script";
@@ -3247,10 +3397,9 @@ checkscript();
 buildmisc();
 dosayif($VERBOSE_DEV, "resulting test script is %s",Dumper(\%ghreal));
 
-# initial ops
-start_check_thread();
-
 init_db();
+
+start_check_thread();
 
 # now we run test
 my $trc = $RC_OK;
@@ -3296,11 +3445,20 @@ foreach my $elem (@lolod) {
 # sleep while test is running while checking for child threads
 my $slep = $ghreal{$TEST_DURATION};
 my $interval = 10;
-dosayif($VERBOSE_ANY,"will sleep for %s seconds checking for threads every %s seconds",$slep,$interval);
+my $fintest = "$ghreal{'tmpdir'}/$PID.fin";
+dosayif($VERBOSE_ANY,"will sleep for %s seconds checking for %s or threads every %s seconds",$slep,$fintest,$interval);
 my $end = time() + $slep;
 my $now = time();
 my $reload = $ghreal{'load_thread_restart'};
 while ($now < $end) {
+    if (-f "$fintest") {
+        if ($ghreal{'terminate_on_assert'} eq 'yes') {
+            dosayif($VERBOSE_ANY,"terminating test because of %s",$fintest);
+            last;
+        } else {
+            dosayif($VERBOSE_ANY,"ignoring %s because terminate_on_assert=no",$fintest);
+        }
+    }
 # fixme refactor
     foreach my $pid (sort(keys(%ghlpids))) {
         my $sub = waitpid($pid, WNOHANG);
@@ -3371,7 +3529,7 @@ while ($now < $end) {
     $now = time();
 }
 
-# kill load and termination threads
+# kill load and termination and check threads
 # first let them go away quietly
 foreach my $pid (sort(keys(%ghlpids)), sort(keys(%ghtermpids), sort(keys(%ghchepids)))) {
     my $finfile = "$ghreal{'tmpdir'}/$pid.fin";

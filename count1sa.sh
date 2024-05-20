@@ -28,10 +28,14 @@ for sname in $schemas; do
   for i in $tables; do
     cnt=`$ECHO "$sname.$i" | $AWK '{printf("SELECT COUNT(*) AS \`%s\` FROM %s;\n",$0,$0)}' | $com `
     tacnt=`$ECHO "$cnt" | $GREP '^[0-9]*$'`
+    [ -z "$tacnt" ] && {
+      $ECHO "No tables, maybe failed connection, going away"
+      $EXIT 1
+    }
     $ECHO -n "$sname.$i: $tacnt, "
     sccnt=$(($sccnt+$tacnt))
   done
   $ECHO "\n  schema $sname: $sccnt rows total"
   allcnt=$(($sccnt+$allcnt))
 done
-$ECHO "  all schemas $schemas: $sccnt rows total"
+$ECHO "  all schemas $schemas: $allcnt rows total"

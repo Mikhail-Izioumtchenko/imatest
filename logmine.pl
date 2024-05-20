@@ -46,7 +46,7 @@ my @LMSG2IGNORE = qw(MY-010048 MY-012203 MY-010949 MY-010050 MY-010051 MY-010054
  MY-010264 MY-010251 MY-011240 MY-011243 MY-010733 MY-010101 MY-013953 MY-013954 MY-015020 MY-015021 NY-015022 MY-015023 MY-015024 MY-012980
  MY-015022 MY-013576 MY-013577 MY-015016 MY-010161 MY-010918 MY-011069 MY-011070 MY-013360 MY-013011 MY-013014 MY-013014 MY-013023 MY-013024
  MY-013177 MY-014016 MY-014017 MY-014018 MY-014019 MY-014021 MY-014022 MY-014023 MY-013015 MY-013777 MY-012050 MY-012230 MY-012233 MY-012234
- MY-012235 MY-012236 MY-013550 MY-015025 MY-015026 MY-010909
+ MY-012235 MY-012236 MY-013550 MY-015025 MY-015026 MY-010909 MY-012551 MY-012552 MY-013072 MY-010910 MY-010931 MY-013172
                     );
 my %ghmsg2ignore = ();
 my $GDATA = '^(ALTER|BEGIN|CHECK|Table\s+Op\s|.*\scheck\s+status\s+OK|COMMIT|EXPLAIN|->|id\s+select_type|[0-9]+\s+INSERT|INSERT|SELECT|UPDATE|pk[0-9]+|col[0-9]+|.?\s?[\s0-9a-zA-Z_]+\s?) ?';
@@ -223,7 +223,8 @@ foreach my $key (sort(keys(%ghloadec2count))) {
 $ec2count =~ s/, //;
 
 foreach my $key (sort(keys(%ghloadmsg2count))) {
-    dosayif($VERBOSE_ANY, "%s: %s", $key, $ghloadmsg2count{$key});
+    my $nl = ($key =~ /TOTL/ and not $key =~ /ETOTL/)? "\n" : '';
+    dosayif($VERBOSE_ANY, "%s%s: %s", $nl, $key, $ghloadmsg2count{$key});
 }
 dosayif($VERBOSE_ANY, "\n%s\n", $ec2count);
 
@@ -373,8 +374,41 @@ sub process_imatest_pl_out {
     my $kind = 'UNKNOWN';
     my @ltoignore = qw (
   replacing.([a-z_]+).of
-  (main|start_destructive_thread|start_load_thread):.random
+  (start_destructive_thread|start_load_thread):.random
   refused,connecting
+  line.[0-9]+.$
+  main.*invoked
+  main.*letting
+  main.*eliminating
+  main.*process
+  main.*starting
+  main.*Options
+  checkscript
+  sandbox.as.root
+  can.be.insecure
+  Killing.MySQL
+  forgetting.it
+  (start|server)_check_thread
+  init_db
+  for.db.init
+  startup.files
+  to.MySQL.at
+  tid=[0-9]+:.(SQL|CONNECTED):
+  (gethashref|getarrayref|runreport).*(SUCCESS|ERROR.*(1070|1008|1064|1118|1167|1146|1071))
+  db_create.will.create
+  db_create.*(returning|remove)
+  start_destructive_thread
+  server_destructive_thread
+  start_load_thread
+  server_load_thread
+  and.*and.*and
+  Starting.MySQL.instance
+  Connection.refused
+  in.dba.startSandboxInstance
+  file.matches
+  main.*exit.code.0
+  main.*new.*load.thread
+  main.*See.also
                        );
     LIN:
     foreach my $lin (@$plfil) {
@@ -408,6 +442,7 @@ sub process_imatest_pl_out {
             next;
         }
         $msgkind =~ s/tid=[0-9]+/tid=N/g;
+        dosayif($VERBOSE_ANY, "%s",$lin);
     }
     dosayif($VERBOSE_ANY, "END %s %s: %s lines, %s ignored, %s output, %s statements, %s good, %s bad, %s distinct msg numbers\n", $filekind,
       $fil,$nlins,$nign,$areout,$areall,($areall-$arebad),$arebad,$ndifnum);
@@ -467,6 +502,7 @@ sub process_destructive_thread_out {
   ^\s*\^\s*$
   Dba.startSandboxInstance.*(port.*is.already.in.use|Starting.*as.root.is.not.recommended)
   Error.starting.sandbox:.Timeout.waiting
+  checkms.sh.:.0.signals.or.assertions
                            );
 
     dosayif($VERBOSE_ANY,"will ignore the following patterns: %s\n","@LDESTR2IGNORE");
@@ -552,9 +588,9 @@ sub process_load_thread_out {
                     $ghloadec2count{$lsu[0]} += $lsu[1];
                 }
             }
-            if ($lin =~ /^ *E([0-9]+|FAIL|GOOD) /) {
+            if ($lin =~ /^ *E([0-9]+|FAIL|GOOD|TOTL) /) {
                 my $top = $lin;
-                $top =~ /^ *(E[0-9]+|EFAIL|EGOOD) +(.*): +([0-9]+),? *$/;
+                $top =~ /^ *(E[0-9]+|EFAIL|EGOOD|ETOTL) +(.*): +([0-9]+),? *$/;
                 $ghloadmsg2count{"$1 $2"} += $3;
             }
         } else {
