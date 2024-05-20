@@ -71,8 +71,8 @@ Rapid Application Development. Would be nice to rewrite in Go eventually.
 However the notoriously poor performance of perl should not matter much as the tool is expected to spend most of CPU
 generating non cryptographic quality random numbers. Non cryptographic RNG should be about the same in any language.
 I may be mistaken.
-Equally notorious perl syntax and looks is a matter of taste imho. perl is readable for an average person. 
+Equally notorious perl syntax and looks is a matter of taste imho.  
 
 Q2: why mysqlsh to execute SQL and not DBD::mysql?
 
-Rapid Application Development, but this is not the only reason.
+Rapid Application Development it was, now it is all DBI within perl but mysqlsh in shell hooks.
