@@ -3,6 +3,17 @@
 
 THE PREVIOUS STATEMENT IS NOT A CLAIM FOR TOOL's  suitability for any purpose whatsoever.
 
+Yield: not everything filed as a bug because bug filing is fairly pointless activity in most cases. imho.
+
+2024-05-26T04:18:00.658915Z 17 [ERROR] [MY-013183] [InnoDB] Assertion failure: row0sel.cc:2796:(!prebuilt->idx_cond && prebuilt->m_mysql_handler->end_range != nullptr) || (prebuilt->trx->isolation_level == TRX_ISO_READ_UNCOMMITTED)
+2024-05-21 bool:parse_sql(THD*,:Parser_state*, 1 (1 distinct) Object_creation_ctx*): Assertion `!mysql_parse_status || mysql_parse_status && thd->is_error()) || (mysql_parse_status && thd->get_internal_handler())' failed.
+2024-05-13T04:41:02.318333Z 0 [ERROR] [MY-013183] [InnoDB] Assertion failure: trx0rec.ic:95:len < ((ulint)srv_page_size)
+https://bugs.mysql.com/?id=114133 dd corrupt assert lob0impl.cc:1237:total_read == len || total_read == avail_lob
+https://bugs.mysql.com/?id=113951 SEGV in INSERT
+https://bugs.mysql.com/?id=113860 Assertion `rc == TYPE_OK' CREATE TABLE sql/dd/impl/raw/raw_record.cc:158
+https://bugs.mysql.com/?id=113410 hang creating InnoDB Cluster
+https://bugs.mysql.com/?id=113694  misleading error message comparing a spatial column with numeric using < or such
+
 It tests MySQL server 8.0+
 This is very much work in progress.
 As of 2024-01-21 it is a working model.
@@ -60,8 +71,9 @@ User's guide:
 
 ` ./imatest.sh  now --test imatest.yaml --seed N --verbose 0 --nodry-run` 2>&1 | tee somelogfile
 
-* for log mining there is `logmine.sh` which is very crude atm. In any case the logs are somelogfile, the file mentioned in the 'See also' line of the script output, mysqld error.log, Linux logfiles if it comes to that.
+* for log mining there is posttest.sh which is a bit crude. 
 * to try to reproduce a problem rerun the test with the same `--seed`. If --seed was not supplied it can be found in the test run output.
+* see also testright.sh
 
 FAQ:
 
@@ -72,7 +84,8 @@ However the notoriously poor performance of perl should not matter much as the t
 generating non cryptographic quality random numbers. Non cryptographic RNG should be about the same in any language.
 I may be mistaken.
 Equally notorious perl syntax and looks is a matter of taste imho.  
+Still it would be nice to have a testing client that supports MySQL X protocol.
 
 Q2: why mysqlsh to execute SQL and not DBD::mysql?
 
-Rapid Application Development it was, now it is all DBI within perl but mysqlsh in shell hooks.
+Rapid Application Development it was, now it is all DBI within perl but mysqlsh in shell hooks. As a client mysql and mysqlsh are disappointing. 
