@@ -6,8 +6,11 @@ THE PREVIOUS STATEMENT IS NOT A CLAIM FOR TOOL's  suitability for any purpose wh
 Yield: not everything filed as a bug because bug filing is fairly pointless activity in most cases. imho.
 
 2024-05-26T04:18:00.658915Z 17 [ERROR] [MY-013183] [InnoDB] Assertion failure: row0sel.cc:2796:(!prebuilt->idx_cond && prebuilt->m_mysql_handler->end_range != nullptr) || (prebuilt->trx->isolation_level == TRX_ISO_READ_UNCOMMITTED)
+
 2024-05-21 bool:parse_sql(THD*,:Parser_state*, 1 (1 distinct) Object_creation_ctx*): Assertion `!mysql_parse_status || mysql_parse_status && thd->is_error()) || (mysql_parse_status && thd->get_internal_handler())' failed.
+
 2024-05-13T04:41:02.318333Z 0 [ERROR] [MY-013183] [InnoDB] Assertion failure: trx0rec.ic:95:len < ((ulint)srv_page_size)
+
 https://bugs.mysql.com/?id=114133 dd corrupt assert lob0impl.cc:1237:total_read == len || total_read == avail_lob
 https://bugs.mysql.com/?id=113951 SEGV in INSERT
 https://bugs.mysql.com/?id=113860 Assertion `rc == TYPE_OK' CREATE TABLE sql/dd/impl/raw/raw_record.cc:158
