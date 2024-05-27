@@ -1,6 +1,8 @@
 
 `imatest` is a testing tool for MySQL.
 
+2024-05-26
+
 THE PREVIOUS STATEMENT IS NOT A CLAIM FOR TOOL's  suitability for any purpose whatsoever.
 
 Yield: not everything filed as a bug because bug filing is fairly pointless activity in most cases. imho.
