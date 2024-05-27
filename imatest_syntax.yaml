@@ -24,6 +24,9 @@ strict:
   allowed: [True, False]
   supported: [True, False]
 # preferred alphabethical order from here on, _ before a, numbers before letters, shorter values first
+analyze_column_p:
+  mandatory: True
+  allowed: probability
 autoinc_explicit_value_p:
   mandatory: True
   allowed: probability
@@ -43,17 +46,13 @@ check_thread_sleep:
 column_default_p:
   mandatory: True
   allowed: probability
-column_non_pk_name_format:
+column_name_format:
   allowed: Rseq       
   mandatory: True
   only_names: True
 column_null:
   mandatory: True
   allowed: Rseq
-column_pk_name_format:
-  allowed: Rseq       
-  mandatory: True
-  only_names: True
 column_unique_p:
   mandatory: True
   allowed: probability
@@ -65,11 +64,7 @@ column_visibility:
   mandatory: True
   allowed: Rseq
   only_values_allowed: visible,invisible,EMPTY
-columns_pk:
-  allowed: Rseq       
-  mandatory: True
-  only_non_negative_integers: True
-columns_non_pk:
+columns_total:
   allowed: Rseq       
   mandatory: True
   only_non_negative_integers: True
@@ -391,7 +386,7 @@ integer_unsigned_p:
 load_alter_length:
   mandatory: True
   allowed: Rseq
-  allowed: only_positive_integers
+  only_positive_integers: True
 load_alter_kind:
   mandatory: True
   allowed: Rseq
@@ -399,9 +394,21 @@ load_alter_kind:
 load_analyze_local_p:
   mandatory: True
   allowed: probability
+load_analyze_buckets:
+  mandatory: True
+  allowed: Rseq
+  only_non_negative_integers: True
+load_analyze_kind:
+  mandatory: True
+  allowed: Rseq
+  only_values_allowed: just,drop,update
 load_check_quick_p:
   mandatory: True
   allowed: probability
+load_create_table_kind:
+  mandatory: True
+  allowed: Rseq
+  only_values_allowed: select,like,new
 load_execute_sql:
   mandatory: True
   allowed: [yes, no]
@@ -412,10 +419,13 @@ load_max_stmt:
 load_optimize_local_p:
   mandatory: True
   allowed: probability
+load_select_limit:
+  mandatory: True
+  allowed: Rseq
 load_sql_class:
   mandatory: True
   allowed: Rseq
-  only_values_allowed: select,update,insert,delete,insel,alter,check,replace,analyze,checksum,optimize,sot,sop
+  only_values_allowed: select,update,insert,delete,insel,drop_table,alter,check,replace,analyze,checksum,optimize,show_open_tables,show_parse_tree,create_table,lock_instance_for_backup,unlock_instance
 load_thread_client_log:
   mandatory: True
 load_thread_err:
@@ -436,6 +446,9 @@ load_thread_sql:
   mandatory: True
 load_threads:
   mandatory: True
+missing_probability_replacement:
+  mandatory: True
+  allowed: probability
 mportoffset:
   mandatory: True
   allowed: only_positive_integers
@@ -443,12 +456,18 @@ multigeometry_kind:
   mandatory: True
   allowed: Rseq
   only_values_allowed: geometry,point,linestring,polygon
+mysql_dynamic_cnf:
+  mandatory: True
 mysql_initial_cnf:
   mandatory: True
 mysql_initial_cnf_ports:
   mandatory: True
 mysql_initial_cnf_targets:
   mandatory: True
+mysql_set_how:
+  mandatory: True
+  allowed: Rseq
+  only_values_allowed: persist,global,EMPTY
 null_illegitimate_p:
   mandatory: True
   allowed: probability
@@ -473,9 +492,6 @@ passfile:
   mandatory: True
   allowed: doeval
 pk_autoinc_p:
-  mandatory: True
-  allowed: probability
-pk_first_p:
   mandatory: True
   allowed: probability
 port_load:
@@ -521,6 +537,9 @@ rediscover_every_seconds:
   mandatory: True
   allowed: Rseq
   only_non_negative_integers: True
+report_every_seconds:
+  mandatory: True
+  allowed: only_positive_integers
 report_every_stmt:
   mandatory: True
   allowed: only_positive_integers
@@ -540,10 +559,19 @@ select_column_p:
 select_distinct_p:
   mandatory: True
   allowed: probability
+select_group_by_p:
+  mandatory: True
+  allowed: probability
 select_how:
   mandatory: True
   allowed: Rseq
   only_values_allowed: all,count,columns
+select_order_by_column_p:
+  mandatory: True
+  allowed: probability
+select_order_by_p:
+  mandatory: True
+  allowed: probability
 select_where_all_p:
   mandatory: True
   allowed: probability

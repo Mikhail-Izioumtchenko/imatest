@@ -1,22 +1,30 @@
 ---
 create_db: yes
 port_writer: 2
-schemas: 3
+schemas: 4
+tables_per_schema: 19
 tables_per_schema: 4
-tables_per_schema: 23
 #destructive_thread_out: qw(/dev/null)
 #destructive_thread_err: qw(/dev/null)
 #load_thread_out: qw(/dev/null)
 #load_thread_err: qw(/dev/null)
 txn_use: yes
 load_thread_sql: qw(/dev/null)
-load_threads: 1
-load_threads: 8Xb2,16
+# heavy START
+load_threads: 9Xb2,17
+server_terminate: yes
+test_duration_seconds: 1800
 load_thread_restart: yes
+# heavy END
+# light START
+load_threads: 1
 server_terminate: no
 test_duration_seconds: 180
+load_thread_restart: no
+# light END
 load_max_stmt: 000
 report_every_stmt: 10000
+report_every_seconds: 60
 rediscover_every_seconds: 60-70
 # 0 means no check thread
 check_thread_ports: 2
@@ -27,8 +35,8 @@ destructive_thread_random_seeds: 0
 sleep_final: 30
 sleep_on_assert: 6
 terminate_on_assert: yes
-load_sql_class: insert:0.5,sot:0.5,sop:0.5,analyze:0.5,optimize:0.5,checksum:0.5,replace:0.1,insel:0.1,alter:0.1,update:0.8,delete:0.1,check:0.05,select #debug
-load_sql_class_k_b2: insert:0.1,insel:0.1,replace:0.1,update:0.1,delete:0.001,check:0.01,alter:0.1,select
+load_sql_class: lock_instance_for_backup:0.0001,unlock_instance:0.001,insert:0.5,show_open_tables:0.01,show_parse_tree:0.01,drop_table:0.001,alter:0.1,create_table:0.001,analyze:0.1,optimize:0.01,checksum:0.01,replace:0.1,insel:0.2,update:0.8,delete:0.1,check:0.05,select #debug
+load_sql_class_k_b2: insert:0.1,insel:0.1,replace:0.1,update:0.1,delete:0.001,check:0.01,alter:0.1,select,lock_instance_for_backup:0.0001,unlock_instance:0.0001 #debug
 destructive_threads: 1Xb2,1
 destructive_threads: 1
 server_termination_how: shutdown:0.01,shutkill:0.1,kill:0.1,sigkill:0.99,sigstop
@@ -42,20 +50,22 @@ destructive_thread_sleep: 5
 port_load: 2
 #port_load_k_b2: 3
 
+missing_probability_replacement: 0.01
+
 # 
-define: &functions_character CONCAT(@SELF;@COL_character),CONCAT(@SELF;@SELF),PI(),NOW(),ASCII(@COL_integer),ASCII(@SELF),HEX(@COL_lob),HEX(@SELF),BIN(@COL),BIT_LENGTH(@COL),BIT_LENGTH(@SELF),CHAR(@COL),CHAR_LENGTH(@SELF),CHAR_LENGTH(@COL),CHARSET(@COL_character),CHARSET(@COL_text),COERCIBILITY(@COL),COLLATION(@COL),CONCAT_WS(@SELF,@SELF,@SELF)
-define: &functions_datetime ADDDATE(@COL_timestamp;1),ADDDATE(@COL_datetime;1),NOW(),ADDDATE(@SELF;1),ADDTIME(@SELF;1)
-define: &functions_datetime_insert NOW()
-define: &functions_lob CURRENT_USER,CURRENT_USER(),PI(),NOW(),ASCII(@COL_varchar),ASCII(@SELF),HEX(@COL),HEX(@SELF),AES_ENCRYPT(@COL;""),AES_DECRYPT(@SELF;""),AES_ENCRYPT(@SELF;""),BIN(@COL),BIT_LENGTH(@COL),BIT_LENGTH(@SELF),CHAR(@COL),CHAR_LENGTH(@SELF),CHAR_LENGTH(@COL),CHARSET(@COL_character),CHARSET(@COL_text),COERCIBILITY(@COL),COLLATION(@COL),COMPRESS(@COL),MD5(@COL)
-define: &functions_lob_insert CURRENT_USER,CURRENT_USER(),PI(),NOW(),RAND()
-define: &functions_numeric PI(),NOW(),ASCII(@COL),ASCII(@SELF),HEX(@COL),HEX(@SELF),ABS(@COL_integer),ACOS(@SELF),ASIN(@SELF),ASIN(@COL),ATAN(@SELF),ATAN(@COL),BIN(@COL),BIN(@SELF),BIT_COUNT(@SELF),BIT_LENGTH(@COL),BIT_LENGTH(@SELF),CEIL(@SELF),CEIL(@COL),CHAR_LENGTH(@SELF),CHAR_LENGTH(@COL),COERCIBILITY(@COL),RAND()
-define: &functions_numeric_insert PI(),NOW(),RAND()
-define: &functions_virtual PI(),CONCAT(@COL_varchar;@COL_character),CONCAT(@FPI(};@COL),ASCII(@COL),HEX(@COL),ABS(@COL),ACOS(@COL),ADDDATE(@COL;1),ADDTIME(@COL;1),AES_ENCRYPT(@COL;""),AES_DECRYPT(@COL;""),AES_ENCRYPT(@COL;""),ASIN(@COL),ASIN(@COL),ATAN(@COL),BIN(@COL),BIT_COUNT(@COL),BIT_LENGTH(@COL),CEIL(@COL),CHAR(@COL),CHAR_LENGTH(@COL),COERCIBILITY(@COL),COLLATION(@COL),COMPRESS(@COL),MD5(@COL),CONCAT_WS(@COL_character,@COL_character,@COL_character)
+define: &functions_character CONCAT(@SELF;@COL_character),CONCAT(@SELF;@SELF),PI(),NOW(),ASCII(@COL_integer),ASCII(@SELF),HEX(@COL_lob),HEX(@SELF),BIN(@COL),BIT_LENGTH(@COL),BIT_LENGTH(@SELF),CHAR(@COL),CHAR_LENGTH(@SELF),CHAR_LENGTH(@COL),CHARSET(@COL_character),CHARSET(@COL_text),COERCIBILITY(@COL),COLLATION(@COL),CONCAT_WS(@SELF;@SELF;@SELF),CONNECTION_ID(),CONVERT(@SELF USING utf8mb4),CONV(@COL_numeric;10;16),CURTIME(),CURRENT_TIME,CURRENT_USER,CURRENT_USER(),CURRENT_TIMESTAMP,CURRENT_TIMESTAMP(),CURRENT_DATE,CURRENT_DATE(),CURRENT_ROLE(),CRC32(@SELF),CRC32(@COL),DATEDIFF(@COL_datetime;@COL_datetime),DATE_FORMAT(@COL_datetime;"%a"),DATE_FORMAT(@COL_datetime;@COL),DAY(@COL_datetime),DATE(@COL_datetime),DATABASE(),DAYOFYEAR(@COL_datetime),DAYOFWEEK(@COL_datetime),DAYOFMONTH(@COL_datetime),DIV(@COL_numeric;@COL_numeric),DEGREES(@COL_numeric),DEFAULT(@COL),ExtractValue(@COL_character;@COL_character),EXTRACT(MICROSECOND FROM @COL_timestamp),EXPORT_SET(@COL_integer;@COL_character;@COL_character;@COL_character;@COL_numeric),EXP(@COL_numeric),ELT(@COL_smallint;@COL_character;@COL_character),FIELD(@COL_character;@COL_character;@COL_character),FIND_IN_SET(@SELF;@SELF),FLOOR(@COL_numeric),FORMAT(@COL_numeric;@COL_numeric),FORMAT_BYTES(@COL_numeric),FORMAT_PICO_TIME(@COL_datetime),FROM_DAYS(@COL_numeric),FROM_UNIXTIME(@COL_numeric),GET_FORMAT(DATE;@COLUMN_character),GET_LOCK(@COL_character;@COL_numeric),GREATEST(@COL_character,@COL_numeric,@COL_datetime),HEX(@COL_character),HEX(@COL_numeric),HOUR(@COL_datetime),ICU_VERSION(),IF(@COL_numeric,@SELF,@COL_character),IFNULL(@SELF,@COL_numeric),INET_ATON(@COL_character),INET_NTOA(@COL_numeric),INSERT(@SELF;@COL_numeric;@COL_numeric;@COL_character),INSTR(@COL_character;@COL_character)
+define: &functions_character_insert NOW(),CURRENT_TIMESTAMP,CURRENT_TIMESTAMP(),CURRENT_DATE,CURRENT_DATE(),DEFAULT(@COL),ICU_VERSION()
+define: &functions_datetime DATE_ADD(@SELF;INTERVAL $COL_numeric DAY):0.1,ADDDATE(@COL_timestamp;1),ADDDATE(@COL_datetime;1),NOW(),ADDDATE(@SELF;1),ADDTIME(@SELF;1),CURTIME(),CURRENT_TIME,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP(),CURRENT_DATE,CURRENT_DATE(),DATE(@COL_datetime),DAYOFWEEK(@COL_datetime),DEFAULT(@COL),FROM_DAYS(@COL_numeric),IFNULL(@SELF,@COL_datetime)
+define: &functions_datetime_insert NOW(),CURRENT_TIMESTAMP,CURRENT_TIMESTAMP(),CURRENT_DATE,CURRENT_DATE(),DEFAULT(@COL)
+define: &functions_lob CURRENT_USER,CURRENT_USER(),PI(),NOW(),ASCII(@COL_varchar),ASCII(@SELF),HEX(@COL),HEX(@SELF),AES_ENCRYPT(@COL;""),AES_DECRYPT(@SELF;""),AES_ENCRYPT(@SELF;""),BIN(@COL),BIT_LENGTH(@COL),BIT_LENGTH(@SELF),CHAR(@COL),CHAR_LENGTH(@SELF),CHAR_LENGTH(@COL),CHARSET(@COL_character),CHARSET(@COL_text),COERCIBILITY(@COL),COLLATION(@COL),COMPRESS(@COL),MD5(@COL),CONNECTION_ID(),CURRENT_TIMESTAMP,CURRENT_TIMESTAMP(),CURRENT_DATE,CURRENT_DATE(),CURRENT_ROLE(),CRC32(@SELF),CRC32(@COL),DATEDIFF(@COL_datetime;@COL_datetime),DATE_FORMAT(@COL_datetime;"%a"),DATE_FORMAT(@COL_datetime;@COL),DAY(@COL_datetime),DATE(@COL_datetime),DATABASE(),DAYOFYEAR(@COL_datetime),DAYOFWEEK(@COL_datetime),DAYOFMONTH(@COL_datetime),DIV(@COL_numeric;@COL_numeric),DEGREES(@COL_numeric),DEFAULT(@COL),EXTRACT(MICROSECOND FROM @COL_timestamp),EXP(@COL_numeric),FORMAT(@COL_numeric;@COL_numeric),FORMAT_BYTES(@COL_numeric),FORMAT_PICO_TIME(@COL_numeric),FROM_DAYS(@COL_numeric),FROM_UNIXTIME(@COL_numeric),FROM_UNIXTIME(@COL_numeric;@COL_character),HEX(@COL_character),HEX(@COL_numeric),HOUR(@COL_datetime),ICU_VERSION(),IFNULL(@SELF,@COL_numeric),INET_NTOA(@COL_numeric),INSERT(@SELF;@COL_numeric;@COL_numeric;@COL_character),INSTR(@COL_character;@COL_character)
+define: &functions_lob_insert CURRENT_USER,CURRENT_USER(),PI(),NOW(),RAND(),CONNECTION_ID(),CURTIME(),CURRENT_TIME,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP(),CURRENT_DATE,CURRENT_DATE(),CURRENT_ROLE(),DATABASE(),DEFAULT(@COL),ICU_VERSION()
+define: &functions_numeric FINDME(),@SELF IN (@COL_numeric;@COL_numeric):0.1,PI(),NOW(),ASCII(@COL),ASCII(@SELF),HEX(@COL),HEX(@SELF),ABS(@COL_integer),ACOS(@SELF),ASIN(@SELF),ASIN(@COL),ATAN(@SELF),ATAN(@COL),BIN(@COL),BIN(@SELF),BIT_COUNT(@SELF),BIT_LENGTH(@COL),BIT_LENGTH(@SELF),CEIL(@SELF),CEIL(@COL),CHAR_LENGTH(@SELF),CHAR_LENGTH(@COL),COERCIBILITY(@COL),RAND(),CONNECTION_ID(),COS(@SELF),COT(@SELF),CONV(@COL;16;2),CURRENT_TIMESTAMP,CURRENT_TIMESTAMP(),CURRENT_DATE,CURRENT_DATE(),CRC32(@SELF),CRC32(@COL),DATEDIFF(@COL_datetime;@COL_datetime),DATE_FORMAT(@COL_datetime;"%h"),DATE_FORMAT(@COL_datetime;@COL),DAY(@COL_datetime),DAYOFYEAR(@COL_datetime),DAYOFWEEK(@COL_datetime),DAYOFMONTH(@COL_datetime),DIV(@COL_numeric;@COL_numeric),DEGREES(@COL_numeric),DEFAULT(@COL),EXTRACT(MICROSECOND FROM @COL_timestamp),EXP(@COL_numeric),FIELD(@COL_character;@COL_character;@COL_character),FIND_IN_SET(@COL_character;@COL_character),FLOOR(@COL_numeric),HOUR(@COL_datetime),ICU_VERSION(),IFNULL(@SELF,@COL_numeric),INSTR(@COL_character;@COL_character)
+define: &functions_numeric_insert PI(),NOW(),RAND(),CONNECTION_ID(),CURRENT_TIMESTAMP,CURRENT_TIMESTAMP(),CURRENT_DATE,CURRENT_DATE(),DEFAULT(@COL),ICU_VERSION()
+define: &functions_virtual PI(),CONCAT(@COL_varchar;@COL_character),CONCAT(@FPI(};@COL),ASCII(@COL),HEX(@COL),ABS(@COL),ACOS(@COL),ADDDATE(@COL;1),ADDTIME(@COL;1),AES_ENCRYPT(@COL;""),AES_DECRYPT(@COL;""),AES_ENCRYPT(@COL;""),ASIN(@COL),ASIN(@COL),ATAN(@COL),BIN(@COL),BIT_COUNT(@COL),BIT_LENGTH(@COL),CEIL(@COL),CHAR(@COL),CHAR_LENGTH(@COL),COERCIBILITY(@COL),COLLATION(@COL),COMPRESS(@COL),MD5(@COL),CONCAT_WS("A";@COL_character;@COL_character),COS(@COL),COT(@COL),CRC32(@COL),DATEDIFF(@COL_datetime;@COL_datetime),DATE_FORMAT(@COL_datetime;"%a"),DATE_FORMAT(@COL_datetime;@COL),DAY(@COL_datetime),DATE(@COL_datetime),DAYOFYEAR(@COL_datetime),DATE_ADD(@COL_datetime;INTERVAL 5 DAY),DAYOFMONTH(@COL_datetime),DAYOFWEEK(@COL_datetime),DIV(@COL_numeric;@COL_numeric),DEGREES(@COL_numeric),DEFAULT(@COL),EXTRACT(MICROSECOND FROM @COL_timestamp),EXP(@COL_numeric),FLOOR(@COL_numeric),FORMAT(@COL_numeric;@COL_numeric),FORMAT_BYTES(@COL_numeric),FORMAT_PICO_TIME(@COL_timestamp),FROM_DAYS(@COL_numeric),FROM_UNIXTIME(@COL_numeric),HEX(@COL_character),HEX(@COL_numeric),HOUR(@COL_datetime),ICU_VERSION(),INET_NTOA(@COL_numeric),INSERT(@COL_character;@COL_numeric;@COL_numeric;@COL_character),INSTR(@COL_character;@COL_character)
 
 # on values kinds and syntax see comments imatest_syntax.yaml
 # one level deep, a sequence of name: value
 # general test parameters
-# loosely grouped, no requirements on order
 
 # STRICT if True, every key must be described in syntax checker e.g. imatest_syntax.yaml
 # exception: keys ending in _k_.+ and .+ is not expected to contain another _k_
@@ -99,6 +109,10 @@ mysql_initial_cnf_k_3: |
    log_error_verbosity=3
    innodb_buffer_pool_size=67108864
 
+mysql_set_how: persist,global,EMPTY #debug
+mysql_dynamic_cnf: |
+   innodb_buffer_pool_size=16777216;60-120;STD
+
 # test load
 server_terminate_shutdown: $ENV{IMASTOPMANY} $ENV{_imatest_ports_destructive_rel}
 server_terminate_shutkill_before: 1-3,0-10
@@ -132,7 +146,7 @@ txn_sleep_after_ms: 0:0.999,0-1:0.8,2-4:0.8,5-20:0.8,21-100
 txn_sleep_in_ms: 0:0.99,1-4:0.99,5-10000
 # when not in txn
 txn_begin_p: 0.5
-txn_begin_how: work,ro,rw #debug
+txn_begin_how: work:0.5,ro:0.2,rw
 # anytime
 txn_end_p: 0.01
 txn_end_how: commit:0.9,rollback
@@ -145,6 +159,7 @@ schema_drop_first: yes
 schema_name_format: gts%s
 # single %s replaced with table number
 table_name_format: tt%s!test_%s_table,test_table_longer_name_%09d
+column_name_format: col%s!test_%s_col,test_col_longer_name_%09d
 
 table_autoextend_size: 4M:0.2,8M:0.2,12M:0.2,16M:0.2,20M:0.1,EMPTY
 table_autoinc: 1-10:0.001,1000-2000:0.001,EMPTY
@@ -156,12 +171,8 @@ table_stats_sample_pages: 1:0.1,1-40:0.9,1-999:0.1,EMPTY
 
 table_has_autoinc_p: 0.1
 pk_autoinc_p: 0.99
-columns_pk: 1:0.9,1-2:0.9,0-19
-columns_non_pk: 0:0.01,0-8:0.9,0-40
-column_pk_name_format: pk%s
-column_non_pk_name_format: col%02d
-pk_first_p: 0.99
-indexes_per_table: 0:0.2,0-1:0.5,0-5:0.9,0-65:0.01,0-4 
+columns_total: 0:0.001,1-8:0.9,1-40
+indexes_per_table: 0:0.1,1-2:0.5,1-5:0.9,0-65:0.01,0-4 
 # ALL means include all columns in any index
 parts_per_index: 1:0.9,1-2:0.9,1-4:0.9,1-10:0.9,ALL:0.1,1  
 index_part_type: function:0.01,column
@@ -174,7 +185,7 @@ part_direction: EMPTY:0.99,desc:0.9,asc
 fulltext_index_p: 0.001 
 
 column_null: not_null:0.8,EMPTY:0.9,null
-column_unique_p: 0.2
+column_unique_p: 0.05
 column_virtuality: virtual:0.5,stored:0.5,EMPTY 
 
 # counted independently from pk and non pk
@@ -183,10 +194,15 @@ virtual_expression_length: 1-3
 virtual_expression_depth: 1:0.99,2
 virtual_term_kind: function,value
 
+analyze_column_p: 0.2
+
 select_where_all_p: 0.01
 select_how: all:0.1,count:0.1,columns
 select_column_p: 0.8
-select_distinct_p: 0.8 #debug
+select_distinct_p: 0.01
+select_group_by_p: 0.5 #debug
+select_order_by_p: 0.8 #debug
+select_order_by_column_p: 0.2 #debug
 
 insert_expression_depth: 1:0.99,2
 insert_expression_length: 1:0.9,1-2:0.9,1-3
@@ -219,10 +235,14 @@ where_term_kind: function,value
 where_column_p: 0.2
 
 load_alter_length: 1-2
-load_alter_kind: TABLE_EB:0.3,ADD_COL:0.3,DROP_COL!ADD_KEY,DROP_KEY #debug
+load_alter_kind: ADD_KEY:0.1,TABLE_EB:0.1,ADD_COL:0.1,DROP_COL:0.01,DROP_KEY
+load_create_table_kind: select,like,new
 load_analyze_local_p: 0.5 #debug
-load_check_quick_p: 0.5 #debug
+load_analyze_kind: drop:0.5,update:0.8,just
+load_analyze_buckets: 0,5,20,100
+load_check_quick_p: 0.1
 load_optimize_local_p: 0.5 #debug
+load_select_limit: M1:0.01,EMPTY:0.9,10-100:0.5,1-1000:0.5,EMPTY
 
 explain: explain_analyze:0.001,explain:0.001,EMPTY
 operator_null: EMPTY:0.9,is_not_null:0.9,is_null

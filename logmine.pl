@@ -224,12 +224,29 @@ $ec2count =~ s/, //;
 
 foreach my $key (sort(keys(%ghloadmsg2count))) {
     my $nl = ($key =~ /TOTL/ and not $key =~ /ETOTL/)? "\n" : '';
-    dosayif($VERBOSE_ANY, "%s%s: %s", $nl, $key, $ghloadmsg2count{$key});
+    if ($key =~ /^E(GOOD|FAIL)\s+(.*)/) {
+        my $totl = "ETOTL $2";
+        my $tok = $ghloadmsg2count{$totl};
+        my $rat = $tok == $ghloadmsg2count{$key}? 'ALL' : sprintf("%0.02f",($ghloadmsg2count{$key}/"$tok.0"));
+        dosayif($VERBOSE_ANY, "%s%s: %s (%s)", $nl, $key, $ghloadmsg2count{$key}, $rat);
+    } elsif ($key =~ /^ETOTL\s+(.*)/) {
+        my $good = "EGOOD $1";
+        my $fail = "EFAIL $1";
+        my $gok = $ghloadmsg2count{$good};
+        my $fok = $ghloadmsg2count{$fail};
+        my $tok = $ghloadmsg2count{$key};
+        my $raf = $tok == $fok? 'ALL' : sprintf("%0.02f",($fok/"$tok.0"));
+        my $rag = $tok == $gok? 'ALL' : sprintf("%0.02f",($gok/"$tok.0"));
+        my $trob = $raf eq 'ALL'? "    --> ALL $tok FAILED" : '';
+        dosayif($VERBOSE_ANY, "%s%s: %s (%s GOOD, %s FAIL)%s", $nl, $key, $tok, $rag, $raf,$trob);
+    } else {
+        dosayif($VERBOSE_ANY, "%s%s: %s", $nl, $key, $ghloadmsg2count{$key});
+    }
 }
 dosayif($VERBOSE_ANY, "\n%s\n", $ec2count);
 
 dosayif($VERBOSE_ANY, "+Done\n");
-exit($ec);
+exit($ec);   # exit EXIT
 
 # 1: file name
 # 2: kind
@@ -251,6 +268,10 @@ sub process_mysqld_error_log {
         ++$nlins;
         chomp($lin);
         if ($lin eq "") {
+            ++$nign;
+            next;
+        }
+        if ($lin =~ /Got packets out of order/) {
             ++$nign;
             next;
         }
@@ -549,12 +570,12 @@ sub process_load_thread_out {
                 last;
             }
         }
-        if ($lin =~ /=== INTERIM LOAD THREAD/) {
+        if ($lin =~ /=== INTERIM BY/) {
             $interim = $nlins;
             @lrep = ();
             next;
         }
-        if ($lin =~ /=== FINAL BY /) {
+        if ($lin =~ /=== FINAL BY/) {
             $final = $nlins;
             @lrep = ();
             next;
