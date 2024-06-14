@@ -5,7 +5,7 @@
 
 THE PREVIOUS STATEMENT IS NOT A CLAIM FOR TOOL's  suitability for any purpose whatsoever.
 
-Yield: not everything filed as a bug because bug filing is fairly pointless activity in most cases. imho.
+Yield: not everything filed as a bug because bug filing is fairly pointless activity in most cases for lack of care of the target audience at the manufacturer of the code. imho.
 
 2024-06-14T01:58:40.260276Z 20 [ERROR] [MY-013183] [InnoDB] Assertion failure: row0sel.cc:2796:(!prebuilt->idx_cond && prebuilt->m_mysql_handler->end_range != nullptr) || (prebuilt->trx->isolation_level == TRX_ISO_READ_UNCOMMITTED) 
 
