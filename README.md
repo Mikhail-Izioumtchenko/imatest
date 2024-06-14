@@ -7,6 +7,8 @@ THE PREVIOUS STATEMENT IS NOT A CLAIM FOR TOOL's  suitability for any purpose wh
 
 Yield: not everything filed as a bug because bug filing is fairly pointless activity in most cases. imho.
 
+2024-06-14T01:58:40.260276Z 20 [ERROR] [MY-013183] [InnoDB] Assertion failure: row0sel.cc:2796:(!prebuilt->idx_cond && prebuilt->m_mysql_handler->end_range != nullptr) || (prebuilt->trx->isolation_level == TRX_ISO_READ_UNCOMMITTED) 
+
 2024-06-09T02:13:33.473147Z 1 [ERROR] [MY-012237] [InnoDB] Corrupted page [page id: space=10337, page number=0] of datafile './gts3/tt22.ibd' could not be found in the doublewrite buffer. 2024-06-09T02:13:33.473262Z 1 [ERROR] [MY-015090] [InnoDB] [FATAL] Tablespace '10143' mentioned in the redo log is corrupted in a way it is unrecoverable by double-write buffer, so further redo log recovery is not possible! 2024-06-09T02:13:33.473280Z 1 [ERROR] [MY-013183] [InnoDB] Assertion failure: log0recv.cc:1163:ib::fatal triggered thread 140240576562752
 
 2024-05-26T04:18:00.658915Z 17 [ERROR] [MY-013183] [InnoDB] Assertion failure: row0sel.cc:2796:(!prebuilt->idx_cond && prebuilt->m_mysql_handler->end_range != nullptr) || (prebuilt->trx->isolation_level == TRX_ISO_READ_UNCOMMITTED)
