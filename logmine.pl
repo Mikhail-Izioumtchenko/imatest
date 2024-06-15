@@ -25,10 +25,11 @@ my $HELP = 'help';
 my $USAGE_ERROR_EC = 1;
 my $VERBOSE = 'verbose';
 my $VERBOSE_ANY = 0;
-my $VERBOSE_SOME = 1;
-my $VERBOSE_MORE = 2;
-my $VERBOSE_DEV = 3;
-my $VERBOSE_NEVER = 4;
+my $VERBOSE_NONL = -1;
+#my $VERBOSE_SOME = 1;
+#my $VERBOSE_MORE = 2;
+#my $VERBOSE_DEV = 3;
+#my $VERBOSE_NEVER = 4;
 
 my $RC_OK = 1;      # not 0
 my $EC_OK = 0;
@@ -94,7 +95,7 @@ sub readfile {
 
 sub dosayif {
     my $howver = shift @ARG;
-    return if defined($ghasopt{$VERBOSE}) and $ghasopt{$VERBOSE} < $howver;
+    #return if defined($ghasopt{$VERBOSE}) and $ghasopt{$VERBOSE} < $howver;
     my ($format, @largs) = @ARG;
     my $res = shortmess();
     my @l = split(/\n/,$res);
@@ -104,7 +105,8 @@ sub dosayif {
     $res = 'main' if ($res eq 'dosayif');
     if ($format =~ /^\+/) {
         $format =~ s/^.//;
-        my $doformat = "#P %s %s %s %s: $format\n";
+        my $doformat = "#P %s %s %s %s: $format";
+        $doformat .= "\n" if ($howver != $VERBOSE_NONL);
         my $dt = DateTime->now(time_zone => 'UTC');
         my ($sec, $mks) = gettimeofday();
         my $dout = sprintf("%s %s.%06d %s", $dt->ymd(), $dt->hms(), $mks, $dt->time_zone_short_name());
@@ -188,9 +190,9 @@ dosayif($VERBOSE_ANY, "");
 sub getkind {
     my ($fil,$plfil) = @ARG;
     return 'mysqld_error_log' if ($fil =~ /\/?error\.log$/);
-    return 'check_thread_out' if ($fil =~ /\/?check_thread\.out$/);
-    return 'destructive_thread_out' if ($fil =~ /\/?destructive_thread_[0-9]+\.out$/);
-    return 'mysql_load_out' if ($fil =~ /\/?load_thread_[0-9]+\.out$/);
+    return 'check_thread_out' if ($fil =~ /\/?check_thread.*\.out$/);
+    return 'destructive_thread_out' if ($fil =~ /\/?destructive_thread_[0-9]+.*\.out$/);
+    return 'mysql_load_out' if ($fil =~ /\/?load_thread_[0-9]+.*\.out$/);
     return 'master_thread_log' if ($fil =~ /\/?master_thread\.log$/);
     return 'imatest_pl_out' if ($fil =~ /\/?imatest\.pl\.out$/);
     return 'UNKNOWN';
@@ -222,6 +224,7 @@ foreach my $key (sort(keys(%ghloadec2count))) {
 }
 $ec2count =~ s/, //;
 
+my $allfail = '';
 foreach my $key (sort(keys(%ghloadmsg2count))) {
     my $nl = ($key =~ /TOTL/ and not $key =~ /ETOTL/)? "\n" : '';
     if ($key =~ /^E(GOOD|FAIL)\s+(.*)/) {
@@ -237,13 +240,21 @@ foreach my $key (sort(keys(%ghloadmsg2count))) {
         my $tok = $ghloadmsg2count{$key};
         my $raf = $tok == $fok? 'ALL' : sprintf("%0.02f",($fok/"$tok.0"));
         my $rag = $tok == $gok? 'ALL' : sprintf("%0.02f",($gok/"$tok.0"));
-        my $trob = $raf eq 'ALL'? "    --> ALL $tok FAILED" : '';
+        my $trob = '';
+        if ($raf eq 'ALL') {
+            $trob = "    --> ALL $tok FAILED";
+            $allfail .= " ${tok}x$key";
+        }
         dosayif($VERBOSE_ANY, "%s%s: %s (%s GOOD, %s FAIL)%s", $nl, $key, $tok, $rag, $raf,$trob);
     } else {
-        dosayif($VERBOSE_ANY, "%s%s: %s", $nl, $key, $ghloadmsg2count{$key});
+        #docroak("#debug+%s+nl+++%s+++",$key,$nl) if ($key =~ /->/);
+        dosayif($VERBOSE_NONL, "%s%s: %s", $nl, $key, $ghloadmsg2count{$key});
     }
 }
 dosayif($VERBOSE_ANY, "\n%s\n", $ec2count);
+$allfail =~ s/ETOTL //g;
+$allfail =~ s/ *-> */ /g;
+dosayif($VERBOSE_ANY, "\nALL FAILED:%s\n", $allfail);
 
 dosayif($VERBOSE_ANY, "+Done\n");
 exit($ec);   # exit EXIT
@@ -396,7 +407,8 @@ sub process_imatest_pl_out {
     my @ltoignore = qw (
   replacing.([a-z_]+).of
   (start_destructive_thread|start_load_thread):.random
-  refused,connecting
+  refused.connecting
+  table_add.*For
   line.[0-9]+.$
   main.*invoked
   main.*letting
@@ -405,6 +417,8 @@ sub process_imatest_pl_out {
   main.*starting
   main.*Options
   checkscript
+  adding.table
+  see.also
   sandbox.as.root
   can.be.insecure
   Killing.MySQL
@@ -415,7 +429,7 @@ sub process_imatest_pl_out {
   startup.files
   to.MySQL.at
   tid=[0-9]+:.(SQL|CONNECTED):
-  (gethashref|getarrayref|runreport).*(SUCCESS|ERROR.*(1070|1008|1064|1118|1167|1146|1071))
+  (gethashref|getarrayref|runreport).*(SUCCESS|ERROR.*(1070|1008|1064|1167|1146))
   db_create.will.create
   db_create.*(returning|remove)
   start_destructive_thread
@@ -428,7 +442,7 @@ sub process_imatest_pl_out {
   in.dba.startSandboxInstance
   file.matches
   main.*exit.code.0
-  main.*new.*load.thread
+  m/tmp/load_thread_01_561.outain.*new.*load.thread
   main.*See.also
                        );
     LIN:
@@ -496,6 +510,7 @@ sub process_check_thread_out {
             ++$nign;
             next;
         }
+        $lin =~ s/UTC.*imatest.pl/UTC/;
         dosayif($VERBOSE_ANY, "%s",$lin);
     }
     dosayif($VERBOSE_ANY, "END %s %s: %s lines, %s ignored\n", $filekind,$fil,$nlins,$nign);
@@ -559,6 +574,8 @@ sub process_load_thread_out {
     ++$gloadthreads;
     my @lmust = qw(
       CROAK
+      needed
+      FINAL.BY
                   );
 
     foreach my $lin (@$plfil) {
@@ -594,17 +611,18 @@ sub process_load_thread_out {
     $nign = $nlins - scalar(@lrep);
     foreach my $lin (@lrep) {
         $dosay = 0 if ($lin =~ /ERROR TO LAST MSG/);
-        $dosay = 0 if ($lin =~ /see also/);
+        $dosay = 0 if ($lin =~ /see.*also/i);
         $dosay = 1 if ($lin =~ /ERROR STMT KIND COUNTS/);
         $dosay = 1 if ($lin =~ /ERROR COUNTS/);
         if ($dosay) {
-            dosayif($VERBOSE_MORE, "%s",$lin) if ($dosay);
+            #dosayif($VERBOSE_MORE, "%s",$lin) if ($dosay);
             if ($lin =~ /ERROR COUNTS/) {
                 my $top = $lin;
                 $top =~ s/.*ERROR COUNTS://;
                 my @lot = split(/,/,$top);
                 foreach my $suc (@lot) {
                     $suc =~ s/ //g;
+                    next if ($suc eq '');
                     my @lsu = split(/:/,$suc);
                     $ghloadec2count{$lsu[0]} += $lsu[1];
                 }

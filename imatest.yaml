@@ -1,48 +1,55 @@
 ---
+#create_db: no
 create_db: yes
 port_writer: 2
-schemas: 4
-tables_per_schema: 19
-tables_per_schema: 4
+schemas: 8
 #destructive_thread_out: qw(/dev/null)
 #destructive_thread_err: qw(/dev/null)
 #load_thread_out: qw(/dev/null)
 #load_thread_err: qw(/dev/null)
 txn_use: yes
-load_thread_sql: qw(/dev/null)
+#load_thread_sql: qw(/dev/null)
 # heavy START
-load_threads: 9Xb2,17
+tables_per_schema: 33
+load_threads: 3Xb3,3Xb2,3Xddl,8
+load_threads: 1Xb3,1Xb2,1Xddl,1
 server_terminate: yes
-test_duration_seconds: 1800
+test_duration_seconds: 3600
 load_thread_restart: yes
 # heavy END
 # light START
+tables_per_schema: 1
 load_threads: 1
 server_terminate: no
 test_duration_seconds: 180
 load_thread_restart: no
 # light END
+reconnect_timeout: 600
 load_max_stmt: 000
 report_every_stmt: 10000
-report_every_seconds: 60
+report_every_seconds: 120
 rediscover_every_seconds: 60-70
 # 0 means no check thread
 check_thread_ports: 2
 check_thread_sleep: 10
-#load_thread_random_seeds: 817250,102580
+load_thread_random_seeds: 345162,655474,732338,887186,393116,820162,53964,324649,439968,642493,866187,330207,677693,793873,543641,766520,400089
 load_thread_random_seeds: 0
 destructive_thread_random_seeds: 0
 sleep_final: 30
 sleep_on_assert: 6
 terminate_on_assert: yes
-load_sql_class: lock_instance_for_backup:0.0001,unlock_instance:0.001,insert:0.5,show_open_tables:0.01,show_parse_tree:0.01,drop_table:0.001,alter:0.1,create_table:0.001,analyze:0.1,optimize:0.01,checksum:0.01,replace:0.1,insel:0.2,update:0.8,delete:0.1,check:0.05,select #debug
-load_sql_class_k_b2: insert:0.1,insel:0.1,replace:0.1,update:0.1,delete:0.001,check:0.01,alter:0.1,select,lock_instance_for_backup:0.0001,unlock_instance:0.0001 #debug
+load_sql_class: set:0.1,kill_connection:0.01,kill_query:0.01,flush_tables:0.01,flush:0.01,show_variables:0.001,show_tables:0.001,show_table_status:0.001,show_status:0.01,show_columns:0.001,set_txn_isolation:0.001,lock_table:0.0001,unlock_table:0.01,lock_instance_for_backup:0.000001,unlock_instance:0.001,insert:0.5,show_open_tables:0.01,show_parse_tree:0.02,drop_table:0.00001,recreate_schema:0.000001,alter:0.2,create_table:0.003,analyze:0.01,optimize:0.001,checksum:0.01,replace:0.2,insel:0.3,update:0.5,delete:0.1,check:0.05,select #debug
+load_sql_class_k_b2: set:0.1,insert:0.1,insel:0.1,replace:0.1,update:0.1,delete:0.001,check:0.001,alter:0.1,select
+load_sql_class_k_b3: insert:0.1,insel:0.2,replace:0.1,update:0.2,analyze:0.01,checksum:0.1,show_parse_tree:0.1,alter
+load_sql_class_k_ddl: set:0.1,alter:0.5,create_table:0.1,insert:0.01,checksum:0.2,show_parse_tree:0.2,drop_table:0.00001,alter
+load_alter_length_k_ddl: 1-3
+load_alter_kind_k_ddl: ADD_KEY:0.2,TABLE_EB:0.2,ADD_COL:0.1,DROP_COL:0.01,DROP_KEY:0.01,TABLE_EB
 destructive_threads: 1Xb2,1
 destructive_threads: 1
-server_termination_how: shutdown:0.01,shutkill:0.1,kill:0.1,sigkill:0.99,sigstop
+server_termination_how: shutdown:0.01,shutkill:0.1,kill:0.5,sigkill:0.1,sigstop:0.01,shutdown
 server_termination_how_k_b2: sigkill
-server_termination_every_seconds: 120-480:0.5,540-600
-server_termination_every_seconds_k_b2: 300-360
+server_termination_every_seconds: 120-180:0.5,120-240
+server_termination_every_seconds_k_b2: 100-250
 ports_destructive_how_many: 1
 ports_destructive: 2
 #ports_destructive_k_b2: 3
@@ -50,28 +57,67 @@ destructive_thread_sleep: 5
 port_load: 2
 #port_load_k_b2: 3
 
-missing_probability_replacement: 0.01
+missing_probability_replacement: 0.001
 
+define: &functions_integer_index LENGTH(@SELF),ASCII(@SELF),HEX(@SELF),ABS(@SELF),ACOS(@SELF),AES_ENCRYPT(@SELF;""),ASIN(@SELF),ATAN(@SELF),BIN(@SELF),BIT_COUNT(@SELF),BIT_LENGTH(@SELF),CEIL(@SELF),CHAR(@SELF),CHAR_LENGTH(@SELF),COMPRESS(@SELF),MMMD5(@SELF),COS(@SELF),COT(@SELF),CRC32(@SELF),DEGREES(@SELF),EXP(@SELF),FLOOR(@SELF),FORMAT_BYTES(@SELF),FROM_DAYS(@SELF),FROM_UNIXTIME(@SELF),INET_NTOA(@SELF),LN(@SELF),LOG(@SELF;@SELF),LOG10(@SELF),LOG2(@SELF),MMMAKEDATE(@SELF;@SELF),MMMAKETIME(@SELF;@SELF;@SELF),OCT(@SELF),MMMOD(@SELF;@SELF),RADIANS(@SELF),REPEAT(@SELF;@SELF),REVERSE(@SELF),ROUND(@SELF;@SELF),TAN(@SELF)
+define: &functions_charlike_index LENGTH(@SELF),CONCAT(@SELF;@SELF),ASCII(@SELF),HEX(@SELF),AES_ENCRYPT(@SELF;""),BIN(@SELF),BIT_COUNT(@SELF),BIT_LENGTH(@SELF),CHAR(@SELF),CHAR_LENGTH(@SELF),COERCIBILITY(@SELF),COLLATION(@SELF),COMPRESS(@SELF),MMMD5(@SELF),CONCAT_WS("A";@SELF;@SELF),CRC32(@SELF),INSTR(@SELF;@SELF),LOCATE(@SELF;@SELF),LOWER(@SELF),ORD(@SELF),QUOTE(@SELF),REGEXP_INSTR(@SELF;@SELF),REPLACE(@SELF;@SELF;@SELF),REVERSE(@SELF),RTRIM(@SELF)
+define: &functions_numeral_virtual LENGTH(@SELF),ASCII(@SELF),HEX(@SELF),ABS(@SELF),ACOS(@SELF),AES_ENCRYPT(@SELF;""),ASIN(@SELF),ATAN(@SELF),BIN(@SELF),BIT_COUNT(@SELF),BIT_LENGTH(@SELF),CEIL(@SELF),CHAR(@SELF),CHAR_LENGTH(@SELF),COMPRESS(@SELF),MMMD5(@SELF),COS(@SELF),COT(@SELF),CRC32(@SELF),DEGREES(@SELF),EXP(@SELF),FLOOR(@SELF),FORMAT_BYTES(@SELF),FROM_DAYS(@SELF),FROM_UNIXTIME(@SELF),INET_NTOA(@SELF),LN(@SELF),LOG(@SELF;@SELF),LOG10(@SELF),LOG2(@SELF),MMMAKEDATE(@SELF;@SELF),MMMAKETIME(@SELF;@SELF;@SELF),OCT(@SELF),MMMOD(@SELF;@SELF),RADIANS(@SELF),REPEAT(@SELF;@SELF),REVERSE(@SELF),ROUND(@SELF;@SELF),TAN(@SELF)
+define: &functions_charlike_virtual LENGTH(@SELF),CONCAT(@SELF;@SELF),ASCII(@SELF),HEX(@SELF),AES_ENCRYPT(@SELF;""),BIN(@SELF),BIT_COUNT(@SELF),BIT_LENGTH(@SELF),CHAR(@SELF),CHAR_LENGTH(@SELF),COERCIBILITY(@SELF),COLLATION(@SELF),COMPRESS(@SELF),MMMD5(@SELF),CONCAT_WS("A";@SELF;@SELF),CRC32(@SELF),INSTR(@SELF;@SELF),LOCATE(@SELF;@SELF),LOWER(@SELF),ORD(@SELF),QUOTE(@SELF),REGEXP_INSTR(@SELF;@SELF),REPLACE(@SELF;@SELF;@SELF),REVERSE(@SELF),RTRIM(@SELF)
+define: &functions_any_virtual LENGTH(@SELF),CONCAT(@SELF;@SELF),ASCII(@SELF),HEX(@SELF),AES_ENCRYPT(@SELF;""),BIN(@SELF),BIT_COUNT(@SELF),BIT_LENGTH(@SELF),CHAR(@SELF),CHAR_LENGTH(@SELF),COERCIBILITY(@SELF),COLLATION(@SELF),COMPRESS(@SELF),MMMD5(@SELF),CONCAT_WS("A";@SELF;@SELF),CRC32(@SELF),INSTR(@SELF;@SELF),LOCATE(@SELF;@SELF),LOWER(@SELF),ORD(@SELF),QUOTE(@SELF),REGEXP_INSTR(@SELF;@SELF),REPLACE(@SELF;@SELF;@SELF),REVERSE(@SELF),RTRIM(@SELF),HEX(@SELF),ABS(@SELF),ACOS(@SELF),AES_ENCRYPT(@SELF;""),ASIN(@SELF),ATAN(@SELF),BIN(@SELF),BIT_COUNT(@SELF),BIT_LENGTH(@SELF),CEIL(@SELF),CHAR(@SELF),CHAR_LENGTH(@SELF),COMPRESS(@SELF),MMMD5(@SELF),COS(@SELF),COT(@SELF),CRC32(@SELF),DEGREES(@SELF),EXP(@SELF),FLOOR(@SELF),FORMAT_BYTES(@SELF),FROM_DAYS(@SELF),FROM_UNIXTIME(@SELF),INET_NTOA(@SELF),LN(@SELF),LOG(@SELF;@SELF),LOG10(@SELF),LOG2(@SELF),MMMAKEDATE(@SELF;@SELF),MMMAKETIME(@SELF;@SELF;@SELF),OCT(@SELF),MMMOD(@SELF;@SELF),RADIANS(@SELF),REPEAT(@SELF;@SELF),REVERSE(@SELF),ROUND(@SELF;@SELF),TAN(@SELF)
+define: &functions_numeral_where LENGTH(@SELF),ASCII(@SELF),HEX(@SELF),ABS(@SELF),ACOS(@SELF),AES_ENCRYPT(@SELF;""),ASIN(@SELF),ATAN(@SELF),BIN(@SELF),BIT_COUNT(@SELF),BIT_LENGTH(@SELF),CEIL(@SELF),CHAR(@SELF),CHAR_LENGTH(@SELF),COMPRESS(@SELF),MMMD5(@SELF),COS(@SELF),COT(@SELF),CRC32(@SELF),DEGREES(@SELF),EXP(@SELF),FLOOR(@SELF),FORMAT_BYTES(@SELF),FROM_DAYS(@SELF),FROM_UNIXTIME(@SELF),INET_NTOA(@SELF),LN(@SELF),LOG(@SELF;@SELF),LOG10(@SELF),LOG2(@SELF),MMMAKEDATE(@SELF;@SELF),MMMAKETIME(@SELF;@SELF;@SELF),OCT(@SELF),MMMOD(@SELF;@SELF),RADIANS(@SELF),REPEAT(@SELF;@SELF),REVERSE(@SELF),ROUND(@SELF;@SELF),TAN(@SELF)
+define: &functions_charlike_where LENGTH(@SELF),CONCAT(@SELF;@SELF),ASCII(@SELF),HEX(@SELF),AES_ENCRYPT(@SELF;""),BIN(@SELF),BIT_COUNT(@SELF),BIT_LENGTH(@SELF),CHAR(@SELF),CHAR_LENGTH(@SELF),COERCIBILITY(@SELF),COLLATION(@SELF),COMPRESS(@SELF),MMMD5(@SELF),CONCAT_WS("A";@SELF;@SELF),CRC32(@SELF),INSTR(@SELF;@SELF),LOCATE(@SELF;@SELF),LOWER(@SELF),ORD(@SELF),QUOTE(@SELF),REGEXP_INSTR(@SELF;@SELF),REPLACE(@SELF;@SELF;@SELF),REVERSE(@SELF),RTRIM(@SELF)
+define: &functions_any_where LENGTH(@SELF),CONCAT(@SELF;@SELF),ASCII(@SELF),HEX(@SELF),AES_ENCRYPT(@SELF;""),BIN(@SELF),BIT_COUNT(@SELF),BIT_LENGTH(@SELF),CHAR(@SELF),CHAR_LENGTH(@SELF),COERCIBILITY(@SELF),COLLATION(@SELF),COMPRESS(@SELF),MMMD5(@SELF),CONCAT_WS("A";@SELF;@SELF),CRC32(@SELF),INSTR(@SELF;@SELF),LOCATE(@SELF;@SELF),LOWER(@SELF),ORD(@SELF),QUOTE(@SELF),REGEXP_INSTR(@SELF;@SELF),REPLACE(@SELF;@SELF;@SELF),REVERSE(@SELF),RTRIM(@SELF),HEX(@SELF),ABS(@SELF),ACOS(@SELF),AES_ENCRYPT(@SELF;""),ASIN(@SELF),ATAN(@SELF),BIN(@SELF),BIT_COUNT(@SELF),BIT_LENGTH(@SELF),CEIL(@SELF),CHAR(@SELF),CHAR_LENGTH(@SELF),COMPRESS(@SELF),MMMD5(@SELF),COS(@SELF),COT(@SELF),CRC32(@SELF),DEGREES(@SELF),EXP(@SELF),FLOOR(@SELF),FORMAT_BYTES(@SELF),FROM_DAYS(@SELF),FROM_UNIXTIME(@SELF),INET_NTOA(@SELF),LN(@SELF),LOG(@SELF;@SELF),LOG10(@SELF),LOG2(@SELF),MMMAKEDATE(@SELF;@SELF),MMMAKETIME(@SELF;@SELF;@SELF),OCT(@SELF),MMMOD(@SELF;@SELF),RADIANS(@SELF),REPEAT(@SELF;@SELF),REVERSE(@SELF),ROUND(@SELF;@SELF),TAN(@SELF)
+define: &functions_datelike_index LENGTH(@SELF),ASCII(@SELF),HEX(@SELF),ADDDATE(@SELF;1),ADDTIME(@SELF;1),AES_ENCRYPT(@SELF;""),BIN(@SELF),BIT_COUNT(@SELF),BIT_LENGTH(@SELF),CHAR(@SELF),CHAR_LENGTH(@SELF),COMPRESS(@SELF),MMMD5(@SELF),CONCAT_WS("A";@SELF;@SELF),CRC32(@SELF),DATEDIFF(@SELF;@SELF),DATE_FORMAT(@SELF;"%a"),DAY(@SELF),DATE(@SELF),DAYOFYEAR(@SELF),DATE_ADD(@SELF;INTERVAL 1 DAY),DAYOFMONTH(@SELF),DAYOFWEEK(@SELF),EXTRACT(MICROSECOND FROM @SELF),FORMAT_PICO_TIME(@SELF),HOUR(@SELF),LAST_DAY(@SELF),MMMICROSECOND(@SELF),MMMINUTE(@SELF),MMMONTH(@SELF),MMMONTHNAME(@SELF),QUARTER(@SELF)
+define: &functions_datelike_virtual LENGTH(@SELF),ASCII(@SELF),HEX(@SELF),ADDDATE(@SELF;1),ADDTIME(@SELF;1),AES_ENCRYPT(@SELF;""),BIN(@SELF),BIT_COUNT(@SELF),BIT_LENGTH(@SELF),CHAR(@SELF),CHAR_LENGTH(@SELF),COMPRESS(@SELF),MMMD5(@SELF),CONCAT_WS("A";@SELF;@SELF),CRC32(@SELF),DATEDIFF(@SELF;@SELF),DATE_FORMAT(@SELF;"%a"),DAY(@SELF),DATE(@SELF),DAYOFYEAR(@SELF),DATE_ADD(@SELF;INTERVAL 1 DAY),DAYOFMONTH(@SELF),DAYOFWEEK(@SELF),EXTRACT(MICROSECOND FROM @SELF),FORMAT_PICO_TIME(@SELF),HOUR(@SELF),LAST_DAY(@SELF),MMMICROSECOND(@SELF),MMMINUTE(@SELF),MMMONTH(@SELF),MMMONTHNAME(@SELF),QUARTER(@SELF)
+
+define: &functions_numeric_insert PI(),NOW(),RAND(),CONNECTION_ID(),CURRENT_TIMESTAMP,CURRENT_TIMESTAMP(),CURRENT_DATE,CURRENT_DATE(),ICU_VERSION(),LOCALTIME,LOCALTIME(),LOCALTIMESTAMP,LOCALTIMESTAMP(),PS_CURRENT_THREAD_ID(),RELEASE_ALL_LOCKS(),ROW_COUNT(),SYSDATE(),UNIX_TIMESTAMP(),UTC_TIME,UTC_TIME(),UTC_TIMESTAMP,UTC_TIMESTAMP(),UUID_SHORT()
+define: &functions_numeric_update PI(),NOW(),RAND(),CONNECTION_ID(),CURRENT_TIMESTAMP,CURRENT_TIMESTAMP(),CURRENT_DATE,CURRENT_DATE(),ICU_VERSION(),LOCALTIME,LOCALTIME(),LOCALTIMESTAMP,LOCALTIMESTAMP(),PS_CURRENT_THREAD_ID(),RELEASE_ALL_LOCKS(),ROW_COUNT(),SYSDATE(),UNIX_TIMESTAMP(),UTC_TIME,UTC_TIME(),UTC_TIMESTAMP,UTC_TIMESTAMP(),UUID_SHORT()
+define: &functions_lob_insert CURRENT_USER,CURRENT_USER(),PI(),NOW(),RAND(),CONNECTION_ID(),CURTIME(),CURRENT_TIME,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP(),CURRENT_DATE,CURRENT_DATE(),CURRENT_ROLE(),DATABASE(),ICU_VERSION(),LAST_INSERT_ID(),LOCALTIME,LOCALTIME(),LOCALTIMESTAMP,LOCALTIMESTAMP(),PS_CURRENT_THREAD_ID(),RANDOM_BYTES(@COL_tinyint),RELEASE_ALL_LOCKS(),ROLES_GRAPHML(),ROW_COUNT(),SYSDATE(),USER(),UTC_DATE,UTC_DATE(),UTC_TIME,UTC_TIME(),UTC_TIMESTAMP,UTC_TIMESTAMP(),VERSION()
+define: &functions_lob_update CURRENT_USER,CURRENT_USER(),PI(),NOW(),RAND(),CONNECTION_ID(),CURTIME(),CURRENT_TIME,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP(),CURRENT_DATE,CURRENT_DATE(),CURRENT_ROLE(),DATABASE(),ICU_VERSION(),LAST_INSERT_ID(),LOCALTIME,LOCALTIME(),LOCALTIMESTAMP,LOCALTIMESTAMP(),PS_CURRENT_THREAD_ID(),RANDOM_BYTES(@COL_tinyint),RELEASE_ALL_LOCKS(),ROLES_GRAPHML(),ROW_COUNT(),SYSDATE(),USER(),UTC_DATE,UTC_DATE(),UTC_TIME,UTC_TIME(),UTC_TIMESTAMP,UTC_TIMESTAMP(),VERSION()
+define: &functions_datetime_insert NOW(),CURRENT_TIMESTAMP,CURRENT_TIMESTAMP(),CURRENT_DATE,CURRENT_DATE(),LOCALTIME,LOCALTIME(),LOCALTIMESTAMP,LOCALTIMESTAMP(),SYSDATE(),UTC_DATE,UTC_DATE(),UTC_TIMESTAMP,UTC_TIMESTAMP()
+define: &functions_datetime_update NOW(),CURRENT_TIMESTAMP,CURRENT_TIMESTAMP(),CURRENT_DATE,CURRENT_DATE(),LOCALTIME,LOCALTIME(),LOCALTIMESTAMP,LOCALTIMESTAMP(),SYSDATE(),UTC_DATE,UTC_DATE(),UTC_TIMESTAMP,UTC_TIMESTAMP()
 # 
-define: &functions_character CONCAT(@SELF;@COL_character),CONCAT(@SELF;@SELF),PI(),NOW(),ASCII(@COL_integer),ASCII(@SELF),HEX(@COL_lob),HEX(@SELF),BIN(@COL),BIT_LENGTH(@COL),BIT_LENGTH(@SELF),CHAR(@COL),CHAR_LENGTH(@SELF),CHAR_LENGTH(@COL),CHARSET(@COL_character),CHARSET(@COL_text),COERCIBILITY(@COL),COLLATION(@COL),CONCAT_WS(@SELF;@SELF;@SELF),CONNECTION_ID(),CONVERT(@SELF USING utf8mb4),CONV(@COL_numeric;10;16),CURTIME(),CURRENT_TIME,CURRENT_USER,CURRENT_USER(),CURRENT_TIMESTAMP,CURRENT_TIMESTAMP(),CURRENT_DATE,CURRENT_DATE(),CURRENT_ROLE(),CRC32(@SELF),CRC32(@COL),DATEDIFF(@COL_datetime;@COL_datetime),DATE_FORMAT(@COL_datetime;"%a"),DATE_FORMAT(@COL_datetime;@COL),DAY(@COL_datetime),DATE(@COL_datetime),DATABASE(),DAYOFYEAR(@COL_datetime),DAYOFWEEK(@COL_datetime),DAYOFMONTH(@COL_datetime),DIV(@COL_numeric;@COL_numeric),DEGREES(@COL_numeric),DEFAULT(@COL),ExtractValue(@COL_character;@COL_character),EXTRACT(MICROSECOND FROM @COL_timestamp),EXPORT_SET(@COL_integer;@COL_character;@COL_character;@COL_character;@COL_numeric),EXP(@COL_numeric),ELT(@COL_smallint;@COL_character;@COL_character),FIELD(@COL_character;@COL_character;@COL_character),FIND_IN_SET(@SELF;@SELF),FLOOR(@COL_numeric),FORMAT(@COL_numeric;@COL_numeric),FORMAT_BYTES(@COL_numeric),FORMAT_PICO_TIME(@COL_datetime),FROM_DAYS(@COL_numeric),FROM_UNIXTIME(@COL_numeric),GET_FORMAT(DATE;@COLUMN_character),GET_LOCK(@COL_character;@COL_numeric),GREATEST(@COL_character,@COL_numeric,@COL_datetime),HEX(@COL_character),HEX(@COL_numeric),HOUR(@COL_datetime),ICU_VERSION(),IF(@COL_numeric,@SELF,@COL_character),IFNULL(@SELF,@COL_numeric),INET_ATON(@COL_character),INET_NTOA(@COL_numeric),INSERT(@SELF;@COL_numeric;@COL_numeric;@COL_character),INSTR(@COL_character;@COL_character)
-define: &functions_character_insert NOW(),CURRENT_TIMESTAMP,CURRENT_TIMESTAMP(),CURRENT_DATE,CURRENT_DATE(),DEFAULT(@COL),ICU_VERSION()
-define: &functions_datetime DATE_ADD(@SELF;INTERVAL $COL_numeric DAY):0.1,ADDDATE(@COL_timestamp;1),ADDDATE(@COL_datetime;1),NOW(),ADDDATE(@SELF;1),ADDTIME(@SELF;1),CURTIME(),CURRENT_TIME,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP(),CURRENT_DATE,CURRENT_DATE(),DATE(@COL_datetime),DAYOFWEEK(@COL_datetime),DEFAULT(@COL),FROM_DAYS(@COL_numeric),IFNULL(@SELF,@COL_datetime)
-define: &functions_datetime_insert NOW(),CURRENT_TIMESTAMP,CURRENT_TIMESTAMP(),CURRENT_DATE,CURRENT_DATE(),DEFAULT(@COL)
-define: &functions_lob CURRENT_USER,CURRENT_USER(),PI(),NOW(),ASCII(@COL_varchar),ASCII(@SELF),HEX(@COL),HEX(@SELF),AES_ENCRYPT(@COL;""),AES_DECRYPT(@SELF;""),AES_ENCRYPT(@SELF;""),BIN(@COL),BIT_LENGTH(@COL),BIT_LENGTH(@SELF),CHAR(@COL),CHAR_LENGTH(@SELF),CHAR_LENGTH(@COL),CHARSET(@COL_character),CHARSET(@COL_text),COERCIBILITY(@COL),COLLATION(@COL),COMPRESS(@COL),MD5(@COL),CONNECTION_ID(),CURRENT_TIMESTAMP,CURRENT_TIMESTAMP(),CURRENT_DATE,CURRENT_DATE(),CURRENT_ROLE(),CRC32(@SELF),CRC32(@COL),DATEDIFF(@COL_datetime;@COL_datetime),DATE_FORMAT(@COL_datetime;"%a"),DATE_FORMAT(@COL_datetime;@COL),DAY(@COL_datetime),DATE(@COL_datetime),DATABASE(),DAYOFYEAR(@COL_datetime),DAYOFWEEK(@COL_datetime),DAYOFMONTH(@COL_datetime),DIV(@COL_numeric;@COL_numeric),DEGREES(@COL_numeric),DEFAULT(@COL),EXTRACT(MICROSECOND FROM @COL_timestamp),EXP(@COL_numeric),FORMAT(@COL_numeric;@COL_numeric),FORMAT_BYTES(@COL_numeric),FORMAT_PICO_TIME(@COL_numeric),FROM_DAYS(@COL_numeric),FROM_UNIXTIME(@COL_numeric),FROM_UNIXTIME(@COL_numeric;@COL_character),HEX(@COL_character),HEX(@COL_numeric),HOUR(@COL_datetime),ICU_VERSION(),IFNULL(@SELF,@COL_numeric),INET_NTOA(@COL_numeric),INSERT(@SELF;@COL_numeric;@COL_numeric;@COL_character),INSTR(@COL_character;@COL_character)
-define: &functions_lob_insert CURRENT_USER,CURRENT_USER(),PI(),NOW(),RAND(),CONNECTION_ID(),CURTIME(),CURRENT_TIME,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP(),CURRENT_DATE,CURRENT_DATE(),CURRENT_ROLE(),DATABASE(),DEFAULT(@COL),ICU_VERSION()
-define: &functions_numeric FINDME(),@SELF IN (@COL_numeric;@COL_numeric):0.1,PI(),NOW(),ASCII(@COL),ASCII(@SELF),HEX(@COL),HEX(@SELF),ABS(@COL_integer),ACOS(@SELF),ASIN(@SELF),ASIN(@COL),ATAN(@SELF),ATAN(@COL),BIN(@COL),BIN(@SELF),BIT_COUNT(@SELF),BIT_LENGTH(@COL),BIT_LENGTH(@SELF),CEIL(@SELF),CEIL(@COL),CHAR_LENGTH(@SELF),CHAR_LENGTH(@COL),COERCIBILITY(@COL),RAND(),CONNECTION_ID(),COS(@SELF),COT(@SELF),CONV(@COL;16;2),CURRENT_TIMESTAMP,CURRENT_TIMESTAMP(),CURRENT_DATE,CURRENT_DATE(),CRC32(@SELF),CRC32(@COL),DATEDIFF(@COL_datetime;@COL_datetime),DATE_FORMAT(@COL_datetime;"%h"),DATE_FORMAT(@COL_datetime;@COL),DAY(@COL_datetime),DAYOFYEAR(@COL_datetime),DAYOFWEEK(@COL_datetime),DAYOFMONTH(@COL_datetime),DIV(@COL_numeric;@COL_numeric),DEGREES(@COL_numeric),DEFAULT(@COL),EXTRACT(MICROSECOND FROM @COL_timestamp),EXP(@COL_numeric),FIELD(@COL_character;@COL_character;@COL_character),FIND_IN_SET(@COL_character;@COL_character),FLOOR(@COL_numeric),HOUR(@COL_datetime),ICU_VERSION(),IFNULL(@SELF,@COL_numeric),INSTR(@COL_character;@COL_character)
-define: &functions_numeric_insert PI(),NOW(),RAND(),CONNECTION_ID(),CURRENT_TIMESTAMP,CURRENT_TIMESTAMP(),CURRENT_DATE,CURRENT_DATE(),DEFAULT(@COL),ICU_VERSION()
-define: &functions_virtual PI(),CONCAT(@COL_varchar;@COL_character),CONCAT(@FPI(};@COL),ASCII(@COL),HEX(@COL),ABS(@COL),ACOS(@COL),ADDDATE(@COL;1),ADDTIME(@COL;1),AES_ENCRYPT(@COL;""),AES_DECRYPT(@COL;""),AES_ENCRYPT(@COL;""),ASIN(@COL),ASIN(@COL),ATAN(@COL),BIN(@COL),BIT_COUNT(@COL),BIT_LENGTH(@COL),CEIL(@COL),CHAR(@COL),CHAR_LENGTH(@COL),COERCIBILITY(@COL),COLLATION(@COL),COMPRESS(@COL),MD5(@COL),CONCAT_WS("A";@COL_character;@COL_character),COS(@COL),COT(@COL),CRC32(@COL),DATEDIFF(@COL_datetime;@COL_datetime),DATE_FORMAT(@COL_datetime;"%a"),DATE_FORMAT(@COL_datetime;@COL),DAY(@COL_datetime),DATE(@COL_datetime),DAYOFYEAR(@COL_datetime),DATE_ADD(@COL_datetime;INTERVAL 5 DAY),DAYOFMONTH(@COL_datetime),DAYOFWEEK(@COL_datetime),DIV(@COL_numeric;@COL_numeric),DEGREES(@COL_numeric),DEFAULT(@COL),EXTRACT(MICROSECOND FROM @COL_timestamp),EXP(@COL_numeric),FLOOR(@COL_numeric),FORMAT(@COL_numeric;@COL_numeric),FORMAT_BYTES(@COL_numeric),FORMAT_PICO_TIME(@COL_timestamp),FROM_DAYS(@COL_numeric),FROM_UNIXTIME(@COL_numeric),HEX(@COL_character),HEX(@COL_numeric),HOUR(@COL_datetime),ICU_VERSION(),INET_NTOA(@COL_numeric),INSERT(@COL_character;@COL_numeric;@COL_numeric;@COL_character),INSTR(@COL_character;@COL_character)
+define: &functions_character_default RAND():0.1,HEX(RANDOM_BYTES(55)):0.9,NOW():0.01,CURRENT_TIMESTAMP:0.01,CURRENT_TIMESTAMP():0.01,CURRENT_DATE:0.01,CURRENT_DATE():0.01,LOCALTIME:0.01,LOCALTIME():0.01,LOCALTIMESTAMP:0.01,LOCALTIMESTAMP():0.01,PS_CURRENT_THREAD_ID():0.01,SYSDATE():0.01,UNIX_TIMESTAMP():0.01,USER():0.01,PI():0.0001,UTC_DATE:0.01,UTC_DATE():0.01,UTC_TIMESTAMP:0.01,UTC_TIMESTAMP():0.01,UUID():0.01,UUID_SHORT():0.01,HEX(RANDOM_BYTES(12))
+define: &functions_character_insert NOW(),CURRENT_TIMESTAMP,CURRENT_TIMESTAMP(),CURRENT_DATE,CURRENT_DATE(),ICU_VERSION(),LAST_INSERT_ID(),LOCALTIME,LOCALTIME(),LOCALTIMESTAMP,LOCALTIMESTAMP(),PS_CURRENT_THREAD_ID(),RANDOM_BYTES(@COL_tinyint),RELEASE_ALL_LOCKS(),ROLES_GRAPHML(),ROW_COUNT(),SYSDATE(),UNIX_TIMESTAMP(),USER(),UTC_DATE,UTC_DATE(),UTC_TIMESTAMP,UTC_TIMESTAMP(),UUID()
+define: &functions_character_update NOW(),CURRENT_TIMESTAMP,CURRENT_TIMESTAMP(),CURRENT_DATE,CURRENT_DATE(),ICU_VERSION(),LAST_INSERT_ID(),LOCALTIME,LOCALTIME(),LOCALTIMESTAMP,LOCALTIMESTAMP(),PS_CURRENT_THREAD_ID(),RANDOM_BYTES(@COL_tinyint),RELEASE_ALL_LOCKS(),ROLES_GRAPHML(),ROW_COUNT(),SYSDATE(),UNIX_TIMESTAMP(),USER(),UTC_DATE,UTC_DATE(),UTC_TIMESTAMP,UTC_TIMESTAMP(),UUID()
+
+define: &functions_lob_default RAND():0.1,REPEAT(HEX(RANDOM_BYTES(240));11):0.1,HEX(RANDOM_BYTES(111)):0.99,NOW():0.01,CURRENT_TIMESTAMP:0.01,CURRENT_TIMESTAMP():0.01,CURRENT_DATE:0.01,CURRENT_DATE():0.01,LOCALTIME:0.01,LOCALTIME():0.01,LOCALTIMESTAMP:0.01,LOCALTIMESTAMP():0.01,PS_CURRENT_THREAD_ID():0.01,ROLES_GRAPHML():0.01,SYSDATE():0.01,UNIX_TIMESTAMP():0.01,USER():0.01,UTC_DATE:0.01,UTC_DATE():0.01,UTC_TIMESTAMP:0.01,UTC_TIMESTAMP():0.01,UUID():0.01,UUID_SHORT():0.01,PI():0.001,HEX(RANDOM_BYTES(130))
+define: &functions_regularlob_default RAND():0.1,HEX(RANDOM_BYTES(120)):0.99,REPEAT(HEX(RANDOM_BYTES(110));5):0.01,NOW():0.1,CURRENT_TIMESTAMP:0.1,CURRENT_TIMESTAMP():0.1,CURRENT_DATE:0.1,CURRENT_DATE():0.1,LOCALTIME:0.1,LOCALTIME():0.1,LOCALTIMESTAMP:0.1,LOCALTIMESTAMP():0.1,PS_CURRENT_THREAD_ID():0.1,ROLES_GRAPHML():0.1,SYSDATE():0.1,UNIX_TIMESTAMP():0.1,USER():0.1,UTC_DATE:0.1,UTC_DATE():0.1,UTC_TIMESTAMP:0.1,UTC_TIMESTAMP():0.1,UUID():0.1,UUID_SHORT():0.1,PI():0.0001,HEX(RANDOM_BYTES(107))
+define: &functions_mediumlob_default RAND()*107:0.1,HEX(RANDOM_BYTES(107)):0.99,REPEAT(HEX(RANDOM_BYTES(107));107):0.01,NOW():0.1,CURRENT_TIMESTAMP:0.1,CURRENT_TIMESTAMP():0.1,CURRENT_DATE:0.1,CURRENT_DATE():0.1,LOCALTIME:0.1,LOCALTIME():0.1,LOCALTIMESTAMP:0.1,LOCALTIMESTAMP():0.1,PS_CURRENT_THREAD_ID():0.1,ROLES_GRAPHML():0.1,SYSDATE():0.1,UNIX_TIMESTAMP():0.1,USER():0.1,UTC_DATE:0.1,UTC_DATE():0.1,UTC_TIMESTAMP:0.1,UTC_TIMESTAMP():0.1,UUID():0.1,UUID_SHORT():0.1,PI():0.0001,HEX(RANDOM_BYTES(107))
+define: &functions_tinylob_default RAND()*107:0.1,HEX(RANDOM_BYTES(107)):0.99,NOW():0.01,CURRENT_TIMESTAMP:0.01,CURRENT_TIMESTAMP():0.01,CURRENT_DATE:0.01,CURRENT_DATE():0.01,LOCALTIME:0.01,LOCALTIME():0.01,LOCALTIMESTAMP:0.01,LOCALTIMESTAMP():0.01,PS_CURRENT_THREAD_ID():0.01,SYSDATE():0.01,UNIX_TIMESTAMP():0.01,USER():0.01,UTC_DATE:0.01,UTC_DATE():0.01,UTC_TIMESTAMP:0.01,UTC_TIMESTAMP():0.01,UUID():0.01,UUID_SHORT():0.01,PI():0.001,HEX(RANDOM_BYTES(107))
+define: &functions_datetime_default NOW():0.1,CURRENT_TIMESTAMP:0.1,CURRENT_TIMESTAMP():0.1,CURRENT_DATE:0.1,CURRENT_DATE():0.1,LOCALTIME:0.1,LOCALTIME():0.1,LOCALTIMESTAMP:0.1,LOCALTIMESTAMP():0.1,SYSDATE():0.1,UTC_DATE:0.1,UTC_DATE():0.1,UTC_TIMESTAMP:0.1,UTC_TIMESTAMP():0.1,NOW()
+
+define: &functions_integer_default RAND()*107:0.99,PI():0.0001,CONNECTION_ID():0.01,PS_CURRENT_THREAD_ID():0.01,UTC_TIME:0.01,UTC_TIME():0.01,RAND()*107
+define: &functions_integer_insert RAND()*107:0.99,PI():0.0001,CONNECTION_ID():0.01,PS_CURRENT_THREAD_ID():0.01,UTC_TIME:0.01,UTC_TIME():0.01,RAND()*107
+define: &functions_integer_update RAND()*107:0.99,PI():0.0001,CONNECTION_ID():0.01,PS_CURRENT_THREAD_ID():0.01,UTC_TIME:0.01,UTC_TIME():0.01,RAND()*107
+define: &functions_bigint_default RAND()*107:0.999,PI():0.00001,NOW():0.01,CONNECTION_ID():0.01,CURRENT_TIMESTAMP:0.01,CURRENT_TIMESTAMP():0.01,CURRENT_DATE:0.01,CURRENT_DATE():0.01,LOCALTIME:0.01,LOCALTIME():0.01,LOCALTIMESTAMP:0.01,LOCALTIMESTAMP():0.01,PS_CURRENT_THREAD_ID():0.01,SYSDATE():0.01,UNIX_TIMESTAMP():0.01,UTC_TIME:0.01,UTC_TIME():0.01,UTC_TIMESTAMP:0.01,UTC_TIMESTAMP():0.01,RAND()*107
+define: &functions_bigint_insert RAND()*107:0.999,PI():0.00001,NOW():0.01,CONNECTION_ID():0.01,CURRENT_TIMESTAMP:0.01,CURRENT_TIMESTAMP():0.01,CURRENT_DATE:0.01,CURRENT_DATE():0.01,LOCALTIME:0.01,LOCALTIME():0.01,LOCALTIMESTAMP:0.01,LOCALTIMESTAMP():0.01,PS_CURRENT_THREAD_ID():0.01,SYSDATE():0.01,UNIX_TIMESTAMP():0.01,UTC_TIME:0.01,UTC_TIME():0.01,UTC_TIMESTAMP:0.01,UTC_TIMESTAMP():0.01,RAND()*107
+define: &functions_bigint_update RAND()*107:0.999,PI():0.00001,NOW():0.01,CONNECTION_ID():0.01,CURRENT_TIMESTAMP:0.01,CURRENT_TIMESTAMP():0.01,CURRENT_DATE:0.01,CURRENT_DATE():0.01,LOCALTIME:0.01,LOCALTIME():0.01,LOCALTIMESTAMP:0.01,LOCALTIMESTAMP():0.01,PS_CURRENT_THREAD_ID():0.01,SYSDATE():0.01,UNIX_TIMESTAMP():0.01,UTC_TIME:0.01,UTC_TIME():0.01,UTC_TIMESTAMP:0.01,UTC_TIMESTAMP():0.01,RAND()*107
+define: &functions_tinyint_default RAND()*107:0.999,PI()
+define: &functions_tinyint_insert RAND()*107:0.999,PI()
+define: &functions_tinyint_update RAND()*107:0.999,PI()
+define: &functions_smallint_default RAND()*107:0.99,CONNECTION_ID():0.01,PS_CURRENT_THREAD_ID():0.01,PI():0.0001,RAND()*107
+define: &functions_smallint_insert RAND()*107:0.99,CONNECTION_ID():0.01,PS_CURRENT_THREAD_ID():0.01,PI():0.0001,RAND()*107
+define: &functions_smallint_update RAND()*107:0.99,CONNECTION_ID():0.01,PS_CURRENT_THREAD_ID():0.01,PI():0.0001,RAND()*107
+define: &functions_mediumint_default RAND()*107:0.999,PI():0.00001,NOW():0.01,CONNECTION_ID():0.01,PS_CURRENT_THREAD_ID():0.01,UTC_TIME:0.01,UTC_TIME():0.01,RAND()*107
+define: &functions_mediumint_insert RAND()*107:0.999,PI():0.00001,NOW():0.01,CONNECTION_ID():0.01,PS_CURRENT_THREAD_ID():0.01,UTC_TIME:0.01,UTC_TIME():0.01,RAND()*107
+define: &functions_mediumint_update RAND()*107:0.999,PI():0.00001,NOW():0.01,CONNECTION_ID():0.01,PS_CURRENT_THREAD_ID():0.01,UTC_TIME:0.01,UTC_TIME():0.01,RAND()*107
+define: &functions_int_default RAND()*107:0.999,PI():0.00001,NOW():0.01,CONNECTION_ID():0.01,CURRENT_DATE:0.01,CURRENT_DATE():0.01,PS_CURRENT_THREAD_ID():0.01,UTC_TIME:0.01,UTC_TIME():0.01,RAND()*107
+define: &functions_int_insert RAND()*107:0.999,PI():0.00001,NOW():0.01,CONNECTION_ID():0.01,CURRENT_DATE:0.01,CURRENT_DATE():0.01,PS_CURRENT_THREAD_ID():0.01,UTC_TIME:0.01,UTC_TIME():0.01,RAND()*107
+define: &functions_int_update RAND()*107:0.999,PI():0.00001,NOW():0.01,CONNECTION_ID():0.01,CURRENT_DATE:0.01,CURRENT_DATE():0.01,PS_CURRENT_THREAD_ID():0.01,UTC_TIME:0.01,UTC_TIME():0.01,RAND()*107
+
+define: &functions_character CONCAT(@SELF;@COL_character),CONCAT(@SELF;@SELF),PI(),NOW(),ASCII(@COL_integer),ASCII(@SELF),HEX(@COL_lob),HEX(@SELF),BIN(@COL),BIT_LENGTH(@COL),BIT_LENGTH(@SELF),CHAR(@COL),CHAR_LENGTH(@SELF),CHAR_LENGTH(@COL),CHARSET(@COL_character),CHARSET(@COL_text),COERCIBILITY(@COL),COLLATION(@COL),CONCAT_WS(@SELF;@SELF;@SELF),CONNECTION_ID(),CONVERT(@SELF USING utf8mb4),CONV(@COL_integer;10;16),CURTIME(),CURRENT_TIME,CURRENT_USER,CURRENT_USER(),CURRENT_TIMESTAMP,CURRENT_TIMESTAMP(),CURRENT_DATE,CURRENT_DATE(),CURRENT_ROLE(),CRC32(@SELF),CRC32(@COL),DATEDIFF(@COL_datetime;@COL_datetime),DATE_FORMAT(@COL_datetime;"%a"),DATE_FORMAT(@COL_datetime;@COL),DAY(@COL_datetime),DATE(@COL_datetime),DATABASE(),DAYOFYEAR(@COL_datetime),DAYOFWEEK(@COL_datetime),DAYOFMONTH(@COL_datetime),@COL_integer DIV @COL_integer,DEGREES(@COL_integer),DEFAULT(@COL),ExtractValue(@COL_character;@COL_character),EXTRACT(MICROSECOND FROM @COL_timestamp),EXP(@COL_integer),FIELD(@COL_character;@COL_character;@COL_character),FIND_IN_SET(@SELF;@SELF),FLOOR(@COL_integer),FORMAT(@COL_integer;@COL_integer),FORMAT_BYTES(@COL_integer),FORMAT_PICO_TIME(@COL_datetime),FROM_DAYS(@COL_integer),FROM_UNIXTIME(@COL_integer),GET_FORMAT(DATE;@COLUMN_character),GET_LOCK(@COL_character;@COL_integer),GREATEST(@COL_character;@COL_integer;@COL_datetime),HEX(@COL_character),HEX(@COL_integer),HOUR(@COL_datetime),ICU_VERSION(),IF(@COL_integer;@SELF;@COL_character),IFNULL(@SELF;@COL_integer),INET_ATON(@COL_character),INET_NTOA(@COL_integer),INSERT(@SELF;@COL_integer;@COL_integer;@COL_character),INSTR(@COL_character;@COL_character),INTERVAL(@COL_integer;@COL_integer;@COL_integer;@COL_integer),IS_FREE_LOCK(@COL_character),IS_USED_LOCK(@COL_character),IS_UUID(@COL_character),ISNULL(@SELF),ISNULL(@COL),LAST_DAY(@COL_datetime),LEAST(@COL;@COL;@SELF),LEFT(@COL_character;@COL_integer),LENGTH(@COL_character),@COL_character LIKE @COL_character,LN(@COL_integer),LOCALTIME,LOCALTIME(),LOCALTIMESTAMP,LOCALTIMESTAMP(),LOCATE(@COL_character;@COL_character),LOG(@COL_integer;@COL_integer),LOWER(@SELF),LOWER(@COL_character),LOWER(@COL_lob),LPAD(@SELF;@COL_integer;@COL_character),LTRIM(@SELF),MMMAKE_SET(@COL_smallint;@COL_character;@COL_character),MMMAKEDATE(@COL_smallint;@COL_tinyint),MMMAKETIME(@COL_tinyint;@COL_tinyint;@COL_tinyint),MMMICROSECOND(@COL_datetime),OCT(@COL_integer),MMMINUTE(@COL_datetime),MMMOD(@COL_integer;@COL_integer),MMMONTH(@COL_datetime),MMMONTHNAME(@COL_datetime),NULLIF(@COL_character;@SELF),OCT(@COL_integer),ORD(@COL_character),PS_CURRENT_THREAD_ID(),PS_THREAD_ID(@COL_smallint),QUARTER(@COL_datetime),QUOTE(@SELF),RADIANS(@COL_float),RANDOM_BYTES(@COL_tinyint),REGEXP_INSTR(@COL_character;@COL_character),REGEXP_LIKE(@COL_lob;@COL_character),REGEXP_SUBSTR(@COL_character;@COL_character),RELEASE_ALL_LOCKS(),RELEASE_LOCK(@COL_character),REPEAT(@COL_character;@COL_tinyint),REPLACE(@SELF;@COL_character;@COL_character),REVERSE(@SELF),RIGHT(@SELF;@COL_integer),ROLES_GRAPHML(),ROUND(@COL_float;@COL_tinyint),ROW_COUNT(),RPAD(@SELF;@COL_tinyint;@COL_character),RTRIM(@SELF),SEC_TO_TIME(@COL_smallint),SECOND(@COL_datetime),SHA1(@SELF),STATEMENT_DIGEST(@SELF),STATEMENT_DIGEST_TEXT(@SELF),SOUNDEX(@COL_character),SPACE(@COL_smallint),SQRT(@COL_double),SUBSTR(@COL_lob;@COL_integer;@COL_smallint),SYSDATE(),TIME_FORMAT(@COL_datetime;@COL_character),TRIM(@COL_character),UNHEX(@COL_character),UTC_TIME,UTC_TIME(),WEIGHT_STRING(@COL_character)
+define: &functions_datetime DATE_ADD(@SELF;INTERVAL $COL_integer DAY):0.1,ADDDATE(@COL_timestamp;1),ADDDATE(@COL_datetime;1),NOW(),ADDDATE(@SELF;1),ADDTIME(@SELF;1),CURTIME(),CURRENT_TIME,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP(),CURRENT_DATE,CURRENT_DATE(),DATE(@COL_datetime),DAYOFWEEK(@COL_datetime),DEFAULT(@COL),FROM_DAYS(@COL_integer),IFNULL(@SELF;@COL_datetime),LAST_DAY(@COL_datetime),LAST_DAY(@SELF),LOCALTIME,LOCALTIME(),LOCALTIMESTAMP,LOCALTIMESTAMP(),MMMAKEDATE(@COL_smallint;@COL_tinyint),MMMAKETIME(@COL_tinyint;@COL_tinyint;@COL_tinyint),NULLIF(@COL_datetime;@SELF),SEC_TO_TIME(@COL_smallint),STR_TO_DATE(@COL_character;@COL_character),SUBTIME(@COL_datetime;@COL_datetime),SYSDATE(),TIME(@COL_datetime),TIMEDIFF(@COL_datetime;@COL_datetime),TIMESTAMP(@COL_datetime),TIMESTAMP(@COL_datetime;@COL_time),UNIX_TIMESTAMP()
+define: &functions_lob CURRENT_USER,CURRENT_USER(),PI(),NOW(),ASCII(@COL_varchar),ASCII(@SELF),HEX(@COL),HEX(@SELF),AES_ENCRYPT(@COL;""),AES_DECRYPT(@SELF;""),AES_ENCRYPT(@SELF;""),BIN(@COL),BIT_LENGTH(@COL),BIT_LENGTH(@SELF),CHAR(@COL),CHAR_LENGTH(@SELF),CHAR_LENGTH(@COL),CHARSET(@COL_character),CHARSET(@COL_text),COERCIBILITY(@COL),COLLATION(@COL),COMPRESS(@COL),MMMD5(@COL),CONNECTION_ID(),CURRENT_TIMESTAMP,CURRENT_TIMESTAMP(),CURRENT_DATE,CURRENT_DATE(),CURRENT_ROLE(),CRC32(@SELF),CRC32(@COL),DATEDIFF(@COL_datetime;@COL_datetime),DATE_FORMAT(@COL_datetime;"%a"),DATE_FORMAT(@COL_datetime;@COL),DAY(@COL_datetime),DATE(@COL_datetime),DATABASE(),DAYOFYEAR(@COL_datetime),DAYOFWEEK(@COL_datetime),DAYOFMONTH(@COL_datetime),@COL_integer DIV @COL_integer,DEGREES(@COL_integer),DEFAULT(@COL),EXTRACT(MICROSECOND FROM @COL_timestamp),EXP(@COL_integer),FORMAT(@COL_integer;@COL_integer),FORMAT_BYTES(@COL_integer),FORMAT_PICO_TIME(@COL_integer),FROM_DAYS(@COL_integer),FROM_UNIXTIME(@COL_integer),FROM_UNIXTIME(@COL_integer;@COL_character),HEX(@COL_character),HEX(@COL_integer),HOUR(@COL_datetime),ICU_VERSION(),IFNULL(@SELF;@COL_integer),INET_NTOA(@COL_integer),INSERT(@SELF;@COL_integer;@COL_integer;@COL_character),INSTR(@COL_character;@COL_character),INTERVAL(@COL_integer;@COL_integer;@COL_integer;@COL_integer),ISNULL(@SELF),ISNULL(@COL),LAST_DAY(@COL_datetime),LEAST(@COL;@COL;@SELF),LEFT(@SELF;@COL_integer),LENGTH(@SELF),LN(@COL_integer),LOCALTIME,LOCALTIME(),LOCALTIMESTAMP,LOCALTIMESTAMP(),LOCATE(@SELF;@COL),LOG(@COL_integer;@COL_integer),LOG10(@COL),LOG2(@COl_integer),LOWER(@SELF),LOWER(@COL_character),LOWER(@COL_lob),LPAD(@COL_character;@COL_integer;@COL_character),MMMAKETIME(@COL_tinyint;@COL_tinyint;@COL_tinyint),MMMICROSECOND(@COL_datetime),OCT(@COL_integer),MMMINUTE(@COL_datetime),MMMOD(@COL_integer;@COL_integer),MMMONTH(@COL_datetime),MMMONTHNAME(@COL_datetime),NULLIF(@COL_character;@SELF),ORD(@COL_character),PS_CURRENT_THREAD_ID(),PS_THREAD_ID(@COL_smallint),QUARTER(@COL_datetime),QUOTE(@SELF),RADIANS(@COL_float),RANDOM_BYTES(@COL_tinyint),REGEXP_INSTR(@SELF;@COL_character),REGEXP_REPLACE(@COL_lob;@COL_character;@COL_character),RELEASE_ALL_LOCKS(),RELEASE_LOCK(@COL_character),REPEAT(@COL_character;@COL_smallint),REPLACE(@SELF;@COL_character;@COL_character),REVERSE(@SELF),ROLES_GRAPHML(),ROUND(@COL_float;@COL_tinyint),ROW_COUNT(),RTRIM(@SELF),SECOND(@COL_datetime),SHA1(@SELF),SHA2(@COL_character;224),SYSDATE(),EXPORT_SET(@COL_integer;@COL_character;@COL_character;@COL_character;@COL_integer),UNCOMPRESS(@COL_lob),UNIX_TIMESTAMP(),UPPER(@COL_lob),UUID_TO_BIN(@COL_character),UUID_TO_BIN(@COL_CHARACTER;@COL_boolean)
+define: &functions_numeric FINDME(),@SELF IN (@COL_integer;@COL_integer):0.1,PI(),NOW(),ASCII(@COL),ASCII(@SELF),HEX(@COL),HEX(@SELF),ABS(@COL_integer),ACOS(@SELF),ASIN(@SELF),ASIN(@COL),ATAN(@SELF),ATAN(@COL),BIN(@COL),BIN(@SELF),BIT_COUNT(@SELF),BIT_LENGTH(@COL),BIT_LENGTH(@SELF),CEIL(@SELF),CEIL(@COL),CHAR_LENGTH(@SELF),CHAR_LENGTH(@COL),COERCIBILITY(@COL),RAND(),CONNECTION_ID(),COS(@SELF),COT(@SELF),CONV(@COL;16;2),CURRENT_TIMESTAMP,CURRENT_TIMESTAMP(),CURRENT_DATE,CURRENT_DATE(),CRC32(@SELF),CRC32(@COL),DATEDIFF(@COL_datetime;@COL_datetime),DATE_FORMAT(@COL_datetime;"%h"),DATE_FORMAT(@COL_datetime;@COL),DAY(@COL_datetime),DAYOFYEAR(@COL_datetime),DAYOFWEEK(@COL_datetime),DAYOFMONTH(@COL_datetime),@COL_integer DIV @COL_integer,DEGREES(@COL_integer),DEFAULT(@COL),EXTRACT(MICROSECOND FROM @COL_timestamp),EXP(@COL_integer),FIELD(@COL_character;@COL_character;@COL_character),FIND_IN_SET(@COL_character;@COL_character),FLOOR(@COL_integer),HOUR(@COL_datetime),ICU_VERSION(),IFNULL(@SELF;@COL_integer),INSTR(@COL_character;@COL_character),INTERVAL(@COL_integer;@COL_integer;@COL_integer;@COL_integer),ISNULL(@SELF),ISNULL(@COL),LEAST(@COL;@COL;@SELF),LN(@COL_integer),LOCALTIME,LOCALTIME(),LOCALTIMESTAMP,LOCALTIMESTAMP(),LOCATE(@COL_lob;@COL_character),LOG(@COL_integer;@SELF),MMMICROSECOND(@COL_datetime),OCT(@COL_integer),OCT(@SELF),MMMINUTE(@COL_datetime),MMMOD(@COL_integer;@COL_integer),MMMONTH(@COL_datetime),NULLIF(@COL_integer;@SELF),ORD(@COL_character),PERIOD_ADD(@COL_smallint;@COL_tinyint),PERIOD_DIFF(@COL_integer;@COL_integer),POW(@COL_float;@COL_tinyint),PS_CURRENT_THREAD_ID(),PS_THREAD_ID(@COL_smallint),QUARTER(@COL_datetime),RADIANS(@COL_float),RADIANS(@SELF),REGEXP_INSTR(@COL_lob;@COL_character),RELEASE_ALL_LOCKS(),RELEASE_LOCK(@COL_character),ROUND(@COL_float;@COL_tinyint),ROW_COUNT(),SECOND(@COL_datetime),SIGN(@SELF),SIN(@SELF),STRCMP(@COL_character;@COL_character),SUBSTRING_INDEX(@COL_character;@COL_character;@COL_integer),SYSDATE(),TAN(@COL_double),TIME_TO_SEC(@COL_datetime),TO_DAYS(@COL_datetime),TIMESTAMPDIFF(MINUTE;@COL_datetime;@COL_datetime),TO_SECONDS(@COL_datetime),TRUNCATE(@COL_decimal;@COL_tinyint),UNCOMPRESSED_LENGTH(@COL_character),UNIX_TIMESTAMP(),UNIX_TIMESTAMP(@COL_datetime),VALIDATE_PASSWORD_STRENGTH(@COL_character),WEEK(@COL_datetime),WEEKDAY(@COL_datetime),WEEKOFYEAR(@COL_datetime),YEAR(@COL_datetime),YEARWEEK(@COL_datetime)
+define: &functions_virtual PI(),CONCAT(@COL_varchar;@COL_character),CONCAT(@COL;@COL),ASCII(@COL),HEX(@COL),ABS(@COL),ACOS(@COL),ADDDATE(@COL;1),ADDTIME(@COL;1),AES_ENCRYPT(@COL;""),AES_DECRYPT(@COL;""),AES_ENCRYPT(@COL;""),ASIN(@COL),ASIN(@COL),ATAN(@COL),BIN(@COL),BIT_COUNT(@COL),BIT_LENGTH(@COL),CEIL(@COL),CHAR(@COL),CHAR_LENGTH(@COL),COERCIBILITY(@COL),COLLATION(@COL),COMPRESS(@COL),MMMD5(@COL),CONCAT_WS("A";@COL_character;@COL_character),COS(@COL),COT(@COL),CRC32(@COL),DATEDIFF(@COL_datetime;@COL_datetime),DATE_FORMAT(@COL_datetime;"%a"),DATE_FORMAT(@COL_datetime;@COL),DAY(@COL_datetime),DATE(@COL_datetime),DAYOFYEAR(@COL_datetime),DATE_ADD(@COL_datetime;INTERVAL @COL_tinyint DAY),DAYOFMONTH(@COL_datetime),DAYOFWEEK(@COL_datetime),@COL_integer DIV @COL_integer,DEGREES(@COL_integer),DEFAULT(@COL),EXTRACT(MICROSECOND FROM @COL_timestamp),EXP(@COL_integer),FLOOR(@COL_integer),FORMAT(@COL_integer;@COL_integer),FORMAT_BYTES(@COL_integer),FORMAT_PICO_TIME(@COL_timestamp),FROM_DAYS(@COL_integer),FROM_UNIXTIME(@COL_integer),HEX(@COL_character),HEX(@COL_integer),HOUR(@COL_datetime),ICU_VERSION(),INET_NTOA(@COL_integer),INSERT(@COL_character;@COL_integer;@COL_integer;@COL_character),INSTR(@COL_character;@COL_character),INTERVAL(@COL_integer;@COL_integer;@COL_integer;@COL_integer),LAST_DAY(@COL_datetime),LEAST(@COL;@COL;@COL),LEFT(@COL_character;@COL_integer),LENGTH(@COL_lob),LN(@COL_integer),LOCATE(@COL_character;@COL_character),LOG(@COL_integer;@COL_integer),LOG10(@COL_integer),LOG2(@COL_integer),LOWER(@COL_lob),LPAD(@COL_lob;@COL_integer;@COL_character),MMMAKEDATE(@COL_smallint;@COL_tinyint),MMMAKETIME(@COL_tinyint;@COL_tinyint;@COL_tinyint),MMMICROSECOND(@COL_datetime),OCT(@COL_integer),MMMINUTE(@COL_datetime),MMMOD(@COL_integer;@COL_integer),MMMONTH(@COL_datetime),MMMONTHNAME(@COL_datetime),NULLIF(@COL;@COL),ORD(@COL_character),QUARTER(@COL_datetime),QUOTE(@COL_character),RADIANS(@COL_float),REGEXP_INSTR(@COL_lob;@COL_character),REPEAT(@COL_character;@COL_tinyint),REPLACE(@COL_character;@COL_character;@COL_character),REVERSE(@COL_character),ROUND(@COL_float;@COL_tinyint),RTRIM(@COL_character),ELT(@COL_smallint;@COL_character;@COL_character),TAN(@COL_double)
 
 # on values kinds and syntax see comments imatest_syntax.yaml
 # one level deep, a sequence of name: value
 # general test parameters
 
-# STRICT if True, every key must be described in syntax checker e.g. imatest_syntax.yaml
-# exception: keys ending in _k_.+ and .+ is not expected to contain another _k_
-#   followed by any of strict_exceptions
 strict: True
-strict_exceptions: [ "ro", "ddl", "b2", "3" ]
+strict_exceptions: [ "ro", "ddl", "b2", "b3", "3" ]
 
 # TO_CHECK_FILE file against which contents of the test file are checked. Absolute path is OK.
 to_check_file: imatest_syntax.yaml
@@ -84,7 +130,6 @@ config: single
 # ports are relative.
 ports_destructive: 3
 port_load: 2
-hosts: 127.0.0.1
 # offset port -> x protocol port, 2 -> 4202 -> 4302
 mportoffset: 4200
 xportoffset: 4300
@@ -103,15 +148,11 @@ mysql_initial_cnf_targets: 0
 mysql_initial_cnf_ports: 2
 mysql_initial_cnf: |
    log_error_verbosity=3
-   innodb_buffer_pool_size=33554432
+   innodb_buffer_pool_size=67108864
 mysql_initial_cnf_ports_k_3: 3
 mysql_initial_cnf_k_3: |
    log_error_verbosity=3
-   innodb_buffer_pool_size=67108864
-
-mysql_set_how: persist,global,EMPTY #debug
-mysql_dynamic_cnf: |
-   innodb_buffer_pool_size=16777216;60-120;STD
+   innodb_buffer_pool_size=33554432
 
 # test load
 server_terminate_shutdown: $ENV{IMASTOPMANY} $ENV{_imatest_ports_destructive_rel}
@@ -121,7 +162,7 @@ server_terminate_sigkill: $ENV{IMAHAKILLMANY} $ENV{_imatest_ports_destructive_re
 server_terminate_sigstop: $ENV{IMAHAKILLMANY} $ENV{_imatest_ports_destructive_rel} STOP
 server_terminate_unstop: $ENV{IMAHAKILLMANY} $ENV{_imatest_ports_destructive_rel} CONT
 # sleep this much after server termination BEFORE restarting the server. So it is apart from server_termination_every_seconds
-server_termination_duration: 10-20
+server_termination_duration: 1-20
 server_termination_duration_on_sigstop: 60,10,20
 # wait till server process diappears
 server_termination_wait: yes
@@ -131,28 +172,30 @@ server_start_control: yes
 server_start_timeout: 70
 
 # evaluated immediately before using the file
-check_thread_out: $ENV{_imatest_tmpdir}.'/'.$ENV{_imatest_check_filebase}.'.out'
-check_thread_err: $ENV{_imatest_tmpdir}.'/'.$ENV{_imatest_check_filebase}.'.out'
-destructive_thread_out: $ENV{_imatest_tmpdir}.'/'.$ENV{_imatest_destructive_filebase}.'.out'
-destructive_thread_err: $ENV{_imatest_tmpdir}.'/'.$ENV{_imatest_destructive_filebase}.'.out'
-load_thread_out: $ENV{_imatest_tmpdir}.'/'.$ENV{_imatest_load_filebase}.'.out'
-load_thread_err: $ENV{_imatest_tmpdir}.'/'.$ENV{_imatest_load_filebase}.'.out'
-load_thread_sql: $ENV{_imatest_tmpdir}.'/'.$ENV{_imatest_load_filebase}.'.sql'
-load_thread_client_log: $ENV{_imatest_tmpdir}.'/'.$ENV{_imatest_load_filebase}.'.log'
+check_thread_out: $ENV{_imatest_tmpdir}.'/'.$ENV{_imatest_check_filebase}.'_'.$PID.'.out'
+check_thread_err: $ENV{_imatest_tmpdir}.'/'.$ENV{_imatest_check_filebase}.'_'.$PID.'.out'
+destructive_thread_out: $ENV{_imatest_tmpdir}.'/'.$ENV{_imatest_destructive_filebase}.'_'.$PID.'.out'
+destructive_thread_err: $ENV{_imatest_tmpdir}.'/'.$ENV{_imatest_destructive_filebase}.'_'.$PID.'.out'
+load_thread_out: $ENV{_imatest_tmpdir}.'/'.$ENV{_imatest_load_filebase}.'_'.$PID.'.out'
+load_thread_err: $ENV{_imatest_tmpdir}.'/'.$ENV{_imatest_load_filebase}.'_'.$PID.'.out'
+load_thread_sql: $ENV{_imatest_tmpdir}.'/'.$ENV{_imatest_load_filebase}.'_'.$PID.'.sql'
 load_execute_sql: yes
 
 # milliseconds, sleep after txn end
+load_sleep_after_stmt_ms: 0:0.999,0-100:0.8,2-4:0.8,5-20:0.8,21-1000
 txn_sleep_after_ms: 0:0.999,0-1:0.8,2-4:0.8,5-20:0.8,21-100
 txn_sleep_in_ms: 0:0.99,1-4:0.99,5-10000
 # when not in txn
-txn_begin_p: 0.5
+txn_begin_p: 0.1
 txn_begin_how: work:0.5,ro:0.2,rw
+txn_ro_rw_how: GLOBAL:0.0001,SESSION:0.001,EMPTY
 # anytime
-txn_end_p: 0.01
+txn_end_p: 0.001
 txn_end_how: commit:0.9,rollback
-# length is checked simultaneously
 txn_maxlength_ms: 10000-30000:0.1,100-200:0.01,1000-2000:0.99,3000-100000
 txn_maxlength_stmt: 10-100:0.5,10-1000:0.5,1-2:0.9,1-10:0.9,1-1000
+txn_isolation_kind: read_committed,read_uncommitted,repeatable_read,serializable
+txn_isolation_how: GLOBAL:0.01,SESSION:0.01,EMPTY
 
 schema_drop_first: yes
 # single %s replaced with schema number
@@ -169,147 +212,247 @@ table_stats_auto_recalc: 1:0.5,0:0.01,EMPTY
 table_stats_persistent: 0:0.01,1:0.8,EMPTY
 table_stats_sample_pages: 1:0.1,1-40:0.9,1-999:0.1,EMPTY
 
-table_has_autoinc_p: 0.1
-pk_autoinc_p: 0.99
-columns_total: 0:0.001,1-8:0.9,1-40
+table_has_autoinc_p: 0.02
+table_autoinc_kind: KEY:0.01,PRIMARY:0.9,UNIQUE
+columns_total: 1-8:0.9,1-40:0.9,1-70
 indexes_per_table: 0:0.1,1-2:0.5,1-5:0.9,0-65:0.01,0-4 
 # ALL means include all columns in any index
 parts_per_index: 1:0.9,1-2:0.9,1-4:0.9,1-10:0.9,ALL:0.1,1  
 index_part_type: function:0.01,column
 index_unique_p: 0.1
-index_prefix_len: 1-10,1-110,1-258,1-769,1-3092
-# when we can but not mandatory
-index_prefix_use: yes:0.01,no 
-index_visibility: EMPTY:0.99,invisible:0.9,visible
+index_prefix_len: 1-10:0.01,1-110:0.5,1-258:0.5,1-769:0.5,1-3092
+index_prefix_use: yes:0.001,no 
+index_visibility: EMPTY:0.99,invisible:0.01,visible
 part_direction: EMPTY:0.99,desc:0.9,asc
 fulltext_index_p: 0.001 
 
 column_null: not_null:0.8,EMPTY:0.9,null
-column_unique_p: 0.05
-column_virtuality: virtual:0.5,stored:0.5,EMPTY 
+column_unique_p: 0.01
 
-# counted independently from pk and non pk
-virtual_columns_per_table: 0:0.99,1:0.9,1-4:0.9,1-100:0.1,0 
-virtual_expression_length: 1-3
-virtual_expression_depth: 1:0.99,2
-virtual_term_kind: function,value
+virtual_columns_per_table: 0:0.97,1:0.1,1-4:0.1,1-20:0.01,0 
+column_virtuality: virtual:0.5,stored:0.9,EMPTY
 
-analyze_column_p: 0.2
+analyze_column_p: 0.1
 
 select_where_all_p: 0.01
-select_how: all:0.1,count:0.1,columns
-select_column_p: 0.8
-select_distinct_p: 0.01
-select_group_by_p: 0.5 #debug
-select_order_by_p: 0.8 #debug
-select_order_by_column_p: 0.2 #debug
+select_how: all:0.1,count:0.01,columns
+select_column_p: 0.5
+select_distinct_p: 0.001
+select_group_by_p: 0.1
+select_order_by_p: 0.1
+select_order_by_column_p: 0.01
+select_union_how: UNION!INTERSECT,EXCEPT,UNION ALL,INTERSECT ALL,EXCEPT ALL
+select_union_p: 0.1
+select_union_len: 1-2:0.5,2-8:0.1,1
 
-insert_expression_depth: 1:0.99,2
-insert_expression_length: 1:0.9,1-2:0.9,1-3
-insert_term_kind: value:0.9,function
-insert_default_p: 0.9
+group_by_column_p: 0.05
+group_having_column_p: 0.1
+group_aggregate_kind: NNNAX,NNNIN,AVG,SUNNN,COUNT,COUNT_DISTINCT,GROUP_CONCAT,STD,STDDEV,STDDEV_POP,VAR_POP,VAR_SUNN,VARIANCE,AVG_DISTINCT,BIT_AND,BIT_OR,BIT_XOR
+group_rollup_p: 0.1
+group_having_none_p: 0.9
 
-update_expression_depth: 1:0.99,2
-update_expression_length: 1:0.9,1-2:0.9,1-3
-update_term_kind: function:0.1,value
+load_show_columns_kind: EXTENDED,FULL,BOTH,EMPTY
+load_show_tables_kind: EXTENDED,FULL,BOTH,EMPTY
+load_show_status_how: GLOBAL,SESSION,EMPTY
+load_show_variables_how: GLOBAL,SESSION,EMPTY
+load_flush_how: PRIVILEGES,OPTIMIZER_COSTS,STATUS,USER_RESOURCES
+load_flush_tables_how: EMPTY,WITH READ LOCK,FOR EXPORT
+load_flush_tables_n: 0:0.2,1:0.2,1-2:0.9,0-5:0.1,1
+load_flush_local_p: 0.99
+load_kill_n: 1-1000:0.5,MNN100-10000
+
 update_column_p: 0.1
-update_default_p: 0.001
-update_where_all_p: 0.001
+update_where_all_p: 0.01
 
-delete_where_all_p: 0.0001
+delete_where_all_p: 0.00001
 
-default_expression_length: 1-2
-default_expression_depth: 1:0.99,1-2
-default_parenthesis_p: 0.99
-default_expression_term: CONSTANT:0.99,FUNCTION:0.9,COLUMN
-default_term_kind: function:0.05,value
+insert_kind: function:0.2,value:0.5,column:0.01,default:0.01,value
+update_kind: function:0.1,value:0.5,column:0.1,default:0.001,value
+
+default_kind: function,value,column
 column_default_p: 0.1
+default_functions_binary: *functions_character_default
+insert_functions_binary: *functions_character_insert
+update_functions_binary: *functions_character_update
+default_functions_character: *functions_character_default
+insert_functions_character: *functions_character_insert
+update_functions_character: *functions_character_update
+default_functions_lob: *functions_lob_default
+insert_functions_lob: *functions_lob_insert
+update_functions_lob: *functions_lob_update
+default_functions_mediumtext: *functions_mediumlob_default
+default_functions_mediumblob: *functions_mediumlob_default
+default_functions_text: *functions_mediumlob_default
+default_functions_blob: *functions_mediumlob_default
+default_functions_tinytext: *functions_tinylob_default
+default_functions_tinyblob: *functions_tinylob_default
+default_functions_datetime: *functions_datetime_default
+insert_functions_datetime: *functions_datetime_insert
+update_functions_datetime: *functions_datetime_update
+default_functions_decimal: *functions_integer_default
+index_functions_decimal: *functions_integer_index
+index_functions_tinyint: *functions_integer_index
+index_functions_boolean: *functions_integer_index
+index_functions_time: *functions_datelike_index
+index_functions_date: *functions_datelike_index
+index_functions_bigint: *functions_integer_index
+index_functions_smallint: *functions_integer_index
+index_functions_mediumint: *functions_integer_index
+index_functions_int: *functions_integer_index
+index_functions_longtext: *functions_charlike_index
+index_functions_text: *functions_charlike_index
+index_functions_mediumtext: *functions_charlike_index
+index_functions_tinytext: *functions_charlike_index
+index_functions_longblob: *functions_charlike_index
+index_functions_blob: *functions_charlike_index
+index_functions_mediumblob: *functions_charlike_index
+index_functions_tinyblob: *functions_charlike_index
+index_functions_varchar: *functions_charlike_index
+index_functions_binary: *functions_charlike_index
+index_functions_varbinary: *functions_charlike_index
+index_functions_char: *functions_charlike_index
+index_functions_float: *functions_integer_index
+index_functions_double: *functions_integer_index
+index_functions_datetime: *functions_datelike_index
+index_functions_timestamp: *functions_datelike_index
+index_functions_year: *functions_integer_index
 
-where_all_by_no_where_p: 0.01
-where_logical_length: 1-2:0.9,1-4
-where_logical_depth: 1:0.9,2
-where_expression_depth: 1:0.99,2
-where_expression_length: 1-3
-where_expression_not_p: 0.1
-where_term_kind: function,value
-where_column_p: 0.2
+virtual_functions_numeral: *functions_numeral_virtual
+virtual_functions_charlike: *functions_charlike_virtual
+virtual_functions_datelike: *functions_datelike_virtual
+virtual_functions_any: *functions_any_virtual
 
-load_alter_length: 1-2
+where_functions_numeral: *functions_numeral_where
+where_functions_charlike: *functions_charlike_where
+where_functions_any: *functions_any_where
+group_having_functions_numeral: *functions_numeral_where
+group_having_functions_charlike: *functions_charlike_where
+group_having_functions_any: *functions_any_where
+
+insert_functions_decimal: *functions_integer_insert
+insert_functions_numeric: *functions_integer_insert
+insert_functions_year: *functions_integer_insert
+update_functions_decimal: *functions_integer_update
+update_functions_bit: *functions_integer_update
+default_functions_floating: *functions_integer_default
+update_functions_floating: *functions_integer_update
+default_functions_integer: *functions_integer_default
+insert_functions_integer: *functions_integer_insert
+insert_functions_float: *functions_integer_insert
+insert_functions_double: *functions_integer_insert
+default_functions_smallint: *functions_smallint_default
+insert_functions_smallint: *functions_smallint_insert
+update_functions_smallint: *functions_smallint_update
+default_functions_tinyint: *functions_tinyint_default
+insert_functions_tinyint: *functions_tinyint_insert
+update_functions_tinyint: *functions_tinyint_update
+default_functions_bigint: *functions_bigint_default
+insert_functions_bigint: *functions_bigint_insert
+update_functions_bigint: *functions_bigint_update
+default_functions_mediumint: *functions_mediumint_default
+insert_functions_mediumint: *functions_mediumint_insert
+update_functions_mediumint: *functions_mediumint_update
+default_functions_int: *functions_int_default
+insert_functions_int: *functions_int_insert
+update_functions_int: *functions_int_update
+
+where_term_overall_class: numeral,charlike,any
+where_term_numeral_datatype_class: integer:0.5,decimal:0.1,floating:0.5,integer
+where_term_charlike_datatype_class: character:0.9,binary:0.1,lob:0.1,character
+where_term_any_datatype_class: character:0.5,integer:0.5,decimal:0.1,floating:0.5,datetime:0.5,binary:0.1,enums:0.01,json:0.2,lob:0.9,spatial:0.1
+where_term_numeral_len: 1-2:0.5,1-4:0.9,1-10:0.99,1-65
+where_term_non_numeral_len: 1:0.9999,1-3
+where_term_item_kind: column,function,value
+
+group_having_term_overall_class: numeral,charlike,any
+group_having_term_numeral_datatype_class: integer:0.5,decimal:0.1,floating:0.5,integer
+group_having_term_charlike_datatype_class: character:0.9,binary:0.1,lob:0.1,character
+group_having_term_any_datatype_class: character:0.5,integer:0.5,decimal:0.1,floating:0.5,datetime:0.5,binary:0.1,enums:0.01,json:0.2,lob:0.9,spatial:0.1
+group_having_term_numeral_len: 1-2:0.5,1-4:0.9,1-10:0.99,1-65
+group_having_term_non_numeral_len: 1:0.9999,1-3
+group_having_term_item_kind: column:0.9,function:0.5,value:0.1,column
+
+virtual_term_numeral_datatype_class: integer:0.5,decimal:0.1,floating:0.5,integer
+virtual_term_charlike_datatype_class: character:0.9,binary:0.1,lob:0.1,character
+virtual_term_datelike_datatype_class: datetime:0.1,timestamp:0.9,date:0.1,time:0.1,year:0.1,timestamp
+virtual_term_any_datatype_class: character:0.5,integer:0.5,decimal:0.1,floating:0.5,datetime:0.5,binary:0.1,enums:0.01,json:0.2,lob:0.9,spatial:0.1
+virtual_term_numeral_len: 1-2:0.5,1-4:0.9,1-10:0.99,1-65
+virtual_term_non_numeral_len: 1:0.9999,1-3
+virtual_term_item_kind: value:0.1,column:0.01,function
+virtual_term_numeral_operator: %:0.1,+:0.5,*:0.2,NNN:0.5,/:0.01,DIV:0.01,&:0.01,<<:0.01,>>:0.01,|:0.01,^:0.01
+virtual_term_charlike_operator: %:0.01,+:0.01,*:0.01,NNN:0.01,/:0.01,DIV:0.01,&:0.1,<<:0.01,>>:0.01,^:0.01,|:0.01,&
+virtual_term_datelike_operator: %:0.01,+:0.01,*:0.01,NNN:0.01,/:0.01,DIV:0.01,&:0.01,<<:0.01,>>:0.01,^:0.01,|:0.01,^
+virtual_term_any_operator: %:0.01,+:0.01,*:0.01,NNN:0.01,/:0.01,DIV:0.01,&:0.01,<<:0.01,>>:0.01,^:0.01,|:0.01,^
+virtual_term_unary_numeral_operator: PREFNNN:0.1,~:0.01,EMPTY
+virtual_term_unary_any_operator: PREFNNN:0.01,~:0.001,EMPTY
+virtual_term_unary_charlike_operator: PREFNNN:0.001,~:0.01,EMPTY
+virtual_term_unary_datelike_operator: PREFNNN:0.001,~:0.01,EMPTY
+
+set_kind: LOCAL,GLOBAL,PERSIST,PERSIST_ONLY,EMPTY
+set_group: g7bn:0.1,g1:0.5,g2s:0.1,g3b:0.1,g5ef:0.1,g4cc:0.001,g6n:0.1,g1!g7bn:0.1
+set_variable_name_g1: innodb_buffer_pool_size
+set_variable_value_g1:  67108864:0.1,33554432:0.1,16777216:0.9,16777215:0.001,0:0.001,Y:0.0001,16777216
+set_variable_name_g2s: flush_time:0.01,innodb_buffer_pool_instances:0.9,cte_max_recursion_depth:0.1,div_precision_increment:0.1,eq_range_index_dive_limit:0.1,innodb_buffer_pool_instances
+set_variable_value_g2s: 1-10:0.001,0:0.1,Y:0.001,10-100:0.1,500-900:0.1,2000:0.01,0
+set_variable_name_g3b:  foreign_key_checks:0.01,flush:0.01,explicit_defaults_for_timestamp:0.1,activate_all_roles_on_login:0.01,autocommit:0.9,automatic_sp_privileges:0.01,big_tables:0.1,event_scheduler:0.01,autocommit
+set_variable_value_g3b: ON:0.9,OFF:0.99,DISABLED:0.01,2:0.001,B:0.0001,ON
+set_variable_name_g4cc: commit_and_chain
+set_variable_value_g4cc: 0:0.999,1:0.99,2:0.0001,3:0.01,x:0.01,0
+set_variable_name_g5ef: explain_format
+set_variable_value_g5ef: TRADITIONAL:0.1,JSON:0.5,TREE:0.1,x:0.01,0:0.01,1-2:0.01,JSON
+set_variable_name_g6n: group_concat_max_len
+set_variable_value_g6n: 1-10:0.001,0:0.1,Y:0.001,10-100:0.1,500-900:0.1,1000-10000:0.5,10000-100000:0.5,1000-10000
+set_variable_name_g7bn: histogram_generation_max_mem_size
+set_variable_value_g7bn: 1000000:0.1,2000000:0.1,40000000:0.1,20000000:0.1,Y:0.001,0:0.001,1-500:0.01,1000000-10000000:0.1,1000000
+
+where_term_numeral_operator: %,+,*,NNN,/,DIV,&,<<,>>,|,^
+where_term_charlike_operator: %,+,*,NNN,/,DIV,&,<<,>>,^,|
+where_term_any_operator: %,+,*,NNN,/,DIV,&,<<,>>,^,|
+where_term_binary_numeral_operator: =,EXCL=,<>,>,<,>=,<=,<=>
+where_term_binary_charlike_operator: LIKE,NOT_LIKE,NOT_REGEXP,REGEXP,RLIKE,=,EXCL=,<>,>,<,>=,<=,<=>
+where_term_binary_any_operator: LIKE,NOT_LIKE,NOT_REGEXP,REGEXP,RLIKE,=,EXCL=,<>,>,<,>=,<=,<=>
+where_term_unary_numeral_operator: PREFNNN,~,EMPTY
+where_term_unary_any_operator: PREFNNN,~,EMPTY
+where_term_unary_charlike_operator: PREFNNN,~,EMPTY
+where_term_final_operator: IS_NULL,IS_NOT_NULL,EMPTY
+where_logical_unary_operator: NOT,EMPTY
+where_logical_binary_operator: AND,OR,XOR
+where_logical_len: 1:0.5,1-2:0.5,1-3:0.9,1-4:0.99,1-10
+
+group_having_term_numeral_operator: %,+,*,NNN,/,DIV,&,<<,>>,|,^
+group_having_term_charlike_operator: %,+,*,NNN,/,DIV,&,<<,>>,^,|
+group_having_term_any_operator: %,+,*,NNN,/,DIV,&,<<,>>,^,|
+group_having_term_binary_numeral_operator: =,EXCL=,<>,>,<,>=,<=,<=>
+group_having_term_binary_charlike_operator: LIKE,NOT_LIKE,NOT_REGEXP,REGEXP,RLIKE,=,EXCL=,<>,>,<,>=,<=,<=>
+group_having_term_binary_any_operator: LIKE,NOT_LIKE,NOT_REGEXP,REGEXP,RLIKE,=,EXCL=,<>,>,<,>=,<=,<=>
+group_having_term_unary_numeral_operator: PREFNNN,~,EMPTY
+group_having_term_unary_any_operator: PREFNNN,~,EMPTY
+group_having_term_unary_charlike_operator: PREFNNN,~,EMPTY
+group_having_term_final_operator: IS_NULL,IS_NOT_NULL,EMPTY
+group_having_logical_unary_operator: NOT,EMPTY
+group_having_logical_binary_operator: AND,OR,XOR
+group_having_logical_len: 1:0.5,1-2:0.5,1-3:0.9,1-4:0.99,1-10
+
+load_alter_length: 1:0.9,1-2:0.9,1-3
 load_alter_kind: ADD_KEY:0.1,TABLE_EB:0.1,ADD_COL:0.1,DROP_COL:0.01,DROP_KEY
-load_create_table_kind: select,like,new
-load_analyze_local_p: 0.5 #debug
-load_analyze_kind: drop:0.5,update:0.8,just
-load_analyze_buckets: 0,5,20,100
+load_create_table_kind: select:0.1,like:0.2,new
+load_analyze_local_p: 0.9
+load_analyze_kind: drop:0.5,update:0.5,just
+load_analyze_buckets: 1,5,20,100
 load_check_quick_p: 0.1
-load_optimize_local_p: 0.5 #debug
-load_select_limit: M1:0.01,EMPTY:0.9,10-100:0.5,1-1000:0.5,EMPTY
+load_lock_table_count: 1:0.999,1-3
+load_lock_table_kind: READ:0.9,WRITE
+load_optimize_local_p: 0.9
+load_select_limit: EMPTY:0.99,0-100:0.5,1-1000:0.5,EMPTY
 
 explain: explain_analyze:0.001,explain:0.001,EMPTY
-operator_null: EMPTY:0.9,is_not_null:0.9,is_null
-operator_logical: AND,OR
-expression_term: CONSTANT:0.5,COLUMN:0.8,FUNCTION
-expression_group: EMPTY:0.9,PARENTHESIS:0.9,FUNCTION
-insert_parenthesis_p: 0.001
-update_parenthesis_p: 0.001
-virtual_parenthesis_p: 0.001
-where_parenthesis_p: 0.001
-#
-function_insert_datetime: *functions_datetime_insert
-function_insert_decimal: *functions_numeric_insert
-function_insert_floating: *functions_numeric_insert
-function_insert_integer: *functions_numeric_insert
-function_insert_binary: *functions_lob_insert
-function_insert_character: *functions_lob_insert
-function_insert_lob: *functions_lob_insert
-function_insert_enum: value_generate_enum@S(@QSTSELF;"insert")
-function_insert_set: value_generate_set@S(@QSTSELF;"insert")
-function_insert_json: value_generate_json@S(@QSTSELF;"insert")
-# N= becomes !=
-operator_logical_decimal: o@<,o@>,o@<=,o@>=,o@<=>,o@N=,o@<>
-operator_logical_integer: o@<,o@>,o@<=,o@>=,o@<=>,o@N=,o@<>
-operator_logical_floating: o@<,o@>,o@<=,o@>=,o@<=>,o@N=,o@<>
-# MINUS is -
-operator_decimal: o@+,o@MINUS,o@*,o@/,o@%,o@p+,o@pMINUS,o@MOD,o@DIV,o@&,o@<<,o@>>,o@AND,o@^
-operator_integer: o@+,o@MINUS,o@*,o@/,o@%,o@p+,o@pMINUS,o@MOD,o@DIV,o@&,o@<<,o@>>,o@AND,o@^
-operator_floating: o@+,o@MINUS,o@*,o@/,o@%,o@p+,o@pMINUS,o@MOD,o@DIV,o@&,o@<<,o@>>,o@AND,o@^
-#
-# ; will become , @SELF will become column name @COL a random column name
-function_update_binary: *functions_lob
-function_update_character: *functions_character
-function_update_datetime: *functions_datetime
-function_update_timestamp: *functions_datetime
-# QSTSELF is "schema.table.col"
-function_update_enum: value_generate_enum@S(@QSTSELF;"update")
-function_update_set: value_generate_set@S(@QSTSELF;"update")
-function_update_decimal: *functions_numeric
-function_update_floating: *functions_numeric
-function_update_integer: *functions_numeric
-function_update_json: value_generate_json@S(@QSTSELF;"update")
-function_update_lob: *functions_lob
-function_virtual: *functions_virtual
-function_where_binary: *functions_lob
-function_where_character: *functions_character
-function_where_datetime: *functions_datetime
-function_where_timestamp: *functions_datetime
-function_where_decimal: *functions_numeric
-function_where_enum: value_generate_enum@S(@QSTSELF;"where")
-function_where_set: value_generate_set@S(@QSTSELF;"where")
-function_where_floating: *functions_numeric
-function_where_integer: *functions_numeric
-function_where_lob: *functions_lob
-#here
 
 column_visibility: EMPTY:0.99,invisible:0.01,visible
-null_legitimate_p: 0.01
-null_illegitimate_p: 0.001
-autoinc_explicit_value_p: 0.001
+autoinc_explicit_value_p: 0.00001
 
-# like many other values this is hardcoded inside imatest.pl
-datatype_class: character:0.5,integer:0.2,decimal:0.2,floating:0.2,datetime:0.5,binary:0.1,enums:0.1,json:0.2,lob:0.9,spatial 
-# mind the format
-datatype_class2dt: integer:tinyint-smallint-mediumint-bigint-int-bit,spatial:polygon-multipolygon-geometrycollection-geomcollection-point-multilinestring-multipoint-geometry-linestring,decimal:decimal-numeric,floating:float-double,character:char-varchar,binary:binary-varbinary,lob:tinyblob-tinytext-blob-text-mediumblob-mediumtext-longblob-longtext,enums:enum-set,datetime:datetime-date-timestamp-time-year,json:json
-datatype_integer: tinyint:0.1,smallint:0.1,mediumint:0.1,bigint:0.2,int:0.9,bit
-#datatype_spatial: point 
+datatype_class: character:0.5,integer:0.5,decimal:0.1,floating:0.5,datetime:0.5,binary:0.1,enums:0.01,json:0.2,lob:0.9,spatial 
+datatype_class2dt: integer:tinyint-boolean-smallint-mediumint-bigint-int-bit,spatial:polygon-multipolygon-geometrycollection-geomcollection-point-multilinestring-multipoint-geometry-linestring,decimal:decimal-numeric,floating:float-double,character:char-varchar,binary:binary-varbinary,lob:tinyblob-tinytext-blob-text-mediumblob-mediumtext-longblob-longtext,enums:enum-set,datetime:datetime-date-timestamp-time-year,json:json
+datatype_integer: tinyint:0.2,smallint:0.5,mediumint:0.1,bigint:0.5,int:0.9,boolean:0.01,bit:0.01,int
 datatype_spatial: polygon,multipolygon,geometrycollection,point,multilinestring,multipoint,geometry,linestring 
 datatype_decimal: decimal:0.99,numeric
 datatype_floating: float:0.9,double
@@ -317,18 +460,18 @@ datatype_character: char:0.2,varchar
 datatype_binary: binary:0.1,varbinary
 datatype_lob: tinyblob,tinytext,blob,text,mediumblob,mediumtext,longblob,longtext
 datatype_enums: enum:0.9,set
-datatype_datetime: datetime:0.1,date:0.1,timestamp:0.9,time:0.1,year
+datatype_datetime: datetime:0.1,date:0.1,timestamp:0.9,time:0.1,year:0.01,timestamp
 
-integer_unsigned_p: 0.3
-number_reverse_sign_legitimate_p: 0.2
-number_reverse_sign_illegitimate_p: 0.05
-datatype_bit_len: EMPTY:0.5,1-60:0.8,61-68
+integer_unsigned_p: 0.1
+number_reverse_sign_legitimate_p: 0.1
+number_reverse_sign_illegitimate_p: 0.0001
+datatype_bit_len: 1-60:0.99,61-68
 # length of the value, not value itself
 value_bit: 1-4:0.5,5-60:0.8,61-68
 # sign is reversed separately, see *reverse_sign*
-value_tinyint: 0-4:0.5,5-100:0.5,101-150:0.5,250-258
+value_tinyint: 0-4:0.5,5-120:0.99,101-150:0.01,250-258:0.01,0-100
 value_json_kind: SIMPLEML,FROMSCRIPT,REFARRAY,SCALAR,REFHASH
-value_json_len: 0:0.01,1-100:0.5,100-1000:0.9,10000-20000:0.9,100-1000000
+value_json_len: 1-100:0.5,100-1000:0.9,10000-20000:0.9,100-1000000
 # appears in a for loop
 value_json_small_len: 0:0.1,1:0.1,2-10:0.9,11-1000
 value_smallint: 0-100:0.5,0-200:0.9,0-300:0.9,10000-20000:0.5,32200-32300:0.1,1-80000
@@ -342,47 +485,40 @@ decimal_part: EMPTY:0.2,0-2:0.5,3-8:0.5,9-28:0.5,29-30
 # todo exp adjust
 decimal_value: 1:0.01,0:0.2,0-2:0.5,3-6:0.9,7-14:0.9,1-62
 # EMPTY means no exponent, then we will use a decimal_value
-float_value_exp: EMPTY:0.2,0:0.1,1-10:0.9,M35-35:0.9,M40-M37:0.9,37-38
-double_value_exp: EMPTY:0.2,0:0.1,1-10:0.9,M35-35:0.9,M305-100
+float_value_exp: EMPTY:0.2,0:0.1,1-10:0.9,MNN35-35:0.9,MNN40-M37:0.9,37-38
+double_value_exp: EMPTY:0.2,0:0.1,1-10:0.9,MNN35-35:0.9,MNN305-100
 datetime_fractional: EMPTY:0.5,0:0.2,1-6
 year_value: 1901-2155:0.9,0:0.01,1969-2039
 datetime_year_value: 1969-2040:0.9,1000-1999
 timestamp_year_value: 1971-2037:0.9,1999-2001:0.9,2002-2025
 datetime_month_value: 1-12:0.99,0-13
 datetime_day_value: 1-28:0.99,0-32
-datetime_hour_value: 0-23:0.99,M1-25
-time_hour_value: 0-23:0.5,M23-23:0.9,M838-838
-datetime_minute_value: 0-59:0.99,M1-61
-datetime_second_value: 0-59:0.99,M1-61
-datetime_microsecond_value: 0:0.5,1-100:0.5,EMPTY:0.5,499999-500001:0.5,0-999999:0.9,M2-1000005
+datetime_hour_value: 0-23:0.99,MNN1-25
+time_hour_value: 0-23:0.5,MNN23-23:0.9,MNN838-838
+datetime_minute_value: 0-59:0.99,MNN1-61
+datetime_second_value: 0-59:0.99,MNN1-61
+datetime_microsecond_value: 0:0.5,1-100:0.5,EMPTY:0.5,499999-500001:0.5,0-999999:0.9,MNN2-1000005
 character_set: EMPTY:0.5,utf8mb4:0.5,latin1
-datatype_char_len: 0:0.01,1-10:0.8,11-250:0.9,0-260
-value_char_len: 0:0.1,1-10:0.9,11-250:0.9,251-260
-datatype_varchar_len: 0:0.01,1-10:0.5,11-250:0.9,251-260:0.1,261-16383
-value_varchar_len: 0:0.1,1-10:0.9,11-250:0.9,251-260:0.9,261-5000:0.9,65000-70000
+datatype_char_len: 0:0.0001,1-10:0.8,11-250:0.9,1-255
+datatype_varchar_len: 0:0.0001,1-10:0.5,11-250:0.9,1-255
+value_varchar_len: 0:0.0001,1-10:0.9,11-250:0.9,251-260:0.9,261-5000:0.9,65000-70000
 # adjust generated value to column length, applies to binary and blob as well
 value_kchar_length_adjust_p: 0.99
-datatype_binary_len: EMPTY:0.1,0:0.01,1-10:0.9,11-250:0.9,1-255
-value_binary_len: 0:0.1,1-10:0.9,1-250:0.9,1-260
-datatype_varbinary_len: 0:0.01,1-10:0.9,1-250:0.9,1-260:0.9,1-5000:0.9,1-75535
-value_varbinary_len: 0:0.1,1-10:0.9,1-250:0.9,1-260:0.9,1-5000:0.9,1-70000
+datatype_binary_len: EMPTY:0.01,0:0.0001,1-10:0.9,11-250:0.9,1-255
+value_binary_len: 1-100:0.9,1-250:0.9,1-2600
+datatype_varbinary_len: 1-10:0.9,1-250:0.9,1-260:0.9,1-5000:0.9,1-75535
+value_varbinary_len: 1-10:0.9,1-250:0.9,1-260:0.9,1-5000:0.9,1-70000
 datatype_lob_key_len: 1-255:0.9,1-500
-# applies to both text and binary
-value_tinylob_len: 0:0.01,1-100:0.9,1-255:0.9,1-300
-value_lob_len: 0:0.01,1-100:0.9,1-20000:0.9,1-35000
-value_mediumlob_len: 0:0.01,1-100:0.9,1-20000:0.9,1-8389000:0.9,1-6778000
-value_longlob_len: 0:0.01,1-100:0.9,1-20000:0.9,1-2147484000:0.9,1-4294968000
-datatype_enum_len: 1-10:0.9,1-25:0.9,1-26:0.99,1-65000
-datatype_set_len: 1-10:0.9,1-60:0.9,1-64
-datatype_set_value_len: 1:0.9,2:0.9,1-10:0.9,1-60:0.9,1-70
+datatype_enum_len: 1-10:0.99,1-25:0.9,1-26:0.99,1-65000
+datatype_set_len: 1-10:0.99,1-60:0.9,1-64
+datatype_set_value_len: 1:0.99,2:0.9,1-10:0.9,1-60:0.9,1-70
 # M will NOT become -
 geometry_kind: point,linestring,polygon
 multigeometry_kind: point,linestring,polygon
 # WKT, allowed max chars when we build the value
-value_spatial_len: 100-1000:0.5,10000-20000:0.9,100-8389000:0.1,100-16778000:0.1,100-200
 spatial_srid: 4326:0.9,0:0.9,32761:0.01,EMPTY
-value_point_x: M90-90:0.9,M92-92
-value_point_y: M180-180:0.9,M182-182
+value_point_x: MNN90-90:0.99,MNN92-92
+value_point_y: MNN180-180:0.99,MNN182-182
 value_linestring_len: 2:0.2,3-8:0.9,2-8:0.9,2-200
 value_multilinestring_len: 1-2:0.2,3-8:0.9,2-8:0.9,2-300
 value_multipolygon_len: 1-2:0.2,3-8:0.9,2-8:0.9,2-300

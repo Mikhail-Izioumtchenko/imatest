@@ -56,7 +56,7 @@ $EXPORT MYSQLD="${MYSQLD:-mysqld}"
 $EXPORT MYSQLD_ORIG="${MYSQLD_ORIG:-/sbin/mysqld}"
 $EXPORT MYSQLD_DEBUG="${MYSQLD_DEBUG:-/sbin/mysqld-debug}"
 $EXPORT MYSQLROUTER="${MYSQLROUTER:-/bin/mysqlrouter}"
-$EXPORT MYSQLSH="${MYSQLSH:-/bin/mysqlsh}"
+[ "$_IMATEST_USE" = '8.3' ] && $EXPORT MYSQLSH="${MYSQLSH:-/hardtmp/mysqlsh-8.3/mysqlsh.cover.sh}" || $EXPORT MYSQLSH="${MYSQLSH:-mysqlsh}"
 $EXPORT ROUTERDIR="${ROUTERDIR:=/root/mysqlrouter}"
 $EXPORT SANDBOXDIR="/root/mysql-sandboxes"
 

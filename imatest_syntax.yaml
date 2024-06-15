@@ -123,7 +123,7 @@ datatype_floating:
 datatype_integer:
   allowed: Rseq       
   mandatory: True
-  only_values_allowed: bit,tinyint,smallint,mediumint,int,bigint
+  only_values_allowed: bit,tinyint,smallint,mediumint,int,bigint,boolean
 datatype_lob:
   allowed: Rseq       
   mandatory: True
@@ -183,25 +183,64 @@ decimal_value:
 decimal_whole:
   mandatory: True
   allowed: Rseq
-default_expression_depth:
+default_functions_bigint:
   mandatory: True
   allowed: Rseq       
-  only_positive_integers: True
-default_expression_length:
+default_functions_binary:
   mandatory: True
   allowed: Rseq       
-  only_positive_integers: True
-default_expression_term:
+default_functions_blob:
   mandatory: True
   allowed: Rseq       
-  only_values_allowed: CONSTANT,COLUMN,FUNCTION
-default_parenthesis_p:
-  mandatory: True
-  allowed: probability
-default_term_kind:
+default_functions_character:
   mandatory: True
   allowed: Rseq       
-  only_values_allowed: value,function
+default_functions_datetime:
+  mandatory: True
+  allowed: Rseq       
+default_functions_decimal:
+  mandatory: True
+  allowed: Rseq       
+default_functions_floating:
+  mandatory: True
+  allowed: Rseq       
+default_functions_int:
+  mandatory: True
+  allowed: Rseq       
+default_functions_integer:
+  mandatory: True
+  allowed: Rseq       
+default_functions_lob:
+  mandatory: True
+  allowed: Rseq       
+default_functions_mediumint:
+  mandatory: True
+  allowed: Rseq       
+default_functions_mediumblob:
+  mandatory: True
+  allowed: Rseq       
+default_functions_mediumtext:
+  mandatory: True
+  allowed: Rseq       
+default_functions_smallint:
+  mandatory: True
+  allowed: Rseq       
+default_functions_text:
+  mandatory: True
+  allowed: Rseq       
+default_functions_tinyint:
+  mandatory: True
+  allowed: Rseq       
+default_functions_tinyblob:
+  mandatory: True
+  allowed: Rseq       
+default_functions_tinytext:
+  mandatory: True
+  allowed: Rseq       
+default_kind:
+  mandatory: True
+  allowed: Rseq       
+  only_values_allowed: function,value,column
 delete_where_all_p:
   mandatory: True
   allowed: probability
@@ -223,123 +262,199 @@ explain:
   mandatory: True
   allowed: Rseq       
   only_values_allowed: explain,explain_analyze,EMPTY
-expression_group:
-  mandatory: True
-  allowed: Rseq       
-  only_values_allowed: PARENTHESIS,FUNCTION,EMPTY
-expression_term:
-  mandatory: True
-  allowed: Rseq       
-  only_values_allowed: CONSTANT,COLUMN,FUNCTION
 float_value_exp:
   mandatory: True
   allowed: Rseq
 fulltext_index_p:
   mandatory: True
   allowed: probability
-function_insert_binary:
-  mandatory: True
-  allowed: Rseq       
-function_insert_character:
-  mandatory: True
-  allowed: Rseq       
-function_insert_datetime:
-  mandatory: True
-  allowed: Rseq       
-function_insert_decimal:
-  mandatory: True
-  allowed: Rseq       
-function_insert_enum:
-  mandatory: True
-  allowed: Rseq       
-function_insert_floating:
-  mandatory: True
-  allowed: Rseq       
-function_insert_integer:
-  mandatory: True
-  allowed: Rseq       
-function_insert_json:
-  mandatory: True
-  allowed: Rseq       
-function_insert_lob:
-  mandatory: True
-  allowed: Rseq       
-function_insert_set:
-  mandatory: True
-  allowed: Rseq       
-function_update_binary:
-  mandatory: True
-  allowed: Rseq       
-function_update_character:
-  mandatory: True
-  allowed: Rseq       
-function_update_datetime:
-  mandatory: True
-  allowed: Rseq       
-function_update_decimal:
-  mandatory: True
-  allowed: Rseq       
-function_update_enum:
-  mandatory: True
-  allowed: Rseq       
-function_update_floating:
-  mandatory: True
-  allowed: Rseq       
-function_update_integer:
-  mandatory: True
-  allowed: Rseq       
-function_update_json:
-  mandatory: True
-  allowed: Rseq       
-function_update_lob:
-  mandatory: True
-  allowed: Rseq       
-function_update_set:
-  mandatory: True
-  allowed: Rseq       
-function_update_timestamp:
-  mandatory: True
-  allowed: Rseq       
-#  only_values_allowed: NOW()
-function_virtual:
-  mandatory: True
-  allowed: Rseq       
-function_where_character:
-  mandatory: True
-  allowed: Rseq       
-function_where_binary:
-  mandatory: True
-  allowed: Rseq       
-function_where_datetime:
-  mandatory: True
-  allowed: Rseq       
-function_where_decimal:
-  mandatory: True
-  allowed: Rseq       
-function_where_enum:
-  mandatory: True
-  allowed: Rseq       
-function_where_floating:
-  mandatory: True
-  allowed: Rseq       
-function_where_integer:
-  mandatory: True
-  allowed: Rseq       
-function_where_lob:
-  mandatory: True
-  allowed: Rseq       
-function_where_set:
-  mandatory: True
-  allowed: Rseq       
-function_where_timestamp:
-  mandatory: True
-  allowed: Rseq       
 geometry_kind:
   mandatory: True
   allowed: Rseq
   only_values_allowed: point,linestring,polygon
-hosts:
+group_aggregate_kind:
   mandatory: True
+  allowed: Rseq
+  only_values_allowed: NNNAX,NNNIN,AVG,SUNNN,COUNT,COUNT_DISTINCT,GROUP_CONCAT,STD,STDDEV,STDDEV_POP,VAR_POP,VAR_SUNN,VARIANCE,AVG_DISTINCT,BIT_AND,BIT_OR,BIT_XOR
+group_by_column_p:
+  mandatory: True
+  allowed: probability
+group_having_column_p:
+  mandatory: True
+  allowed: probability
+group_having_none_p:
+  mandatory: True
+  allowed: probability
+group_rollup_p:
+  mandatory: True
+  allowed: probability
+group_having_functions_any:
+  mandatory: True
+  allowed: Rseq       
+group_having_functions_charlike:
+  mandatory: True
+  allowed: Rseq       
+group_having_functions_numeral:
+  mandatory: True
+  allowed: Rseq       
+group_having_logical_unary_operator:
+  mandatory: True
+  allowed: Rseq       
+  only_values_allowed: NOT,EMPTY
+group_having_logical_binary_operator:
+  mandatory: True
+  allowed: Rseq       
+  only_values_allowed: AND,OR,XOR
+group_having_logical_len:
+  mandatory: True
+  allowed: Rseq       
+  only_positive_integers: True
+group_having_term_any_datatype_class:
+  mandatory: True
+  allowed: Rseq       
+  only_values_allowed: integer,decimal,floating,datetime,character,binary,lob,enums,json,spatial
+group_having_term_any_operator:
+  mandatory: True
+  allowed: Rseq       
+  only_values_allowed: %,+,*,NNN,/,DIV,&,<<,>>,^,|
+group_having_term_binary_any_operator:
+  mandatory: True
+  allowed: Rseq       
+  only_values_allowed: LIKE,NOT_LIKE,NOT_REGEXP,REGEXP,RLIKE,=,EXCL=,<>,>,<,>=,<=,<=>
+group_having_term_binary_charlike_operator:
+  mandatory: True
+  allowed: Rseq       
+  only_values_allowed: LIKE,NOT_LIKE,NOT_REGEXP,REGEXP,RLIKE,=,EXCL=,<>,>,<,>=,<=,<=>
+group_having_term_binary_numeral_operator:
+  mandatory: True
+  allowed: Rseq       
+  only_values_allowed: =,EXCL=,<>,>,<,>=,<=,<=>
+group_having_term_charlike_datatype_class:
+  mandatory: True
+  allowed: Rseq       
+  only_values_allowed: character,binary,lob,character
+group_having_term_charlike_operator:
+  mandatory: True
+  allowed: Rseq       
+  only_values_allowed: %,+,*,NNN,/,DIV,&,<<,>>,^,|
+group_having_term_item_kind:
+  mandatory: True
+  allowed: Rseq       
+  only_values_allowed: column,function,value
+group_having_term_non_numeral_len:
+  mandatory: True
+  allowed: Rseq       
+  only_positive_integers: True
+group_having_term_numeral_datatype_class:
+  mandatory: True
+  allowed: Rseq       
+  only_values_allowed: integer,decimal,floating,integer
+group_having_term_numeral_len:
+  mandatory: True
+  allowed: Rseq       
+  only_positive_integers: True
+group_having_term_numeral_operator:
+  mandatory: True
+  allowed: Rseq       
+  only_values_allowed: %,+,*,NNN,/,DIV,&,<<,>>,^,|
+group_having_term_overall_class:
+  mandatory: True
+  allowed: Rseq       
+  only_values_allowed: numeral,charlike,any
+group_having_term_unary_any_operator:
+  mandatory: True
+  allowed: Rseq       
+  only_values_allowed: PREFNNN,~,EMPTY
+group_having_term_unary_charlike_operator:
+  mandatory: True
+  allowed: Rseq       
+  only_values_allowed: PREFNNN,~,EMPTY
+group_having_term_unary_numeral_operator:
+  mandatory: True
+  allowed: Rseq       
+  only_values_allowed: PREFNNN,~,EMPTY
+group_having_term_final_operator:
+  mandatory: True
+  allowed: Rseq       
+  only_values_allowed: IS_NULL,IS_NOT_NULL,EMPTY
+index_functions_bigint:
+  mandatory: True
+  allowed: Rseq       
+index_functions_blob:
+  mandatory: True
+  allowed: Rseq       
+index_functions_boolean:
+  mandatory: True
+  allowed: Rseq       
+index_functions_binary:
+  mandatory: True
+  allowed: Rseq       
+index_functions_char:
+  mandatory: True
+  allowed: Rseq       
+index_functions_date:
+  mandatory: True
+  allowed: Rseq       
+index_functions_datetime:
+  mandatory: True
+  allowed: Rseq       
+index_functions_decimal:
+  mandatory: True
+  allowed: Rseq       
+index_functions_double:
+  mandatory: True
+  allowed: Rseq       
+index_functions_float:
+  mandatory: True
+  allowed: Rseq       
+index_functions_longblob:
+  mandatory: True
+  allowed: Rseq       
+index_functions_longtext:
+  mandatory: True
+  allowed: Rseq       
+index_functions_int:
+  mandatory: True
+  allowed: Rseq       
+index_functions_mediumblob:
+  mandatory: True
+  allowed: Rseq       
+index_functions_mediumint:
+  mandatory: True
+  allowed: Rseq       
+index_functions_mediumtext:
+  mandatory: True
+  allowed: Rseq       
+index_functions_smallint:
+  mandatory: True
+  allowed: Rseq       
+index_functions_text:
+  mandatory: True
+  allowed: Rseq       
+index_functions_time:
+  mandatory: True
+  allowed: Rseq       
+index_functions_timestamp:
+  mandatory: True
+  allowed: Rseq       
+index_functions_tinyblob:
+  mandatory: True
+  allowed: Rseq       
+index_functions_tinyint:
+  mandatory: True
+  allowed: Rseq       
+index_functions_tinytext:
+  mandatory: True
+  allowed: Rseq       
+index_functions_varbinary:
+  mandatory: True
+  allowed: Rseq       
+index_functions_varchar:
+  mandatory: True
+  allowed: Rseq       
+index_functions_year:
+  mandatory: True
+  allowed: Rseq       
 index_part_type:
   mandatory: True
   allowed: Rseq       
@@ -362,24 +477,55 @@ index_visibility:
   mandatory: True
   allowed: Rseq       
   only_values_allowed: visible,invisible,EMPTY
-insert_default_p:
-  mandatory: True
-  allowed: probability
-insert_expression_depth:
+insert_functions_bigint:
   mandatory: True
   allowed: Rseq       
-  only_positive_integers: True
-insert_expression_length:
+insert_functions_binary:
   mandatory: True
   allowed: Rseq       
-  only_positive_integers: True
-insert_parenthesis_p:
-  mandatory: True
-  allowed: probability
-insert_term_kind:
+insert_functions_character:
   mandatory: True
   allowed: Rseq       
-  only_values_allowed: value,function
+insert_functions_datetime:
+  mandatory: True
+  allowed: Rseq       
+insert_functions_decimal:
+  mandatory: True
+  allowed: Rseq       
+insert_functions_double:
+  mandatory: True
+  allowed: Rseq       
+insert_functions_float:
+  mandatory: True
+  allowed: Rseq       
+insert_functions_int:
+  mandatory: True
+  allowed: Rseq       
+insert_functions_integer:
+  mandatory: True
+  allowed: Rseq       
+insert_functions_lob:
+  mandatory: True
+  allowed: Rseq       
+insert_functions_mediumint:
+  mandatory: True
+  allowed: Rseq       
+insert_functions_numeric:
+  mandatory: True
+  allowed: Rseq       
+insert_functions_smallint:
+  mandatory: True
+  allowed: Rseq       
+insert_functions_tinyint:
+  mandatory: True
+  allowed: Rseq       
+insert_functions_year:
+  mandatory: True
+  allowed: Rseq       
+insert_kind:
+  mandatory: True
+  allowed: Rseq       
+  only_values_allowed: value,function,column,default
 integer_unsigned_p:
   mandatory: True
   allowed: probability
@@ -409,10 +555,36 @@ load_create_table_kind:
   mandatory: True
   allowed: Rseq
   only_values_allowed: select,like,new
+load_flush_how:
+  mandatory: True
+  allowed: Rseq
+  only_values_allowed: PRIVILEGES,OPTIMIZER_COSTS,STATUS,USER_RESOURCES
+load_flush_local_p:
+  mandatory: True
+  allowed: probability
+load_flush_tables_how:
+  mandatory: True
+  allowed: Rseq
+  only_values_allowed: EMPTY,WITH READ LOCK,FOR EXPORT
+load_flush_tables_n:
+  mandatory: True
+  allowed: Rseq
+  only_non_negative_integers: True
 load_execute_sql:
   mandatory: True
   allowed: [yes, no]
   supported: [yes, no]
+load_kill_n:
+  allowed: Rseq
+  mandatory: True
+load_lock_table_count:
+  mandatory: True
+  allowed: Rseq
+  only_non_negative_integers: True
+load_lock_table_kind:
+  mandatory: True
+  allowed: Rseq
+  only_values_allowed: READ,WRITE
 load_max_stmt:
   mandatory: True
   allowed: only_non_negative_integers
@@ -422,12 +594,30 @@ load_optimize_local_p:
 load_select_limit:
   mandatory: True
   allowed: Rseq
+load_show_columns_kind:
+  mandatory: True
+  allowed: Rseq
+  only_values_allowed: EXTENDED,FULL,BOTH,EMPTY
+load_show_status_how:
+  mandatory: True
+  allowed: Rseq
+  only_values_allowed: GLOBAL,SESSION,EMPTY
+load_show_tables_kind:
+  mandatory: True
+  allowed: Rseq
+  only_values_allowed: EXTENDED,FULL,BOTH,EMPTY
+load_show_variables_how:
+  mandatory: True
+  allowed: Rseq
+  only_values_allowed: GLOBAL,SESSION,EMPTY
+load_sleep_after_stmt_ms:
+  mandatory: True
+  allowed: Rseq       
+  only_non_negative_integers: True
 load_sql_class:
   mandatory: True
   allowed: Rseq
-  only_values_allowed: select,update,insert,delete,insel,drop_table,alter,check,replace,analyze,checksum,optimize,show_open_tables,show_parse_tree,create_table,lock_instance_for_backup,unlock_instance
-load_thread_client_log:
-  mandatory: True
+  only_values_allowed: select,update,insert,delete,insel,drop_table,alter,check,replace,analyze,checksum,optimize,show_open_tables,show_parse_tree,create_table,lock_instance_for_backup,unlock_instance,lock_table,unlock_table,set_txn_isolation,show_columns,show_status,show_table_status,show_tables,show_variables,flush,flush_tables,kill_connection,kill_query,recreate_schema,set
 load_thread_err:
   mandatory: True
 load_thread_execute_with:
@@ -456,24 +646,12 @@ multigeometry_kind:
   mandatory: True
   allowed: Rseq
   only_values_allowed: geometry,point,linestring,polygon
-mysql_dynamic_cnf:
-  mandatory: True
 mysql_initial_cnf:
   mandatory: True
 mysql_initial_cnf_ports:
   mandatory: True
 mysql_initial_cnf_targets:
   mandatory: True
-mysql_set_how:
-  mandatory: True
-  allowed: Rseq
-  only_values_allowed: persist,global,EMPTY
-null_illegitimate_p:
-  mandatory: True
-  allowed: probability
-null_legitimate_p:
-  mandatory: True
-  allowed: probability
 number_reverse_sign_illegitimate_p:
   mandatory: True
   allowed: probability
@@ -491,9 +669,6 @@ parts_per_index:
 passfile:
   mandatory: True
   allowed: doeval
-pk_autoinc_p:
-  mandatory: True
-  allowed: probability
 port_load:
   mandatory: True
 ports_destructive:
@@ -504,35 +679,9 @@ ports_destructive_how_many:
   only_positive_integers: True
 port_writer:
   mandatory: True
-operator_decimal:
+reconnect_timeout:
   mandatory: True
-  allowed: Rseq
-  only_values_allowed: o@+,o@MINUS,o@p+,o@pMINUS,o@*,o@/,o@%,o@MOD,o@DIV,o@&,o@<<,o@>>,o@AND,o@^
-operator_floating:
-  mandatory: True
-  allowed: Rseq
-  only_values_allowed: o@+,o@MINUS,o@p+,o@pMINUS,o@*,o@/,o@%,o@MOD,o@DIV,o@&,o@<<,o@>>,o@AND,o@^
-operator_integer:
-  mandatory: True
-  allowed: Rseq
-  only_values_allowed: o@+,o@MINUS,o@p+,o@pMINUS,o@*,o@/,o@%,o@MOD,o@DIV,o@&,o@<<,o@>>,o@AND,o@^
-operator_null:
-  mandatory: True
-  allowed: Rseq
-  only_values_allowed: is_null,is_not_null,EMPTY
-operator_logical_decimal:
-  mandatory: True
-  allowed: Rseq
-operator_logical_floating:
-  mandatory: True
-  allowed: Rseq
-operator_logical_integer:
-  mandatory: True
-  allowed: Rseq
-operator_logical:
-  mandatory: True
-  allowed: Rseq
-  only_values_allowed: AND,OR
+  allowed: only_positive_integers
 rediscover_every_seconds:
   mandatory: True
   allowed: Rseq
@@ -570,6 +719,17 @@ select_order_by_column_p:
   mandatory: True
   allowed: probability
 select_order_by_p:
+  mandatory: True
+  allowed: probability
+select_union_how:
+  mandatory: True
+  allowed: Rseq
+  only_values_allowed: UNION,UNION ALL,INTERSECT,INTERSECT ALL,EXCEPT,EXCEPT ALL
+select_union_len:
+  mandatory: True
+  allowed: Rseq
+  only_positive_integers: True
+select_union_p:
   mandatory: True
   allowed: probability
 select_where_all_p:
@@ -627,6 +787,56 @@ server_termination_wait:
 server_termination_wait_timeout:
   mandatory: True
   allowed: only_positive_integers
+set_group:
+  mandatory: True
+  allowed: Rseq
+  only_values_allowed: g1,g2s,g3b,g4cc,g5ef,g6n,g7bn
+set_kind:
+  mandatory: True
+  allowed: Rseq
+  only_values_allowed: LOCAL,GLOBAL,PERSIST,PERSIST_ONLY,EMPTY
+set_variable_name_g1:
+  mandatory: True
+  allowed: Rseq
+set_variable_name_g2s:
+  mandatory: True
+  allowed: Rseq
+set_variable_name_g3b:
+  mandatory: True
+  allowed: Rseq
+set_variable_name_g4cc:
+  mandatory: True
+  allowed: Rseq
+set_variable_name_g5ef:
+  mandatory: True
+  allowed: Rseq
+set_variable_name_g6n:
+  mandatory: True
+  allowed: Rseq
+set_variable_name_g7bn:
+  mandatory: True
+  allowed: Rseq
+set_variable_value_g1:
+  mandatory: True
+  allowed: Rseq
+set_variable_value_g2s:
+  mandatory: True
+  allowed: Rseq
+set_variable_value_g3b:
+  mandatory: True
+  allowed: Rseq
+set_variable_value_g4cc:
+  mandatory: True
+  allowed: Rseq
+set_variable_value_g5ef:
+  mandatory: True
+  allowed: Rseq
+set_variable_value_g6n:
+  mandatory: True
+  allowed: Rseq
+set_variable_value_g7bn:
+  mandatory: True
+  allowed: Rseq
 sleep_final:
   mandatory: True
   allowed: only_non_negative_integers
@@ -644,6 +854,10 @@ table_autoextend_size:
 table_autoinc:
   mandatory: True
   allowed: Rseq       
+table_autoinc_kind:
+  mandatory: True
+  allowed: Rseq       
+  only_values_allowed: KEY,UNIQUE,PRIMARY
 table_compression:
   mandatory: True
   allowed: Rseq       
@@ -701,6 +915,14 @@ txn_end_how:
 txn_end_p:
   mandatory: True
   allowed: probability
+txn_isolation_kind:
+  mandatory: True
+  allowed: Rseq
+  only_values_allowed: read_committed,read_uncommitted,repeatable_read,serializable
+txn_isolation_how:
+  mandatory: True
+  allowed: Rseq
+  only_values_allowed: GLOBAL,SESSION,EMPTY
 txn_maxlength_ms:
   mandatory: True
   allowed: Rseq       
@@ -709,6 +931,10 @@ txn_maxlength_stmt:
   mandatory: True
   allowed: Rseq       
   only_positive_integers: True
+txn_ro_rw_how:
+  mandatory: True
+  allowed: Rseq       
+  only_values_allowed: SESSION,GLOBAL,EMPTY
 txn_sleep_after_ms:
   mandatory: True
   allowed: Rseq       
@@ -724,24 +950,46 @@ txn_use:
 update_column_p:
   mandatory: True
   allowed: probability
-update_default_p:
-  mandatory: True
-  allowed: probability
-update_expression_depth:
+update_functions_bigint:
   mandatory: True
   allowed: Rseq       
-  only_positive_integers: True
-update_expression_length:
+update_functions_binary:
   mandatory: True
   allowed: Rseq       
-  only_positive_integers: True
-update_parenthesis_p:
-  mandatory: True
-  allowed: probability
-update_term_kind:
+update_functions_bit:
   mandatory: True
   allowed: Rseq       
-  only_values_allowed: value,function
+update_functions_character:
+  mandatory: True
+  allowed: Rseq       
+update_functions_datetime:
+  mandatory: True
+  allowed: Rseq       
+update_functions_decimal:
+  mandatory: True
+  allowed: Rseq       
+update_functions_floating:
+  mandatory: True
+  allowed: Rseq       
+update_functions_int:
+  mandatory: True
+  allowed: Rseq       
+update_functions_lob:
+  mandatory: True
+  allowed: Rseq       
+update_functions_mediumint:
+  mandatory: True
+  allowed: Rseq       
+update_functions_smallint:
+  mandatory: True
+  allowed: Rseq       
+update_functions_tinyint:
+  mandatory: True
+  allowed: Rseq       
+update_kind:
+  mandatory: True
+  allowed: Rseq       
+  only_values_allowed: value,function,column,default
 update_where_all_p:
   mandatory: True
   allowed: probability
@@ -756,10 +1004,6 @@ value_bit:
   mandatory: True
   allowed: Rseq
 value_binary_len:
-  mandatory: True
-  allowed: Rseq
-  only_non_negative_integers: True
-value_char_len:
   mandatory: True
   allowed: Rseq
   only_non_negative_integers: True
@@ -786,19 +1030,7 @@ value_linestring_len:
   mandatory: True
   allowed: Rseq
   only_non_negative_integers: True
-value_lob_len:
-  mandatory: True
-  allowed: Rseq
-  only_non_negative_integers: True
-value_longlob_len:
-  mandatory: True
-  allowed: Rseq
-  only_non_negative_integers: True
 value_mediumint:
-  mandatory: True
-  allowed: Rseq
-  only_non_negative_integers: True
-value_mediumlob_len:
   mandatory: True
   allowed: Rseq
   only_non_negative_integers: True
@@ -841,13 +1073,6 @@ value_smallint:
   mandatory: True
   allowed: Rseq
   only_non_negative_integers: True
-value_spatial_len:
-  allowed: Rseq       
-  mandatory: True
-  only_positive_integers: True
-value_tinylob_len:
-  mandatory: True
-  allowed: Rseq       
 value_tinyint:
   mandatory: True
   allowed: Rseq
@@ -863,53 +1088,167 @@ value_varchar_len:
 virtual_columns_per_table:
   mandatory: True
   allowed: Rseq
-virtual_expression_depth:
+virtual_functions_numeral:
+  mandatory: True
+  allowed: Rseq
+virtual_functions_datelike:
+  mandatory: True
+  allowed: Rseq
+virtual_functions_charlike:
+  mandatory: True
+  allowed: Rseq
+virtual_functions_any:
+  mandatory: True
+  allowed: Rseq
+virtual_term_any_datatype_class:
+  mandatory: True
+  allowed: Rseq
+  only_values_allowed: character,integer,decimal,floating,datetime,binary,enums,json,lob,spatial
+virtual_term_any_operator:
+  mandatory: True
+  allowed: Rseq
+  only_values_allowed: %,+,*,NNN,/,DIV,&,<<,>>,^,|
+virtual_term_charlike_datatype_class:
+  mandatory: True
+  allowed: Rseq
+  only_values_allowed: character,binary,lob,character
+virtual_term_datelike_datatype_class:
+  mandatory: True
+  allowed: Rseq
+  only_values_allowed: datetime,timestamp,date,time,year,timestamp
+virtual_term_charlike_operator:
+  mandatory: True
+  allowed: Rseq
+  only_values_allowed: %,+,*,NNN,/,DIV,&,<<,>>,^,|
+virtual_term_datelike_operator:
+  mandatory: True
+  allowed: Rseq
+  only_values_allowed: %,+,*,NNN,/,DIV,&,<<,>>,^,|
+virtual_term_item_kind:
+  mandatory: True
+  allowed: Rseq
+  only_values_allowed: column,function,value
+virtual_term_non_numeral_len:
+  mandatory: True
+  allowed: Rseq
+  only_positive_integers: True
+virtual_term_numeral_datatype_class:
+  mandatory: True
+  allowed: Rseq
+  only_values_allowed: integer,decimal,floating,integer
+virtual_term_numeral_len:
+  mandatory: True
+  allowed: Rseq
+  only_positive_integers: True
+virtual_term_numeral_operator:
+  mandatory: True
+  allowed: Rseq
+  only_values_allowed: %,+,*,NNN,/,DIV,&,<<,>>,|,^
+virtual_term_unary_any_operator:
+  mandatory: True
+  allowed: Rseq
+  only_values_allowed: PREFNNN,~,EMPTY
+virtual_term_unary_charlike_operator:
+  mandatory: True
+  allowed: Rseq
+  only_values_allowed: PREFNNN,~,EMPTY
+virtual_term_unary_datelike_operator:
+  mandatory: True
+  allowed: Rseq
+  only_values_allowed: PREFNNN,~,EMPTY
+virtual_term_unary_numeral_operator:
+  mandatory: True
+  allowed: Rseq
+  only_values_allowed: PREFNNN,~,EMPTY
+where_functions_any:
+  mandatory: True
+  allowed: Rseq       
+where_functions_charlike:
+  mandatory: True
+  allowed: Rseq       
+where_functions_numeral:
+  mandatory: True
+  allowed: Rseq       
+where_logical_unary_operator:
+  mandatory: True
+  allowed: Rseq       
+  only_values_allowed: NOT,EMPTY
+where_logical_binary_operator:
+  mandatory: True
+  allowed: Rseq       
+  only_values_allowed: AND,OR,XOR
+where_logical_len:
   mandatory: True
   allowed: Rseq       
   only_positive_integers: True
-virtual_expression_length:
+where_term_any_datatype_class:
+  mandatory: True
+  allowed: Rseq       
+  only_values_allowed: integer,decimal,floating,datetime,character,binary,lob,enums,json,spatial
+where_term_any_operator:
+  mandatory: True
+  allowed: Rseq       
+  only_values_allowed: %,+,*,NNN,/,DIV,&,<<,>>,^,|
+where_term_binary_any_operator:
+  mandatory: True
+  allowed: Rseq       
+  only_values_allowed: LIKE,NOT_LIKE,NOT_REGEXP,REGEXP,RLIKE,=,EXCL=,<>,>,<,>=,<=,<=>
+where_term_binary_charlike_operator:
+  mandatory: True
+  allowed: Rseq       
+  only_values_allowed: LIKE,NOT_LIKE,NOT_REGEXP,REGEXP,RLIKE,=,EXCL=,<>,>,<,>=,<=,<=>
+where_term_binary_numeral_operator:
+  mandatory: True
+  allowed: Rseq       
+  only_values_allowed: =,EXCL=,<>,>,<,>=,<=,<=>
+where_term_charlike_datatype_class:
+  mandatory: True
+  allowed: Rseq       
+  only_values_allowed: character,binary,lob,character
+where_term_charlike_operator:
+  mandatory: True
+  allowed: Rseq       
+  only_values_allowed: %,+,*,NNN,/,DIV,&,<<,>>,^,|
+where_term_item_kind:
+  mandatory: True
+  allowed: Rseq       
+  only_values_allowed: column,function,value
+where_term_non_numeral_len:
   mandatory: True
   allowed: Rseq       
   only_positive_integers: True
-virtual_parenthesis_p:
-  mandatory: True
-  allowed: probability
-virtual_term_kind:
+where_term_numeral_datatype_class:
   mandatory: True
   allowed: Rseq       
-  only_values_allowed: value,function
-where_all_by_no_where_p:
-  mandatory: True
-  allowed: probability
-where_column_p:
-  mandatory: True
-  allowed: probability
-where_expression_depth:
-  allowed: Rseq
-  mandatory: True
-  only_non_negative_integers: True
-where_expression_length:
-  allowed: Rseq
-  mandatory: True
-  only_non_negative_integers: True
-where_expression_not_p:
-  mandatory: True
-  allowed: probability
-where_logical_depth:
-  mandatory: True
-  allowed: Rseq
-  only_non_negative_integers: True
-where_logical_length:
-  mandatory: True
-  allowed: Rseq
-  only_non_negative_integers: True
-where_parenthesis_p:
-  mandatory: True
-  allowed: probability
-where_term_kind:
+  only_values_allowed: integer,decimal,floating,integer
+where_term_numeral_len:
   mandatory: True
   allowed: Rseq       
-  only_values_allowed: value,function
+  only_positive_integers: True
+where_term_numeral_operator:
+  mandatory: True
+  allowed: Rseq       
+  only_values_allowed: %,+,*,NNN,/,DIV,&,<<,>>,^,|
+where_term_overall_class:
+  mandatory: True
+  allowed: Rseq       
+  only_values_allowed: numeral,charlike,any
+where_term_unary_any_operator:
+  mandatory: True
+  allowed: Rseq       
+  only_values_allowed: PREFNNN,~,EMPTY
+where_term_unary_charlike_operator:
+  mandatory: True
+  allowed: Rseq       
+  only_values_allowed: PREFNNN,~,EMPTY
+where_term_unary_numeral_operator:
+  mandatory: True
+  allowed: Rseq       
+  only_values_allowed: PREFNNN,~,EMPTY
+where_term_final_operator:
+  mandatory: True
+  allowed: Rseq       
+  only_values_allowed: IS_NULL,IS_NOT_NULL,EMPTY
 xportoffset:
   mandatory: True
   allowed: only_positive_integers

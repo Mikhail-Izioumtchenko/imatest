@@ -7,8 +7,11 @@ envbase='imavars.dot'
 function usage() {
   echo -e "$*\n"
   cat <<EOF
-Usage: $0 help | --help | [--env env_shell_script] [--test test_perl_script] [--log log_file_name] now [more...]
+Usage: $0 help | --help | [--use 8.3] [--env env_shell_script] [--test test_perl_script] [--log log_file_name] now [more...]
   help, --help: to see this message
+  use: 8.3 to pass an indicator to env_shell_script to use local mysqlsh 8.3 environment, default empty string
+    to use standard installation of mysqlsh
+    currently $opuse
   env_shell_script: script to set the environment, default is cwd/$envbase,
     currently $vars
   test_perl_script: test script to run, default is cwd/$filebase,
@@ -26,6 +29,7 @@ EOF
 opvars=''
 opfil=''
 oplof=''
+opuse=''
 while true ; do
   [ "$1" = 'help' -o "$1" = '--help' ] && {
     break
@@ -49,8 +53,18 @@ while true ; do
     shift 2
     continue
   }
+  [ "$1" = '--use' ] && {
+    opuse="$2"
+    shift 2
+    continue
+  }
   [ -z "$1" ] && break || usage "Invalid options or parameters are supplied: $1"
 done
+
+export _IMATEST_USE=''
+[ "$opuse" = '8.3' ] && export _IMATEST_USE="$opuse" || {
+  [ -z "$_IMATEST_USE" ] || usage "--use '$opuse' is not supported, the only supported value is 8.3"
+}
 
 vars=${opvars:-`pwd`/$envbase}
 [ ! -f "$vars" ] && usage "$vars is not set or not a regular file or inaccessible"

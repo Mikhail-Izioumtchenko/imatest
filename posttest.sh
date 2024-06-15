@@ -36,7 +36,7 @@ lof="/tmp/`$BASENAME $0`.tmp"
 
 ./usems.sh "$port"
 
-tomine="/root/mysql-sandboxes/*/sandboxdata/error.log /tmp/*out"
+tomine="/root/mysql-sandboxes/4202/sandboxdata/error.log /tmp/*out"
 [ "$dom" = 'y' ] && $PERL logmine.pl $tomine 2>&1 | $TEE "$lof" | $LESS
 [ "$doc" = 'y' -o "$doh" = 'y' ] && {
   ./startms.sh "$port"
@@ -67,6 +67,10 @@ $ECHO ""
   $ECHO "signals and croaks SHORT"
   $GREP -i 'Assertion|signal|croak' $tomine | $GREP -v '(hakill1sa.sh|checkms.sh : 0 signals or assertions)' | $GREP -v semi
   $ECHO "signals and croaks END with $hom signals and croaks including semicroaks"
+  $ECHO ""
+  $ECHO "JUST SIGNALS"
+  $GREP -i 'Assertion|signal' $tomine | $GREP -v '(hakill1sa.sh|checkms.sh : 0 signals or assertions)' 
+  $ECHO "SIGNALS END"
   $ECHO ""
   $ECHO "See also $lof"
 }
