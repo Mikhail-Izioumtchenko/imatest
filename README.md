@@ -7,24 +7,26 @@ THE PREVIOUS STATEMENT IS NOT A CLAIM FOR TOOL's  suitability for any purpose wh
 
 Yield: not everything filed as a bug because bug filing is fairly pointless activity in most cases for lack of care of the target audience at the manufacturer of the code. imho.
 
-correlated with using SELECT ... UNION/INTERSECT
+12. 2024-06-15: mysql-8.3.0/sql/opt_explain.cc:2099: bool explain_query_specification(THD*, const THD*, Query_term*, enum_parsing_context): Assertion `ret || !explain_thd->is_error()' failed.
+
+11. 2024-06-14: correlated with using SELECT ... UNION/INTERSECT
 https://bugs.mysql.com/bug.php?id=115346 mysql-8.3.0/sql/iterators/composite_iterators.cc:2970: int materialize_iterator::SpillState::read_next_row_secondary_overflow(): Assertion `false' failed.
 
-2024-06-14T01:58:40.260276Z 20 [ERROR] [MY-013183] [InnoDB] Assertion failure: row0sel.cc:2796:(!prebuilt->idx_cond && prebuilt->m_mysql_handler->end_range != nullptr) || (prebuilt->trx->isolation_level == TRX_ISO_READ_UNCOMMITTED) 
+10. 2024-06-14T01:58:40.260276Z 20 [ERROR] [MY-013183] [InnoDB] Assertion failure: row0sel.cc:2796:(!prebuilt->idx_cond && prebuilt->m_mysql_handler->end_range != nullptr) || (prebuilt->trx->isolation_level == TRX_ISO_READ_UNCOMMITTED) 
 
-2024-06-09T02:13:33.473147Z 1 [ERROR] [MY-012237] [InnoDB] Corrupted page [page id: space=10337, page number=0] of datafile './gts3/tt22.ibd' could not be found in the doublewrite buffer. 2024-06-09T02:13:33.473262Z 1 [ERROR] [MY-015090] [InnoDB] [FATAL] Tablespace '10143' mentioned in the redo log is corrupted in a way it is unrecoverable by double-write buffer, so further redo log recovery is not possible! 2024-06-09T02:13:33.473280Z 1 [ERROR] [MY-013183] [InnoDB] Assertion failure: log0recv.cc:1163:ib::fatal triggered thread 140240576562752
+9. 2024-06-09T02:13:33.473147Z 1 [ERROR] [MY-012237] [InnoDB] Corrupted page [page id: space=10337, page number=0] of datafile './gts3/tt22.ibd' could not be found in the doublewrite buffer. 2024-06-09T02:13:33.473262Z 1 [ERROR] [MY-015090] [InnoDB] [FATAL] Tablespace '10143' mentioned in the redo log is corrupted in a way it is unrecoverable by double-write buffer, so further redo log recovery is not possible! 2024-06-09T02:13:33.473280Z 1 [ERROR] [MY-013183] [InnoDB] Assertion failure: log0recv.cc:1163:ib::fatal triggered thread 140240576562752
 
-2024-05-26T04:18:00.658915Z 17 [ERROR] [MY-013183] [InnoDB] Assertion failure: row0sel.cc:2796:(!prebuilt->idx_cond && prebuilt->m_mysql_handler->end_range != nullptr) || (prebuilt->trx->isolation_level == TRX_ISO_READ_UNCOMMITTED)
+8. 2024-05-26T04:18:00.658915Z 17 [ERROR] [MY-013183] [InnoDB] Assertion failure: row0sel.cc:2796:(!prebuilt->idx_cond && prebuilt->m_mysql_handler->end_range != nullptr) || (prebuilt->trx->isolation_level == TRX_ISO_READ_UNCOMMITTED)
 
-2024-05-21 bool:parse_sql(THD*,:Parser_state*, 1 (1 distinct) Object_creation_ctx*): Assertion `!mysql_parse_status || mysql_parse_status && thd->is_error()) || (mysql_parse_status && thd->get_internal_handler())' failed.
+7. 2024-05-21 bool:parse_sql(THD*,:Parser_state*, 1 (1 distinct) Object_creation_ctx*): Assertion `!mysql_parse_status || mysql_parse_status && thd->is_error()) || (mysql_parse_status && thd->get_internal_handler())' failed.
 
-2024-05-13T04:41:02.318333Z 0 [ERROR] [MY-013183] [InnoDB] Assertion failure: trx0rec.ic:95:len < ((ulint)srv_page_size)
+6. 2024-05-13T04:41:02.318333Z 0 [ERROR] [MY-013183] [InnoDB] Assertion failure: trx0rec.ic:95:len < ((ulint)srv_page_size)
 
-https://bugs.mysql.com/?id=114133 dd corrupt assert lob0impl.cc:1237:total_read == len || total_read == avail_lob
-https://bugs.mysql.com/?id=113951 SEGV in INSERT
-https://bugs.mysql.com/?id=113860 Assertion `rc == TYPE_OK' CREATE TABLE sql/dd/impl/raw/raw_record.cc:158
-https://bugs.mysql.com/?id=113410 hang creating InnoDB Cluster
-https://bugs.mysql.com/?id=113694  misleading error message comparing a spatial column with numeric using < or such
+5. https://bugs.mysql.com/?id=114133 dd corrupt assert lob0impl.cc:1237:total_read == len || total_read == avail_lob
+4. https://bugs.mysql.com/?id=113951 SEGV in INSERT
+3. https://bugs.mysql.com/?id=113860 Assertion `rc == TYPE_OK' CREATE TABLE sql/dd/impl/raw/raw_record.cc:158
+2. https://bugs.mysql.com/?id=113410 hang creating InnoDB Cluster
+1. https://bugs.mysql.com/?id=113694  misleading error message comparing a spatial column with numeric using < or such
 
 It tests MySQL server 8.0+
 This is very much work in progress.
