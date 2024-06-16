@@ -7,9 +7,13 @@ THE PREVIOUS STATEMENT IS NOT A CLAIM FOR TOOL's  suitability for any purpose wh
 
 Yield: not everything filed as a bug because bug filing is fairly pointless activity in most cases for lack of care of the target audience at the manufacturer of the code. imho.
 
-12. 2024-06-15: mysql-8.3.0/sql/opt_explain.cc:2099: bool explain_query_specification(THD*, const THD*, Query_term*, enum_parsing_context): Assertion `ret || !explain_thd->is_error()' failed.
+14. 2024-06-16: 8.4LTS. 2024-06-16T17:17:08.393423Z 23 [ERROR] [MY-013183] [InnoDB] Assertion failure: dyn0buf.h:111:ptr <= begin() + m_buf_end thread 139875615458880
 
-11. 2024-06-14: correlated with using SELECT ... UNION/INTERSECT
+13. 2024-06-15: mysql-8.4.0/sql/dd/impl/cache/dictionary_client.cc:945: bool dd::cache::Dictionary_client::acquire(const K&, const T**, bool*, bool*) [with K = dd::Item_name_key; T = dd::Column_statistics]: Assertion `MDL_checker::is_read_locked(m_thd, *object)' failed.
+
+12. 2024-06-15: Also happens in 8.4. mysql-8.3.0/sql/opt_explain.cc:2099: bool explain_query_specification(THD*, const THD*, Query_term*, enum_parsing_context): Assertion `ret || !explain_thd->is_error()' failed.
+
+11. 2024-06-14: Also happens in 8.4. Correlated with using SELECT ... UNION/INTERSECT
 https://bugs.mysql.com/bug.php?id=115346 mysql-8.3.0/sql/iterators/composite_iterators.cc:2970: int materialize_iterator::SpillState::read_next_row_secondary_overflow(): Assertion `false' failed.
 
 10. 2024-06-14T01:58:40.260276Z 20 [ERROR] [MY-013183] [InnoDB] Assertion failure: row0sel.cc:2796:(!prebuilt->idx_cond && prebuilt->m_mysql_handler->end_range != nullptr) || (prebuilt->trx->isolation_level == TRX_ISO_READ_UNCOMMITTED) 
