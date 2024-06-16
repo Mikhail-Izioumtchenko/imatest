@@ -11,7 +11,7 @@ Yield: not everything filed as a bug because bug filing is fairly pointless acti
 
 14. 2024-06-16: 8.4LTS. 2024-06-16T17:17:08.393423Z 23 [ERROR] [MY-013183] [InnoDB] Assertion failure: dyn0buf.h:111:ptr <= begin() + m_buf_end thread 139875615458880
 
-13. 2024-06-15: mysql-8.4.0/sql/dd/impl/cache/dictionary_client.cc:945: bool dd::cache::Dictionary_client::acquire(const K&, const T**, bool*, bool*) [with K = dd::Item_name_key; T = dd::Column_statistics]: Assertion `MDL_checker::is_read_locked(m_thd, *object)' failed.
+13. https://bugs.mysql.com/bug.php?id=115349 2024-06-15: mysql-8.4.0/sql/dd/impl/cache/dictionary_client.cc:945: bool dd::cache::Dictionary_client::acquire(const K&, const T**, bool*, bool*) [with K = dd::Item_name_key; T = dd::Column_statistics]: Assertion `MDL_checker::is_read_locked(m_thd, *object)' failed.
 
 12. 2024-06-15: Also happens in 8.4. mysql-8.3.0/sql/opt_explain.cc:2099: bool explain_query_specification(THD*, const THD*, Query_term*, enum_parsing_context): Assertion `ret || !explain_thd->is_error()' failed.
 
