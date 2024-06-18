@@ -7,9 +7,9 @@ THE PREVIOUS STATEMENT IS NOT A CLAIM FOR TOOL's  suitability for any purpose wh
 
 Yield: not everything filed as a bug because bug filing is fairly pointless activity in most cases for lack of care of the target audience at the manufacturer of the code. imho.
 
-15. 2024-06-16: 8.4LTS. SEGV. 2024-06-16T18:44:01Z UTC - mysqld got signal 11 ; buf_flush_LRU_list_batch at /usr/src/debug/mysql-community-8.4.0-1.el9.x86_64/mysql-8.4.0/storage/innobase/buf/buf0flu.cc:1808
+Y15. 2024-06-16: 8.4LTS. SEGV. 2024-06-16T18:44:01Z UTC - mysqld got signal 11 ; buf_flush_LRU_list_batch at /usr/src/debug/mysql-community-8.4.0-1.el9.x86_64/mysql-8.4.0/storage/innobase/buf/buf0flu.cc:1808
 
-14. 2024-06-16: 8.4LTS. 2024-06-16T17:17:08.393423Z 23 [ERROR] [MY-013183] [InnoDB] Assertion failure: dyn0buf.h:111:ptr <= begin() + m_buf_end thread 139875615458880
+Y14. 2024-06-16: 8.4LTS. 2024-06-16T17:17:08.393423Z 23 [ERROR] [MY-013183] [InnoDB] Assertion failure: dyn0buf.h:111:ptr <= begin() + m_buf_end thread 139875615458880
 
 13. https://bugs.mysql.com/bug.php?id=115349 2024-06-15: mysql-8.4.0/sql/dd/impl/cache/dictionary_client.cc:945: bool dd::cache::Dictionary_client::acquire(const K&, const T**, bool*, bool*) [with K = dd::Item_name_key; T = dd::Column_statistics]: Assertion `MDL_checker::is_read_locked(m_thd, *object)' failed.
 
