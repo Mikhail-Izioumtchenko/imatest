@@ -526,6 +526,9 @@ insert_kind:
   mandatory: True
   allowed: Rseq       
   only_values_allowed: value,function,column,default
+insert_on_dup_update_p:
+  mandatory: True
+  allowed: probability
 integer_unsigned_p:
   mandatory: True
   allowed: probability

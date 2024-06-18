@@ -36,7 +36,8 @@ lof="/tmp/`$BASENAME $0`.tmp"
 
 ./usems.sh "$port"
 
-tomine="/root/mysql-sandboxes/4202/sandboxdata/error.log /tmp/*out"
+elog="/root/mysql-sandboxes/420$port/sandboxdata/error.log"
+tomine="$elog /tmp/*out"
 [ "$dom" = 'y' ] && $PERL logmine.pl $tomine 2>&1 | $TEE "$lof" | $LESS
 [ "$doc" = 'y' -o "$doh" = 'y' ] && {
   ./startms.sh "$port"
@@ -61,15 +62,15 @@ $ECHO ""
   
   $ECHO ""
   $ECHO "signals and croaks START"
-  hom=`$GREP -i 'Assertion|signal|croak' $tomine | $GREP -v '(hakill1sa.sh|checkms.sh : 0 signals or assertions)' | $WC -l`
+  hom=`$GREP -i 'ssertion|signal|croak' $tomine | $GREP -v '(hakill1sa.sh|checkms.sh : 0 signals or assertions)' | $WC -l`
   [ "$hom" -gt 10 ] && $GREP -i 'signal|croak' $tomine | $GREP -v hakill1sa.sh |  $GREP -v '(hakill1sa.sh|checkms.sh : 0 signals or assertions)' | $LESS || $GREP -i 'signal|croak' $tomine | $GREP -v '(hakill1sa.sh|checkms.sh : 0 signals or assertions)'
   $ECHO ""
   $ECHO "signals and croaks SHORT"
-  $GREP -i 'Assertion|signal|croak' $tomine | $GREP -v '(hakill1sa.sh|checkms.sh : 0 signals or assertions)' | $GREP -v semi
+  $GREP -i 'ssertion|signal|croak' $tomine | $GREP -v '(hakill1sa.sh|checkms.sh : 0 signals or assertions)' | $GREP -v semi
   $ECHO "signals and croaks END with $hom signals and croaks including semicroaks"
   $ECHO ""
-  $ECHO "JUST SIGNALS"
-  $GREP -i 'Assertion|signal' $tomine | $GREP -v '(hakill1sa.sh|checkms.sh : 0 signals or assertions)' 
+  $ECHO "JUST SIGNALS in $elog"
+  $GREP -i 'ssertion|signal' $elog
   $ECHO "SIGNALS END"
   $ECHO ""
   $ECHO "See also $lof"
@@ -83,9 +84,15 @@ $ECHO ""
 
 ./usems.sh "$port"
 
+$GREP main.*seed /tmp/i*out
 $ECHO -n "Remove -rf /tmp/* ? "
 $READ ans
 [ "$ans" = 'y' ] && $RM -rfv /tmp/*
+$ECHO -n "Remove $elog? "
+$READ ans
+[ "$ans" = 'y' ] && $RM -fv $elog
 $DF -h /mnt/c
 
 ./usems.sh "$port"
+./stopms.sh "$port" wait
+$GREP main.*seed /tmp/i*out

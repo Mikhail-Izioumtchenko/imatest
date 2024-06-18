@@ -43,6 +43,7 @@ pass=`$CAT "$IMAPAS"`
 rc='0'
 com="$ECHO $pass | $MYSQLSH --quiet-start=2 --passwords-from-stdin --execute \"dba.deploySandboxInstance($port, {'portX':$portex$add})\""
 ima_say "$me : executing $com"
+#exit 0 #debug
 $EVAL $com
 rc="$?"
 ima_say "$me : finished with exit code $rc executing $com"

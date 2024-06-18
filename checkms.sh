@@ -49,10 +49,10 @@ for port in $portlist ; do
   tsig=''
   taport="$(($port + $base))"
   errorlog="$SANDBOXDIR/$taport/sandboxdata/error.log"
-  ecnt=`$GREP 'mysqld got signal|Assertion failure' "$errorlog" | $WC -l`
+  ecnt=`$GREP 'mysqld got signal|ssertion' "$errorlog" | $WC -l`
   toecnt=$(($toecnt + $ecnt))
   [ "$ecnt" != '0' ] && {
-      $GREP '$MySQL got signal|Assertion failure' $errorlog
+      $GREP 'mysqld got signal|ssertion' $errorlog
       ima_say "$me: PROBLEM: $ecnt signals or assertions in $errorlog"
       hassig='1'
       tsig='SIG'

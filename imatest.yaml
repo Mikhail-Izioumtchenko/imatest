@@ -1,18 +1,27 @@
 ---
+define: &port 4
 #create_db: no
 create_db: yes
-port_writer: 2
+check_thread_ports: *port
+port_writer: *port
+check_thread_ports: *port
+ports_destructive: *port
+port_load: *port
+mysql_initial_cnf_ports: *port
 schemas: 8
 #destructive_thread_out: qw(/dev/null)
 #destructive_thread_err: qw(/dev/null)
 #load_thread_out: qw(/dev/null)
 #load_thread_err: qw(/dev/null)
 txn_use: yes
-#load_thread_sql: qw(/dev/null)
+load_thread_sql: qw(/dev/null)
 # heavy START
+tables_per_schema: 2
 tables_per_schema: 33
-load_threads: 3Xb3,3Xb2,3Xddl,8
-load_threads: 1Xb3,1Xb2,1Xddl,1
+server_terminate: no
+load_threads: 1Xb3,1Xb2,2Xddl,2
+load_threads: 3Xb3,3Xb2,4Xddl,9
+load_threads: 1Xb2,1Xddl,1
 server_terminate: yes
 test_duration_seconds: 3600
 load_thread_restart: yes
@@ -29,10 +38,7 @@ load_max_stmt: 000
 report_every_stmt: 10000
 report_every_seconds: 120
 rediscover_every_seconds: 60-70
-# 0 means no check thread
-check_thread_ports: 2
 check_thread_sleep: 10
-load_thread_random_seeds: 345162,655474,732338,887186,393116,820162,53964,324649,439968,642493,866187,330207,677693,793873,543641,766520,400089
 load_thread_random_seeds: 0
 destructive_thread_random_seeds: 0
 sleep_final: 30
@@ -51,17 +57,15 @@ server_termination_how_k_b2: sigkill
 server_termination_every_seconds: 120-180:0.5,120-240
 server_termination_every_seconds_k_b2: 100-250
 ports_destructive_how_many: 1
-ports_destructive: 2
 #ports_destructive_k_b2: 3
 destructive_thread_sleep: 5
-port_load: 2
 #port_load_k_b2: 3
 
 missing_probability_replacement: 0.001
 
 define: &functions_integer_index LENGTH(@SELF),ASCII(@SELF),HEX(@SELF),ABS(@SELF),ACOS(@SELF),AES_ENCRYPT(@SELF;""),ASIN(@SELF),ATAN(@SELF),BIN(@SELF),BIT_COUNT(@SELF),BIT_LENGTH(@SELF),CEIL(@SELF),CHAR(@SELF),CHAR_LENGTH(@SELF),COMPRESS(@SELF),MMMD5(@SELF),COS(@SELF),COT(@SELF),CRC32(@SELF),DEGREES(@SELF),EXP(@SELF),FLOOR(@SELF),FORMAT_BYTES(@SELF),FROM_DAYS(@SELF),FROM_UNIXTIME(@SELF),INET_NTOA(@SELF),LN(@SELF),LOG(@SELF;@SELF),LOG10(@SELF),LOG2(@SELF),MMMAKEDATE(@SELF;@SELF),MMMAKETIME(@SELF;@SELF;@SELF),OCT(@SELF),MMMOD(@SELF;@SELF),RADIANS(@SELF),REPEAT(@SELF;@SELF),REVERSE(@SELF),ROUND(@SELF;@SELF),TAN(@SELF)
 define: &functions_charlike_index LENGTH(@SELF),CONCAT(@SELF;@SELF),ASCII(@SELF),HEX(@SELF),AES_ENCRYPT(@SELF;""),BIN(@SELF),BIT_COUNT(@SELF),BIT_LENGTH(@SELF),CHAR(@SELF),CHAR_LENGTH(@SELF),COERCIBILITY(@SELF),COLLATION(@SELF),COMPRESS(@SELF),MMMD5(@SELF),CONCAT_WS("A";@SELF;@SELF),CRC32(@SELF),INSTR(@SELF;@SELF),LOCATE(@SELF;@SELF),LOWER(@SELF),ORD(@SELF),QUOTE(@SELF),REGEXP_INSTR(@SELF;@SELF),REPLACE(@SELF;@SELF;@SELF),REVERSE(@SELF),RTRIM(@SELF)
-define: &functions_numeral_virtual LENGTH(@SELF),ASCII(@SELF),HEX(@SELF),ABS(@SELF),ACOS(@SELF),AES_ENCRYPT(@SELF;""),ASIN(@SELF),ATAN(@SELF),BIN(@SELF),BIT_COUNT(@SELF),BIT_LENGTH(@SELF),CEIL(@SELF),CHAR(@SELF),CHAR_LENGTH(@SELF),COMPRESS(@SELF),MMMD5(@SELF),COS(@SELF),COT(@SELF),CRC32(@SELF),DEGREES(@SELF),EXP(@SELF),FLOOR(@SELF),FORMAT_BYTES(@SELF),FROM_DAYS(@SELF),FROM_UNIXTIME(@SELF),INET_NTOA(@SELF),LN(@SELF),LOG(@SELF;@SELF),LOG10(@SELF),LOG2(@SELF),MMMAKEDATE(@SELF;@SELF),MMMAKETIME(@SELF;@SELF;@SELF),OCT(@SELF),MMMOD(@SELF;@SELF),RADIANS(@SELF),REPEAT(@SELF;@SELF),REVERSE(@SELF),ROUND(@SELF;@SELF),TAN(@SELF)
+define: &functions_numeral_virtual LENGTH(@SELF),ASCII(@SELF),ASCII(@COL_int),HEX(@SELF),ABS(@SELF),ACOS(@SELF),AES_ENCRYPT(@SELF;""),ASIN(@SELF),ATAN(@SELF),BIN(@SELF),BIT_COUNT(@SELF),BIT_LENGTH(@SELF),CEIL(@SELF),CHAR(@SELF),CHAR_LENGTH(@SELF),COMPRESS(@SELF),MMMD5(@SELF),COS(@SELF),COT(@SELF),CRC32(@SELF),DEGREES(@SELF),EXP(@SELF),FLOOR(@SELF),FORMAT_BYTES(@SELF),FROM_DAYS(@SELF),FROM_UNIXTIME(@SELF),INET_NTOA(@SELF),LN(@SELF),LOG(@SELF;@SELF),LOG10(@SELF),LOG2(@SELF),MMMAKEDATE(@SELF;@SELF),MMMAKETIME(@SELF;@SELF;@SELF),OCT(@SELF),MMMOD(@SELF;@SELF),RADIANS(@SELF),REPEAT(@SELF;@SELF),REVERSE(@SELF),ROUND(@SELF;@SELF),TAN(@SELF)
 define: &functions_charlike_virtual LENGTH(@SELF),CONCAT(@SELF;@SELF),ASCII(@SELF),HEX(@SELF),AES_ENCRYPT(@SELF;""),BIN(@SELF),BIT_COUNT(@SELF),BIT_LENGTH(@SELF),CHAR(@SELF),CHAR_LENGTH(@SELF),COERCIBILITY(@SELF),COLLATION(@SELF),COMPRESS(@SELF),MMMD5(@SELF),CONCAT_WS("A";@SELF;@SELF),CRC32(@SELF),INSTR(@SELF;@SELF),LOCATE(@SELF;@SELF),LOWER(@SELF),ORD(@SELF),QUOTE(@SELF),REGEXP_INSTR(@SELF;@SELF),REPLACE(@SELF;@SELF;@SELF),REVERSE(@SELF),RTRIM(@SELF)
 define: &functions_any_virtual LENGTH(@SELF),CONCAT(@SELF;@SELF),ASCII(@SELF),HEX(@SELF),AES_ENCRYPT(@SELF;""),BIN(@SELF),BIT_COUNT(@SELF),BIT_LENGTH(@SELF),CHAR(@SELF),CHAR_LENGTH(@SELF),COERCIBILITY(@SELF),COLLATION(@SELF),COMPRESS(@SELF),MMMD5(@SELF),CONCAT_WS("A";@SELF;@SELF),CRC32(@SELF),INSTR(@SELF;@SELF),LOCATE(@SELF;@SELF),LOWER(@SELF),ORD(@SELF),QUOTE(@SELF),REGEXP_INSTR(@SELF;@SELF),REPLACE(@SELF;@SELF;@SELF),REVERSE(@SELF),RTRIM(@SELF),HEX(@SELF),ABS(@SELF),ACOS(@SELF),AES_ENCRYPT(@SELF;""),ASIN(@SELF),ATAN(@SELF),BIN(@SELF),BIT_COUNT(@SELF),BIT_LENGTH(@SELF),CEIL(@SELF),CHAR(@SELF),CHAR_LENGTH(@SELF),COMPRESS(@SELF),MMMD5(@SELF),COS(@SELF),COT(@SELF),CRC32(@SELF),DEGREES(@SELF),EXP(@SELF),FLOOR(@SELF),FORMAT_BYTES(@SELF),FROM_DAYS(@SELF),FROM_UNIXTIME(@SELF),INET_NTOA(@SELF),LN(@SELF),LOG(@SELF;@SELF),LOG10(@SELF),LOG2(@SELF),MMMAKEDATE(@SELF;@SELF),MMMAKETIME(@SELF;@SELF;@SELF),OCT(@SELF),MMMOD(@SELF;@SELF),RADIANS(@SELF),REPEAT(@SELF;@SELF),REVERSE(@SELF),ROUND(@SELF;@SELF),TAN(@SELF)
 define: &functions_numeral_where LENGTH(@SELF),ASCII(@SELF),HEX(@SELF),ABS(@SELF),ACOS(@SELF),AES_ENCRYPT(@SELF;""),ASIN(@SELF),ATAN(@SELF),BIN(@SELF),BIT_COUNT(@SELF),BIT_LENGTH(@SELF),CEIL(@SELF),CHAR(@SELF),CHAR_LENGTH(@SELF),COMPRESS(@SELF),MMMD5(@SELF),COS(@SELF),COT(@SELF),CRC32(@SELF),DEGREES(@SELF),EXP(@SELF),FLOOR(@SELF),FORMAT_BYTES(@SELF),FROM_DAYS(@SELF),FROM_UNIXTIME(@SELF),INET_NTOA(@SELF),LN(@SELF),LOG(@SELF;@SELF),LOG10(@SELF),LOG2(@SELF),MMMAKEDATE(@SELF;@SELF),MMMAKETIME(@SELF;@SELF;@SELF),OCT(@SELF),MMMOD(@SELF;@SELF),RADIANS(@SELF),REPEAT(@SELF;@SELF),REVERSE(@SELF),ROUND(@SELF;@SELF),TAN(@SELF)
@@ -110,7 +114,7 @@ define: &functions_character CONCAT(@SELF;@COL_character),CONCAT(@SELF;@SELF),PI
 define: &functions_datetime DATE_ADD(@SELF;INTERVAL $COL_integer DAY):0.1,ADDDATE(@COL_timestamp;1),ADDDATE(@COL_datetime;1),NOW(),ADDDATE(@SELF;1),ADDTIME(@SELF;1),CURTIME(),CURRENT_TIME,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP(),CURRENT_DATE,CURRENT_DATE(),DATE(@COL_datetime),DAYOFWEEK(@COL_datetime),DEFAULT(@COL),FROM_DAYS(@COL_integer),IFNULL(@SELF;@COL_datetime),LAST_DAY(@COL_datetime),LAST_DAY(@SELF),LOCALTIME,LOCALTIME(),LOCALTIMESTAMP,LOCALTIMESTAMP(),MMMAKEDATE(@COL_smallint;@COL_tinyint),MMMAKETIME(@COL_tinyint;@COL_tinyint;@COL_tinyint),NULLIF(@COL_datetime;@SELF),SEC_TO_TIME(@COL_smallint),STR_TO_DATE(@COL_character;@COL_character),SUBTIME(@COL_datetime;@COL_datetime),SYSDATE(),TIME(@COL_datetime),TIMEDIFF(@COL_datetime;@COL_datetime),TIMESTAMP(@COL_datetime),TIMESTAMP(@COL_datetime;@COL_time),UNIX_TIMESTAMP()
 define: &functions_lob CURRENT_USER,CURRENT_USER(),PI(),NOW(),ASCII(@COL_varchar),ASCII(@SELF),HEX(@COL),HEX(@SELF),AES_ENCRYPT(@COL;""),AES_DECRYPT(@SELF;""),AES_ENCRYPT(@SELF;""),BIN(@COL),BIT_LENGTH(@COL),BIT_LENGTH(@SELF),CHAR(@COL),CHAR_LENGTH(@SELF),CHAR_LENGTH(@COL),CHARSET(@COL_character),CHARSET(@COL_text),COERCIBILITY(@COL),COLLATION(@COL),COMPRESS(@COL),MMMD5(@COL),CONNECTION_ID(),CURRENT_TIMESTAMP,CURRENT_TIMESTAMP(),CURRENT_DATE,CURRENT_DATE(),CURRENT_ROLE(),CRC32(@SELF),CRC32(@COL),DATEDIFF(@COL_datetime;@COL_datetime),DATE_FORMAT(@COL_datetime;"%a"),DATE_FORMAT(@COL_datetime;@COL),DAY(@COL_datetime),DATE(@COL_datetime),DATABASE(),DAYOFYEAR(@COL_datetime),DAYOFWEEK(@COL_datetime),DAYOFMONTH(@COL_datetime),@COL_integer DIV @COL_integer,DEGREES(@COL_integer),DEFAULT(@COL),EXTRACT(MICROSECOND FROM @COL_timestamp),EXP(@COL_integer),FORMAT(@COL_integer;@COL_integer),FORMAT_BYTES(@COL_integer),FORMAT_PICO_TIME(@COL_integer),FROM_DAYS(@COL_integer),FROM_UNIXTIME(@COL_integer),FROM_UNIXTIME(@COL_integer;@COL_character),HEX(@COL_character),HEX(@COL_integer),HOUR(@COL_datetime),ICU_VERSION(),IFNULL(@SELF;@COL_integer),INET_NTOA(@COL_integer),INSERT(@SELF;@COL_integer;@COL_integer;@COL_character),INSTR(@COL_character;@COL_character),INTERVAL(@COL_integer;@COL_integer;@COL_integer;@COL_integer),ISNULL(@SELF),ISNULL(@COL),LAST_DAY(@COL_datetime),LEAST(@COL;@COL;@SELF),LEFT(@SELF;@COL_integer),LENGTH(@SELF),LN(@COL_integer),LOCALTIME,LOCALTIME(),LOCALTIMESTAMP,LOCALTIMESTAMP(),LOCATE(@SELF;@COL),LOG(@COL_integer;@COL_integer),LOG10(@COL),LOG2(@COl_integer),LOWER(@SELF),LOWER(@COL_character),LOWER(@COL_lob),LPAD(@COL_character;@COL_integer;@COL_character),MMMAKETIME(@COL_tinyint;@COL_tinyint;@COL_tinyint),MMMICROSECOND(@COL_datetime),OCT(@COL_integer),MMMINUTE(@COL_datetime),MMMOD(@COL_integer;@COL_integer),MMMONTH(@COL_datetime),MMMONTHNAME(@COL_datetime),NULLIF(@COL_character;@SELF),ORD(@COL_character),PS_CURRENT_THREAD_ID(),PS_THREAD_ID(@COL_smallint),QUARTER(@COL_datetime),QUOTE(@SELF),RADIANS(@COL_float),RANDOM_BYTES(@COL_tinyint),REGEXP_INSTR(@SELF;@COL_character),REGEXP_REPLACE(@COL_lob;@COL_character;@COL_character),RELEASE_ALL_LOCKS(),RELEASE_LOCK(@COL_character),REPEAT(@COL_character;@COL_smallint),REPLACE(@SELF;@COL_character;@COL_character),REVERSE(@SELF),ROLES_GRAPHML(),ROUND(@COL_float;@COL_tinyint),ROW_COUNT(),RTRIM(@SELF),SECOND(@COL_datetime),SHA1(@SELF),SHA2(@COL_character;224),SYSDATE(),EXPORT_SET(@COL_integer;@COL_character;@COL_character;@COL_character;@COL_integer),UNCOMPRESS(@COL_lob),UNIX_TIMESTAMP(),UPPER(@COL_lob),UUID_TO_BIN(@COL_character),UUID_TO_BIN(@COL_CHARACTER;@COL_boolean)
 define: &functions_numeric FINDME(),@SELF IN (@COL_integer;@COL_integer):0.1,PI(),NOW(),ASCII(@COL),ASCII(@SELF),HEX(@COL),HEX(@SELF),ABS(@COL_integer),ACOS(@SELF),ASIN(@SELF),ASIN(@COL),ATAN(@SELF),ATAN(@COL),BIN(@COL),BIN(@SELF),BIT_COUNT(@SELF),BIT_LENGTH(@COL),BIT_LENGTH(@SELF),CEIL(@SELF),CEIL(@COL),CHAR_LENGTH(@SELF),CHAR_LENGTH(@COL),COERCIBILITY(@COL),RAND(),CONNECTION_ID(),COS(@SELF),COT(@SELF),CONV(@COL;16;2),CURRENT_TIMESTAMP,CURRENT_TIMESTAMP(),CURRENT_DATE,CURRENT_DATE(),CRC32(@SELF),CRC32(@COL),DATEDIFF(@COL_datetime;@COL_datetime),DATE_FORMAT(@COL_datetime;"%h"),DATE_FORMAT(@COL_datetime;@COL),DAY(@COL_datetime),DAYOFYEAR(@COL_datetime),DAYOFWEEK(@COL_datetime),DAYOFMONTH(@COL_datetime),@COL_integer DIV @COL_integer,DEGREES(@COL_integer),DEFAULT(@COL),EXTRACT(MICROSECOND FROM @COL_timestamp),EXP(@COL_integer),FIELD(@COL_character;@COL_character;@COL_character),FIND_IN_SET(@COL_character;@COL_character),FLOOR(@COL_integer),HOUR(@COL_datetime),ICU_VERSION(),IFNULL(@SELF;@COL_integer),INSTR(@COL_character;@COL_character),INTERVAL(@COL_integer;@COL_integer;@COL_integer;@COL_integer),ISNULL(@SELF),ISNULL(@COL),LEAST(@COL;@COL;@SELF),LN(@COL_integer),LOCALTIME,LOCALTIME(),LOCALTIMESTAMP,LOCALTIMESTAMP(),LOCATE(@COL_lob;@COL_character),LOG(@COL_integer;@SELF),MMMICROSECOND(@COL_datetime),OCT(@COL_integer),OCT(@SELF),MMMINUTE(@COL_datetime),MMMOD(@COL_integer;@COL_integer),MMMONTH(@COL_datetime),NULLIF(@COL_integer;@SELF),ORD(@COL_character),PERIOD_ADD(@COL_smallint;@COL_tinyint),PERIOD_DIFF(@COL_integer;@COL_integer),POW(@COL_float;@COL_tinyint),PS_CURRENT_THREAD_ID(),PS_THREAD_ID(@COL_smallint),QUARTER(@COL_datetime),RADIANS(@COL_float),RADIANS(@SELF),REGEXP_INSTR(@COL_lob;@COL_character),RELEASE_ALL_LOCKS(),RELEASE_LOCK(@COL_character),ROUND(@COL_float;@COL_tinyint),ROW_COUNT(),SECOND(@COL_datetime),SIGN(@SELF),SIN(@SELF),STRCMP(@COL_character;@COL_character),SUBSTRING_INDEX(@COL_character;@COL_character;@COL_integer),SYSDATE(),TAN(@COL_double),TIME_TO_SEC(@COL_datetime),TO_DAYS(@COL_datetime),TIMESTAMPDIFF(MINUTE;@COL_datetime;@COL_datetime),TO_SECONDS(@COL_datetime),TRUNCATE(@COL_decimal;@COL_tinyint),UNCOMPRESSED_LENGTH(@COL_character),UNIX_TIMESTAMP(),UNIX_TIMESTAMP(@COL_datetime),VALIDATE_PASSWORD_STRENGTH(@COL_character),WEEK(@COL_datetime),WEEKDAY(@COL_datetime),WEEKOFYEAR(@COL_datetime),YEAR(@COL_datetime),YEARWEEK(@COL_datetime)
-define: &functions_virtual PI(),CONCAT(@COL_varchar;@COL_character),CONCAT(@COL;@COL),ASCII(@COL),HEX(@COL),ABS(@COL),ACOS(@COL),ADDDATE(@COL;1),ADDTIME(@COL;1),AES_ENCRYPT(@COL;""),AES_DECRYPT(@COL;""),AES_ENCRYPT(@COL;""),ASIN(@COL),ASIN(@COL),ATAN(@COL),BIN(@COL),BIT_COUNT(@COL),BIT_LENGTH(@COL),CEIL(@COL),CHAR(@COL),CHAR_LENGTH(@COL),COERCIBILITY(@COL),COLLATION(@COL),COMPRESS(@COL),MMMD5(@COL),CONCAT_WS("A";@COL_character;@COL_character),COS(@COL),COT(@COL),CRC32(@COL),DATEDIFF(@COL_datetime;@COL_datetime),DATE_FORMAT(@COL_datetime;"%a"),DATE_FORMAT(@COL_datetime;@COL),DAY(@COL_datetime),DATE(@COL_datetime),DAYOFYEAR(@COL_datetime),DATE_ADD(@COL_datetime;INTERVAL @COL_tinyint DAY),DAYOFMONTH(@COL_datetime),DAYOFWEEK(@COL_datetime),@COL_integer DIV @COL_integer,DEGREES(@COL_integer),DEFAULT(@COL),EXTRACT(MICROSECOND FROM @COL_timestamp),EXP(@COL_integer),FLOOR(@COL_integer),FORMAT(@COL_integer;@COL_integer),FORMAT_BYTES(@COL_integer),FORMAT_PICO_TIME(@COL_timestamp),FROM_DAYS(@COL_integer),FROM_UNIXTIME(@COL_integer),HEX(@COL_character),HEX(@COL_integer),HOUR(@COL_datetime),ICU_VERSION(),INET_NTOA(@COL_integer),INSERT(@COL_character;@COL_integer;@COL_integer;@COL_character),INSTR(@COL_character;@COL_character),INTERVAL(@COL_integer;@COL_integer;@COL_integer;@COL_integer),LAST_DAY(@COL_datetime),LEAST(@COL;@COL;@COL),LEFT(@COL_character;@COL_integer),LENGTH(@COL_lob),LN(@COL_integer),LOCATE(@COL_character;@COL_character),LOG(@COL_integer;@COL_integer),LOG10(@COL_integer),LOG2(@COL_integer),LOWER(@COL_lob),LPAD(@COL_lob;@COL_integer;@COL_character),MMMAKEDATE(@COL_smallint;@COL_tinyint),MMMAKETIME(@COL_tinyint;@COL_tinyint;@COL_tinyint),MMMICROSECOND(@COL_datetime),OCT(@COL_integer),MMMINUTE(@COL_datetime),MMMOD(@COL_integer;@COL_integer),MMMONTH(@COL_datetime),MMMONTHNAME(@COL_datetime),NULLIF(@COL;@COL),ORD(@COL_character),QUARTER(@COL_datetime),QUOTE(@COL_character),RADIANS(@COL_float),REGEXP_INSTR(@COL_lob;@COL_character),REPEAT(@COL_character;@COL_tinyint),REPLACE(@COL_character;@COL_character;@COL_character),REVERSE(@COL_character),ROUND(@COL_float;@COL_tinyint),RTRIM(@COL_character),ELT(@COL_smallint;@COL_character;@COL_character),TAN(@COL_double)
+#define: &functions_virtual PI(),CONCAT(@COL_varchar;@COL_character),CONCAT(@COL;@COL),ASCII(@COL),HEX(@COL),ABS(@COL),ACOS(@COL),ADDDATE(@COL;1),ADDTIME(@COL;1),AES_ENCRYPT(@COL;""),AES_DECRYPT(@COL;""),AES_ENCRYPT(@COL;""),ASIN(@COL),ASIN(@COL),ATAN(@COL),BIN(@COL),BIT_COUNT(@COL),BIT_LENGTH(@COL),CEIL(@COL),CHAR(@COL),CHAR_LENGTH(@COL),COERCIBILITY(@COL),COLLATION(@COL),COMPRESS(@COL),MMMD5(@COL),CONCAT_WS("A";@COL_character;@COL_character),COS(@COL),COT(@COL),CRC32(@COL),DATEDIFF(@COL_datetime;@COL_datetime),DATE_FORMAT(@COL_datetime;"%a"),DATE_FORMAT(@COL_datetime;@COL),DAY(@COL_datetime),DATE(@COL_datetime),DAYOFYEAR(@COL_datetime),DATE_ADD(@COL_datetime;INTERVAL @COL_tinyint DAY),DAYOFMONTH(@COL_datetime),DAYOFWEEK(@COL_datetime),@COL_integer DIV @COL_integer,DEGREES(@COL_integer),DEFAULT(@COL),EXTRACT(MICROSECOND FROM @COL_timestamp),EXP(@COL_integer),FLOOR(@COL_integer),FORMAT(@COL_integer;@COL_integer),FORMAT_BYTES(@COL_integer),FORMAT_PICO_TIME(@COL_timestamp),FROM_DAYS(@COL_integer),FROM_UNIXTIME(@COL_integer),HEX(@COL_character),HEX(@COL_integer),HOUR(@COL_datetime),ICU_VERSION(),INET_NTOA(@COL_integer),INSERT(@COL_character;@COL_integer;@COL_integer;@COL_character),INSTR(@COL_character;@COL_character),INTERVAL(@COL_integer;@COL_integer;@COL_integer;@COL_integer),LAST_DAY(@COL_datetime),LEAST(@COL;@COL;@COL),LEFT(@COL_character;@COL_integer),LENGTH(@COL_lob),LN(@COL_integer),LOCATE(@COL_character;@COL_character),LOG(@COL_integer;@COL_integer),LOG10(@COL_integer),LOG2(@COL_integer),LOWER(@COL_lob),LPAD(@COL_lob;@COL_integer;@COL_character),MMMAKEDATE(@COL_smallint;@COL_tinyint),MMMAKETIME(@COL_tinyint;@COL_tinyint;@COL_tinyint),MMMICROSECOND(@COL_datetime),OCT(@COL_integer),MMMINUTE(@COL_datetime),MMMOD(@COL_integer;@COL_integer),MMMONTH(@COL_datetime),MMMONTHNAME(@COL_datetime),NULLIF(@COL;@COL),ORD(@COL_character),QUARTER(@COL_datetime),QUOTE(@COL_character),RADIANS(@COL_float),REGEXP_INSTR(@COL_lob;@COL_character),REPEAT(@COL_character;@COL_tinyint),REPLACE(@COL_character;@COL_character;@COL_character),REVERSE(@COL_character),ROUND(@COL_float;@COL_tinyint),RTRIM(@COL_character),ELT(@COL_smallint;@COL_character;@COL_character),TAN(@COL_double)
 
 # on values kinds and syntax see comments imatest_syntax.yaml
 # one level deep, a sequence of name: value
@@ -129,7 +133,6 @@ create_db: True
 config: single
 # ports are relative.
 ports_destructive: 3
-port_load: 2
 # offset port -> x protocol port, 2 -> 4202 -> 4302
 mportoffset: 4200
 xportoffset: 4300
@@ -241,7 +244,9 @@ select_distinct_p: 0.001
 select_group_by_p: 0.1
 select_order_by_p: 0.1
 select_order_by_column_p: 0.01
-select_union_how: UNION!INTERSECT,EXCEPT,UNION ALL,INTERSECT ALL,EXCEPT ALL
+#bug#mysql-8.4.0/sql/iterators/composite_iterators.cc:3596: int {anonymous}::SpillState::read_next_row_secondary_overflow(): Assertion `false' failed.
+#select_union_how: UNION,INTERSECT,EXCEPT,UNION ALL,INTERSECT ALL,EXCEPT ALL
+select_union_how: UNION!UNION ALL,EXCEPT,INTERSECT,INTERSECT ALL,EXCEPT ALL
 select_union_p: 0.1
 select_union_len: 1-2:0.5,2-8:0.1,1
 
@@ -255,7 +260,8 @@ load_show_columns_kind: EXTENDED,FULL,BOTH,EMPTY
 load_show_tables_kind: EXTENDED,FULL,BOTH,EMPTY
 load_show_status_how: GLOBAL,SESSION,EMPTY
 load_show_variables_how: GLOBAL,SESSION,EMPTY
-load_flush_how: PRIVILEGES,OPTIMIZER_COSTS,STATUS,USER_RESOURCES
+#https://bugs.mysql.com/bug.php?id=115349 2024-06-15: mysql-8.4.0/sql/dd/impl/cache/dictionary_client.cc:945: bool dd::cache::Dictionary_client::acquire(const K&, const T**, bool*, bool*) [with K = dd::Item_name_key; T = dd::Column_statistics]: Assertion `MDL_checker::is_read_locked(m_thd, *object)' failed.
+load_flush_how: PRIVILEGES,STATUS,USER_RESOURCES!OPTIMIZER_COSTS
 load_flush_tables_how: EMPTY,WITH READ LOCK,FOR EXPORT
 load_flush_tables_n: 0:0.2,1:0.2,1-2:0.9,0-5:0.1,1
 load_flush_local_p: 0.99
@@ -267,6 +273,7 @@ update_where_all_p: 0.01
 delete_where_all_p: 0.00001
 
 insert_kind: function:0.2,value:0.5,column:0.01,default:0.01,value
+insert_on_dup_update_p: 0.1
 update_kind: function:0.1,value:0.5,column:0.1,default:0.001,value
 
 default_kind: function,value,column
@@ -389,7 +396,7 @@ virtual_term_unary_charlike_operator: PREFNNN:0.001,~:0.01,EMPTY
 virtual_term_unary_datelike_operator: PREFNNN:0.001,~:0.01,EMPTY
 
 set_kind: LOCAL,GLOBAL,PERSIST,PERSIST_ONLY,EMPTY
-set_group: g7bn:0.1,g1:0.5,g2s:0.1,g3b:0.1,g5ef:0.1,g4cc:0.001,g6n:0.1,g1!g7bn:0.1
+set_group: g7bn:0.1,g2s:0.1,g3b:0.1,g5ef:0.1,g4cc:0.001,g6n:0.1!g1:0.5,g1
 set_variable_name_g1: innodb_buffer_pool_size
 set_variable_value_g1:  67108864:0.1,33554432:0.1,16777216:0.9,16777215:0.001,0:0.001,Y:0.0001,16777216
 set_variable_name_g2s: flush_time:0.01,innodb_buffer_pool_instances:0.9,cte_max_recursion_depth:0.1,div_precision_increment:0.1,eq_range_index_dive_limit:0.1,innodb_buffer_pool_instances
@@ -400,10 +407,10 @@ set_variable_name_g4cc: commit_and_chain
 set_variable_value_g4cc: 0:0.999,1:0.99,2:0.0001,3:0.01,x:0.01,0
 set_variable_name_g5ef: explain_format
 set_variable_value_g5ef: TRADITIONAL:0.1,JSON:0.5,TREE:0.1,x:0.01,0:0.01,1-2:0.01,JSON
-set_variable_name_g6n: group_concat_max_len
+set_variable_name_g6n: group_concat_max_len,information_schema_stats_expiry,lock_wait_timeout
 set_variable_value_g6n: 1-10:0.001,0:0.1,Y:0.001,10-100:0.1,500-900:0.1,1000-10000:0.5,10000-100000:0.5,1000-10000
-set_variable_name_g7bn: histogram_generation_max_mem_size
-set_variable_value_g7bn: 1000000:0.1,2000000:0.1,40000000:0.1,20000000:0.1,Y:0.001,0:0.001,1-500:0.01,1000000-10000000:0.1,1000000
+set_variable_name_g7bn: join_buffer_size,histogram_generation_max_mem_size
+set_variable_value_g7bn: 1000000:0.1,10000-100000:0.1,40000000:0.1,100000-1000000:0.1,Y:0.001,0:0.001,1-500:0.01,1000000-10000000:0.1,100000-300000
 
 where_term_numeral_operator: %,+,*,NNN,/,DIV,&,<<,>>,|,^
 where_term_charlike_operator: %,+,*,NNN,/,DIV,&,<<,>>,^,|
@@ -437,7 +444,8 @@ load_alter_length: 1:0.9,1-2:0.9,1-3
 load_alter_kind: ADD_KEY:0.1,TABLE_EB:0.1,ADD_COL:0.1,DROP_COL:0.01,DROP_KEY
 load_create_table_kind: select:0.1,like:0.2,new
 load_analyze_local_p: 0.9
-load_analyze_kind: drop:0.5,update:0.5,just
+#https://bugs.mysql.com/bug.php?id=115349 2024-06-15: mysql-8.4.0/sql/dd/impl/cache/dictionary_client.cc:945: bool dd::cache::Dictionary_client::acquire(const K&, const T**, bool*, bool*) [with K = dd::Item_name_key; T = dd::Column_statistics]: Assertion `MDL_checker::is_read_locked(m_thd, *object)' failed.
+load_analyze_kind: just!drop:0.5,update:0.5,just
 load_analyze_buckets: 1,5,20,100
 load_check_quick_p: 0.1
 load_lock_table_count: 1:0.999,1-3
@@ -445,7 +453,8 @@ load_lock_table_kind: READ:0.9,WRITE
 load_optimize_local_p: 0.9
 load_select_limit: EMPTY:0.99,0-100:0.5,1-1000:0.5,EMPTY
 
-explain: explain_analyze:0.001,explain:0.001,EMPTY
+#bug#mysql-8.3.0/sql/opt_explain.cc:2099: bool explain_query_specification(THD*, const THD*, Query_term*, enum_parsing_context): Assertion `ret || !explain_thd->is_error()' failed. 8.4, too
+explain: explain:0.01,EMPTY!explain_analyze:0.001,EMPTY
 
 column_visibility: EMPTY:0.99,invisible:0.01,visible
 autoinc_explicit_value_p: 0.00001

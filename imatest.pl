@@ -28,7 +28,6 @@ require 5.032;
 #todo
 # test case for seed
 # flag file to start tracing
-# on duplicate key update
 # join subqueries
 # savepoints
 
@@ -954,9 +953,19 @@ sub new_generate_virtual {
             $tval = $pluse->[dorand()*scalar(@$pluse)];
         } else { # function
             my $tfun = process_rseq($parmfun);
-            while ($tfun =~ /\@(SELF|COL)/) { #todo @COL_integer
-                my $tcol = $pluse->[dorand()*scalar(@$pluse)];
-                $tfun =~ s/\@(SELF|COL)/$tcol/;
+            while ($tfun =~ /\@(SELF|COL)/) { #todo @COL_integer in values yaml
+                my $tcol = '';
+                if ($tfun =~ /\@COL_([a-z]+)/) {
+                    my $typ = $1;
+                    my @luse = grep {(defined($ghstc2just{"$tnam.$_"}) and $ghstc2just{"$tnam.$_"} eq $typ) or (defined($ghstc2class{"$tnam.$_"}) and $ghstc2class{"$tnam.$_"} eq $typ) or (defined($ghstc2suc{"$tnam.$_"}) and $ghstc2suc{"$tnam.$_"} eq $typ)} @$pluse;
+                    @luse = @$pluse if (scalar(@luse) == 0);
+                    $tcol = $luse[dorand()*scalar(@luse)];
+                    $tfun =~ s/\@COL_([a-z]+)/$tcol/;
+            #docroak("#debug+%s+%s+%s+%s+%s+%s+%s+",$tnam,$tfun,$tcol,$typ,$ghstc2suc{"$tnam.$tcol"},$ghstc2class{"$tnam.$tcol"},$ghstc2just{"$tnam.$tcol"});
+                } else {
+                    $tcol = $pluse->[dorand()*scalar(@$pluse)];
+                    $tfun =~ s/\@(SELF|COL)/$tcol/;
+                }
             }
             $tfun =~ s/;/,/g;
             $tval = $tfun;
@@ -1660,6 +1669,8 @@ sub table_add {
                     $ghstc2default{$stc} = $DEFEMPTY;
                 }
                 $coldes =~ s/ON\s+UPDATE\s+CURRENT_TIMESTAMP//;
+                $coldes =~ s/\(\d+\)//;
+                $coldes =~ s/\'[a-zA-Z0-9]*\'//;
                 docroak("BAD column description for %s, need empty string now: +%s+ dt +%s+ IN %s",$stc,$dt,$coldes,$lin) if ($coldes ne '');
             }
         }
@@ -1813,7 +1824,7 @@ sub generate_index_clause {
             $type = 'column';
             dosayif($VERBOSE_SOME,"fallback from function to %s for %s %s, dtc %s dt %s",$type,$tnam,$coname,$dtc,$dt);
         }
-        if (($type eq 'column' or $ispk) and $ghstc2len{$coname} != 0) { #todo cleaner
+        if (($type eq 'column' or $ispk) and $ghstc2len{$coname} != 0) {
             $rc .= ", $qcol";
             if (($dtc eq 'character' and $type eq 'column' and process_rseq('index_prefix_use') eq 'yes')
                 or $dtc eq $LOB) {
@@ -1839,9 +1850,9 @@ sub generate_index_clause {
                 docroak("no index functions for %s: dtc index_function_%s dt index_function_%s",$coname,$dtc,$dt) if (not defined($ghreal{$parm}));
             }
             my $ind = process_rseq($parm);
-            $ind =~ s/\@SELF/$qcol/g;
+            $ind =~ s/\@SELF/$qcol/g; #todo COL_int
             $ind =~ s/;/,/g;
-            $rc .= ", ($ind)"; #todo @COL
+            $rc .= ", ($ind)";
             $hasfun = 1;
         }
         my $dir = process_rseq('part_direction');
@@ -2218,7 +2229,12 @@ sub stmt_select_generate {
     $stmt .= " $tosel FROM $tnam";
     my $wher = new_generate_where($tnam,'select_where_all_p','where');
     $stmt .= " $wher";
+    my $hasun = 0;
+    my $sbord = '';
     if (dorand() < $ghreal{'select_union_p'}) {
+        $hasun = 1;
+        $sbord = join(',',(1..scalar(split(/, */,$tosel))));
+        #docroak("#debug+from+%s+to+%s+",$tosel,$sbord);
         my $hom = process_rseq('select_union_len');
         for my $num (1..$hom) {
             my $how = process_rseq('select_union_how');
@@ -2236,11 +2252,25 @@ sub stmt_select_generate {
             my $plord = table_columns_subset($tnam,'select_order_by_column_p','group');
             foreach my $c (@$plord) {
                 my @lin = grep {$c eq $_} @$ltog;
-                $ord .= scalar(@lin) == 0? ", MAX($c)" : ", $c"; #todo more
+                if (scalar(@lin) == 0) {
+                    my $ga = process_rseq('group_aggregate_kind'); #todo sub
+                    $ga =~ s/NNN/M/g;
+                    $ga = "$ga($c)";
+                    $ga =~ s/_DISTINCT\(/(DISTINCT /;
+                    $ord .= ", $ga";
+                } else {
+                    $ord .= ", $c";
+                }
             }
             $ord =~ s/^,//;
         } else {
-            $ord = table_columns_subset($tnam,'select_order_by_column_p','select');
+            if ($hasun) {
+                $ord = join(',',grep {dorand() < $ghreal{'select_order_by_column_p'}} split(/, */,$sbord));
+                $ord = '1' if ($ord eq '');
+            } else {
+                $ord = table_columns_subset($tnam,'select_order_by_column_p','select');
+            }
+            #docroak("#debug+%s+of+%s+",$ord,$sbord) if ($hasun);
         }
         $stmt .= " ORDER BY $ord";
         $sub .= 'O';
@@ -2807,9 +2837,10 @@ sub new_stmt_update_generate {
     return $stmt;
 }
 
-# returns statement
+# returns statement,kup1
 sub stmt_insert_generate {
     my $stmt = 'INSERT into ';
+    my $kup1 = 'INSERT';
     # determine schema.table
     my $tnam = table_get();
     # https://bugs.mysql.com/?id=113951&edit=2
@@ -2822,7 +2853,22 @@ sub stmt_insert_generate {
     $stmt .= " $tnam (".join(',',@lqcols).')';
     my $values = new_generate_insert_values($tnam,\@lcols);
     $stmt .= " VALUES ($values)";
-    return $stmt;
+    if (dorand() < $ghreal{'insert_on_dup_update_p'}) {
+        $kup1 .= '_U';
+        $stmt .= " ON DUPLICATE KEY UPDATE";
+        my $plcols = table_columns_subset($tnam,'update_column_p','update');
+        my $plvalues = new_generate_update_values($tnam,$plcols);
+        my $set = '';
+        my $n = 0;
+        foreach my $col (@$plcols) {
+            my $val = $plvalues->[$n];
+            $set .= ", \`$col\` = $val";
+            ++$n;
+        }
+        $set =~ s/^,//;
+        $stmt .= " $set";
+    }
+    return $stmt,$kup1;
 }
 
 # returns statement
@@ -2964,7 +3010,7 @@ sub server_load_thread {
     my $glabsport;
 
     my %hneed = (
-        '1054' => 10,
+        #'1054' => 10, #only for single load
         '1064' => 10,
         #'1091' => 10, #PRIMARY
         #'1210' => 10,
@@ -3296,7 +3342,7 @@ sub server_load_thread {
             $tnam = "$schema.".sprintf($frm,int(dorand()*10000+1000));
             ($stmt,$kup1) = stmt_create_table_generate($tnam);
         } elsif ($ksql eq 'insert') {
-            $stmt = stmt_insert_generate();
+            ($stmt,$kup1) = stmt_insert_generate();
             $canexp = 1;
         } elsif ($ksql eq 'unlock_table') {
             $stmt = stmt_unlock_table_generate();

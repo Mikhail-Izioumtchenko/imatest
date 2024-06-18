@@ -2,9 +2,17 @@
 ### initialize one instance given absolute port
 ###
 port="$1"
+forhelp="$1"
 
 . `pwd`/imavars.dot
 me="`$BASENAME $0`"
+
+[ -z "$forhelp" -o "$forhelp" = 'h' -o "$forhelp" = 'help' ] && {
+  $ECHO "Usage: $0 absolute_port"
+  $ECHO "       To create initial data on relevant instance."
+  $EXIT 1
+}
+
 ima_say "$me : starting as $0 $@"
 
 pass=`$CAT "$IMAPAS"`
