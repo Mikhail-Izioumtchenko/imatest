@@ -7,20 +7,24 @@ THE PREVIOUS STATEMENT IS NOT A CLAIM FOR TOOL's  suitability for any purpose wh
 
 Yield: not everything filed as a bug because bug filing is fairly pointless activity in most cases for lack of care of the target audience at the manufacturer of the code. imho.
 
+Y16. fixable DB corruption. This was OEL on WSL after all.
+2024-06-17T16:35:19.155106Z 41 [ERROR] [MY-012869] [InnoDB] Record in index `ind8101` of table `gts5`.`tt5` was not found on update: TUPLE (info_bits=0, 2 n_cmp=2, fields): {[70]6BDEF1efcdefgrstuvjklm3456KLMNOUVWB923456TUVW45ABCDb89ANOPQRdOPQRituvw(0x3642444546316566636465666772737475766a6b6c6d333435364b4c4d4e4f5556574239323334353654555657343541424344623839414e4f505152644f5051526974757677),[6]   +  (0x0000002b8bea)} at: COMPACT RECORD(info_bits=20, 2 fields): {[37]4FabcdIJKLMnop12EFGHzvwyQRSTrstuz01klmnos4fxyz01EF9ABCD(0x344661626364494a4b4c4d6e6f703132454647487a76777951525354727374757a30316b6c6d6e6f73346678797a303145463941424344),[6]   ,e (0x0000002c65e2)}
+2024-06-17T16:35:19.251301Z 41 [ERROR] [MY-013183] [InnoDB] Assertion failure: row0upd.cc:2350 thread 140668173252160
+
 Y15. 2024-06-16: 8.4LTS. SEGV. 2024-06-16T18:44:01Z UTC - mysqld got signal 11 ; buf_flush_LRU_list_batch at /usr/src/debug/mysql-community-8.4.0-1.el9.x86_64/mysql-8.4.0/storage/innobase/buf/buf0flu.cc:1808
 
 Y14. 2024-06-16: 8.4LTS. 2024-06-16T17:17:08.393423Z 23 [ERROR] [MY-013183] [InnoDB] Assertion failure: dyn0buf.h:111:ptr <= begin() + m_buf_end thread 139875615458880
 
-13. https://bugs.mysql.com/bug.php?id=115349 2024-06-15: mysql-8.4.0/sql/dd/impl/cache/dictionary_client.cc:945: bool dd::cache::Dictionary_client::acquire(const K&, const T**, bool*, bool*) [with K = dd::Item_name_key; T = dd::Column_statistics]: Assertion `MDL_checker::is_read_locked(m_thd, *object)' failed.
+Y13. https://bugs.mysql.com/bug.php?id=115349 2024-06-15: mysql-8.4.0/sql/dd/impl/cache/dictionary_client.cc:945: bool dd::cache::Dictionary_client::acquire(const K&, const T**, bool*, bool*) [with K = dd::Item_name_key; T = dd::Column_statistics]: Assertion `MDL_checker::is_read_locked(m_thd, *object)' failed.
 
-12. 2024-06-15: Also happens in 8.4. mysql-8.3.0/sql/opt_explain.cc:2099: bool explain_query_specification(THD*, const THD*, Query_term*, enum_parsing_context): Assertion `ret || !explain_thd->is_error()' failed.
+Y12. 2024-06-15: Also happens in 8.4. mysql-8.3.0/sql/opt_explain.cc:2099: bool explain_query_specification(THD*, const THD*, Query_term*, enum_parsing_context): Assertion `ret || !explain_thd->is_error()' failed.
 
-11. 2024-06-14: Also happens in 8.4. Correlated with using SELECT ... UNION/INTERSECT
+Y11. 2024-06-14: Also happens in 8.4. Correlated with using SELECT ... UNION/INTERSECT
 https://bugs.mysql.com/bug.php?id=115346 mysql-8.3.0/sql/iterators/composite_iterators.cc:2970: int materialize_iterator::SpillState::read_next_row_secondary_overflow(): Assertion `false' failed.
 
-10. 2024-06-14T01:58:40.260276Z 20 [ERROR] [MY-013183] [InnoDB] Assertion failure: row0sel.cc:2796:(!prebuilt->idx_cond && prebuilt->m_mysql_handler->end_range != nullptr) || (prebuilt->trx->isolation_level == TRX_ISO_READ_UNCOMMITTED) 
+Y10. 2024-06-14T01:58:40.260276Z 20 [ERROR] [MY-013183] [InnoDB] Assertion failure: row0sel.cc:2796:(!prebuilt->idx_cond && prebuilt->m_mysql_handler->end_range != nullptr) || (prebuilt->trx->isolation_level == TRX_ISO_READ_UNCOMMITTED) 
 
-9. 2024-06-09T02:13:33.473147Z 1 [ERROR] [MY-012237] [InnoDB] Corrupted page [page id: space=10337, page number=0] of datafile './gts3/tt22.ibd' could not be found in the doublewrite buffer. 2024-06-09T02:13:33.473262Z 1 [ERROR] [MY-015090] [InnoDB] [FATAL] Tablespace '10143' mentioned in the redo log is corrupted in a way it is unrecoverable by double-write buffer, so further redo log recovery is not possible! 2024-06-09T02:13:33.473280Z 1 [ERROR] [MY-013183] [InnoDB] Assertion failure: log0recv.cc:1163:ib::fatal triggered thread 140240576562752
+Y9. 2024-06-09T02:13:33.473147Z 1 [ERROR] [MY-012237] [InnoDB] Corrupted page [page id: space=10337, page number=0] of datafile './gts3/tt22.ibd' could not be found in the doublewrite buffer. 2024-06-09T02:13:33.473262Z 1 [ERROR] [MY-015090] [InnoDB] [FATAL] Tablespace '10143' mentioned in the redo log is corrupted in a way it is unrecoverable by double-write buffer, so further redo log recovery is not possible! 2024-06-09T02:13:33.473280Z 1 [ERROR] [MY-013183] [InnoDB] Assertion failure: log0recv.cc:1163:ib::fatal triggered thread 140240576562752
 
 8. 2024-05-26T04:18:00.658915Z 17 [ERROR] [MY-013183] [InnoDB] Assertion failure: row0sel.cc:2796:(!prebuilt->idx_cond && prebuilt->m_mysql_handler->end_range != nullptr) || (prebuilt->trx->isolation_level == TRX_ISO_READ_UNCOMMITTED)
 
