@@ -7,6 +7,10 @@ THE PREVIOUS STATEMENT IS NOT A CLAIM FOR TOOL's  suitability for any purpose wh
 
 Yield: not everything filed as a bug because bug filing is fairly pointless activity in most cases for lack of care of the target audience at the manufacturer of the code. imho.
 
+Y18. https://bugs.mysql.com/bug.php?id=115366 8.4LTS SEGV signal 11 around buf_flush_LRU_list_batch
+
+Y17. https://bugs.mysql.com/115365 EXPLAIN ANALYZE: Assertion `ret || !explain_thd->is_error()'
+
 Y16. fixable DB corruption. This was OEL on WSL after all.
 2024-06-17T16:35:19.155106Z 41 [ERROR] [MY-012869] [InnoDB] Record in index `ind8101` of table `gts5`.`tt5` was not found on update: TUPLE (info_bits=0, 2 n_cmp=2, fields): {[70]6BDEF1efcdefgrstuvjklm3456KLMNOUVWB923456TUVW45ABCDb89ANOPQRdOPQRituvw(0x3642444546316566636465666772737475766a6b6c6d333435364b4c4d4e4f5556574239323334353654555657343541424344623839414e4f505152644f5051526974757677),[6]   +  (0x0000002b8bea)} at: COMPACT RECORD(info_bits=20, 2 fields): {[37]4FabcdIJKLMnop12EFGHzvwyQRSTrstuz01klmnos4fxyz01EF9ABCD(0x344661626364494a4b4c4d6e6f703132454647487a76777951525354727374757a30316b6c6d6e6f73346678797a303145463941424344),[6]   ,e (0x0000002c65e2)}
 2024-06-17T16:35:19.251301Z 41 [ERROR] [MY-013183] [InnoDB] Assertion failure: row0upd.cc:2350 thread 140668173252160
@@ -26,17 +30,17 @@ Y10. 2024-06-14T01:58:40.260276Z 20 [ERROR] [MY-013183] [InnoDB] Assertion failu
 
 Y9. 2024-06-09T02:13:33.473147Z 1 [ERROR] [MY-012237] [InnoDB] Corrupted page [page id: space=10337, page number=0] of datafile './gts3/tt22.ibd' could not be found in the doublewrite buffer. 2024-06-09T02:13:33.473262Z 1 [ERROR] [MY-015090] [InnoDB] [FATAL] Tablespace '10143' mentioned in the redo log is corrupted in a way it is unrecoverable by double-write buffer, so further redo log recovery is not possible! 2024-06-09T02:13:33.473280Z 1 [ERROR] [MY-013183] [InnoDB] Assertion failure: log0recv.cc:1163:ib::fatal triggered thread 140240576562752
 
-8. 2024-05-26T04:18:00.658915Z 17 [ERROR] [MY-013183] [InnoDB] Assertion failure: row0sel.cc:2796:(!prebuilt->idx_cond && prebuilt->m_mysql_handler->end_range != nullptr) || (prebuilt->trx->isolation_level == TRX_ISO_READ_UNCOMMITTED)
+Y8. 2024-05-26T04:18:00.658915Z 17 [ERROR] [MY-013183] [InnoDB] Assertion failure: row0sel.cc:2796:(!prebuilt->idx_cond && prebuilt->m_mysql_handler->end_range != nullptr) || (prebuilt->trx->isolation_level == TRX_ISO_READ_UNCOMMITTED)
 
-7. 2024-05-21 bool:parse_sql(THD*,:Parser_state*, 1 (1 distinct) Object_creation_ctx*): Assertion `!mysql_parse_status || mysql_parse_status && thd->is_error()) || (mysql_parse_status && thd->get_internal_handler())' failed.
+Y7. 2024-05-21 bool:parse_sql(THD*,:Parser_state*, 1 (1 distinct) Object_creation_ctx*): Assertion `!mysql_parse_status || mysql_parse_status && thd->is_error()) || (mysql_parse_status && thd->get_internal_handler())' failed.
 
-6. 2024-05-13T04:41:02.318333Z 0 [ERROR] [MY-013183] [InnoDB] Assertion failure: trx0rec.ic:95:len < ((ulint)srv_page_size)
+Y6. 2024-05-13T04:41:02.318333Z 0 [ERROR] [MY-013183] [InnoDB] Assertion failure: trx0rec.ic:95:len < ((ulint)srv_page_size)
 
-5. https://bugs.mysql.com/?id=114133 dd corrupt assert lob0impl.cc:1237:total_read == len || total_read == avail_lob
-4. https://bugs.mysql.com/?id=113951 SEGV in INSERT
-3. https://bugs.mysql.com/?id=113860 Assertion `rc == TYPE_OK' CREATE TABLE sql/dd/impl/raw/raw_record.cc:158
-2. https://bugs.mysql.com/?id=113410 hang creating InnoDB Cluster
-1. https://bugs.mysql.com/?id=113694  misleading error message comparing a spatial column with numeric using < or such
+Y5. https://bugs.mysql.com/?id=114133 dd corrupt assert lob0impl.cc:1237:total_read == len || total_read == avail_lob
+Y4. https://bugs.mysql.com/?id=113951 SEGV in INSERT
+Y3. https://bugs.mysql.com/?id=113860 Assertion `rc == TYPE_OK' CREATE TABLE sql/dd/impl/raw/raw_record.cc:158
+Y2. https://bugs.mysql.com/?id=113410 hang creating InnoDB Cluster
+Y1. https://bugs.mysql.com/?id=113694  misleading error message comparing a spatial column with numeric using < or such
 
 It tests MySQL server 8.0+
 This is very much work in progress.
