@@ -7,6 +7,10 @@ THE PREVIOUS STATEMENT IS NOT A CLAIM FOR TOOL's  suitability for any purpose wh
 
 Yield: not everything filed as a bug because bug filing is fairly pointless activity in most cases for lack of care of the target audience at the manufacturer of the code. imho.
 
+Y20. 8.4LTS-debug 2024-06-19T16:19:11.692448Z 13 [ERROR] [MY-013183] [InnoDB] Assertion failure: dyn0buf.h:111:ptr <= begin() + m_buf_end 
+
+Y19. 8.4LTS-debug 2024-06-19T16:03:37.078574Z 13 [ERROR] [MY-013183] [InnoDB] Assertion failure: mtr0log.cc:652:total > (ulint)(log_ptr - log_start) 
+
 Y18. https://bugs.mysql.com/bug.php?id=115366 8.4LTS SEGV signal 11 around buf_flush_LRU_list_batch
 
 Y17. https://bugs.mysql.com/115365 EXPLAIN ANALYZE: Assertion `ret || !explain_thd->is_error()'
