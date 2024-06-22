@@ -7,7 +7,7 @@ THE PREVIOUS STATEMENT IS NOT A CLAIM FOR TOOL's  suitability for any purpose wh
 
 Yield: not everything filed as a bug because bug filing is fairly pointless activity in most cases for lack of care of the target audience at the manufacturer of the code. imho.
 
-Y20. bug2file. 2024-06-20T01:02:42Z UTC - mysqld got signal 11 executing ALTER
+Y20. https://bugs.mysql.com/bug.php?id=115405 2024-06-20T01:02:42Z UTC - mysqld got signal 11 executing ALTER
 
 Y19. bug2file 8.4LTS-debug 2024-06-19T16:03:37.078574Z 13 [ERROR] [MY-013183] [InnoDB] Assertion failure: mtr0log.cc:652:total > (ulint)(log_ptr - log_start) 
 
