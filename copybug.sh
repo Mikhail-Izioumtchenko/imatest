@@ -22,6 +22,8 @@ dir="$basedir/$sub"
 $CP -R /tmp "$dir"
 
 $CP -v $boxdir/*.cnf $boxdir/*/*.cnf $boxdir/*/error.log "$dir"
+$MV -v "$dir/my.cnf" "$dir/mycnf.txt"
+$MV -v "$dir/mysqld-auto.cnf" "$dir/mysqld-autocnf.txt"
 
 $ECHO "\nSee also $dir"
 

@@ -14,9 +14,10 @@ more="$*"
   $EXIT 1
 }
 
-base="$IMAPORTMXBASE"
+base="$IMAPORTBASE"
 taport="$(($port + $base))"
 pass=`$CAT "$IMAPAS"`
 
-com="$MYSQLSH --quiet-start=2 --port=$taport --user=root --host 127.0.0.1 --password=$pass --sqlx --mx $more"
+com="$MYSQLSH --quiet-start=2 --port=$taport --user=root --host 127.0.0.1 --password=$pass --sql $more"
+#echo "$com";exit
 $com

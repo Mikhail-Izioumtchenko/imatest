@@ -94,5 +94,7 @@ $READ ans
 $DF -h /mnt/c
 
 ./usems.sh "$port"
-./stopms.sh "$port" wait
+$ECHO -n "stopms $port? "
+$READ ans
+[ "$ans" = 'y' ] && ./stopms.sh "$port" wait
 $GREP main.*seed /tmp/i*out

@@ -98,8 +98,6 @@ datatype_class:
   mandatory: True
   allowed: Rseq       
   only_values_allowed: integer,decimal,floating,datetime,character,binary,lob,enums,json,spatial
-datatype_class2dt:
-  mandatory: True
 datatype_datetime:
   mandatory: True
   allowed: Rseq       
@@ -620,7 +618,7 @@ load_sleep_after_stmt_ms:
 load_sql_class:
   mandatory: True
   allowed: Rseq
-  only_values_allowed: select,update,insert,delete,insel,drop_table,alter,check,replace,analyze,checksum,optimize,show_open_tables,show_parse_tree,create_table,lock_instance_for_backup,unlock_instance,lock_table,unlock_table,set_txn_isolation,show_columns,show_status,show_table_status,show_tables,show_variables,flush,flush_tables,kill_connection,kill_query,recreate_schema,set
+  only_values_allowed: select,update,insert,delete,insel,drop_table,alter,check,replace,analyze,checksum,optimize,show_open_tables,show_parse_tree,create_table,lock_instance_for_backup,unlock_instance,lock_table,unlock_table,set_txn_isolation,show_columns,show_status,show_table_status,show_tables,show_variables,flush,flush_tables,kill_connection,kill_query,recreate_schema,set,savepoint
 load_thread_err:
   mandatory: True
 load_thread_execute_with:
@@ -711,6 +709,10 @@ select_column_p:
 select_distinct_p:
   mandatory: True
   allowed: probability
+select_for_update:
+  mandatory: True
+  allowed: Rseq
+  only_values_allowed: UPDATE,UPDATE NOWAIT,UPDATE SKIP LOCKED,SHARE,SHARE NOWAIT,SHARE SKIP LOCKED,EMPTY
 select_group_by_p:
   mandatory: True
   allowed: probability
@@ -718,6 +720,14 @@ select_how:
   mandatory: True
   allowed: Rseq
   only_values_allowed: all,count,columns
+select_join_len:
+  mandatory: True
+  allowed: Rseq
+  only_positive_integers: True
+select_join_kind_simple:
+  mandatory: True
+  allowed: Rseq
+  only_values_allowed: NATURAL INNER,NATURAL INNER,NATURAL LEFT,NATURAL RIGHT,NATURAL LEFT OUTER,NATURAL RIGHT OUTER,COMMA,INNER,CROSS,STRAIGHT_JOIN
 select_order_by_column_p:
   mandatory: True
   allowed: probability
@@ -793,11 +803,15 @@ server_termination_wait_timeout:
 set_group:
   mandatory: True
   allowed: Rseq
-  only_values_allowed: g1,g2s,g3b,g4cc,g5ef,g6n,g7bn
+  only_values_allowed: g1,g2s,g3b,g4cc,g5ef,g6n,g7bn,g8opt
 set_kind:
   mandatory: True
   allowed: Rseq
   only_values_allowed: LOCAL,GLOBAL,PERSIST,PERSIST_ONLY,EMPTY
+set_variable_len_g8opt:
+  mandatory: True
+  allowed: Rseq
+  only_positive_integers: True
 set_variable_name_g1:
   mandatory: True
   allowed: Rseq
@@ -819,6 +833,8 @@ set_variable_name_g6n:
 set_variable_name_g7bn:
   mandatory: True
   allowed: Rseq
+set_variable_name_g8opt:
+  mandatory: True
 set_variable_value_g1:
   mandatory: True
   allowed: Rseq
@@ -838,6 +854,9 @@ set_variable_value_g6n:
   mandatory: True
   allowed: Rseq
 set_variable_value_g7bn:
+  mandatory: True
+  allowed: Rseq
+set_variable_value_g8opt:
   mandatory: True
   allowed: Rseq
 sleep_final:
@@ -938,6 +957,15 @@ txn_ro_rw_how:
   mandatory: True
   allowed: Rseq       
   only_values_allowed: SESSION,GLOBAL,EMPTY
+txn_savepoints:
+  mandatory: True
+  allowed: Rseq       
+  only_positive_integers: True
+txn_savepoint_how:
+  mandatory: True
+  allowed: Rseq       
+  only_values_allowed: SET,ROLLBACK,RELEASE
+txn_savepoints:
 txn_sleep_after_ms:
   mandatory: True
   allowed: Rseq       

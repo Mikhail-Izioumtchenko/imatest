@@ -21,6 +21,7 @@ taport="$(($port + $base))"
 pass=`$CAT "$IMAPAS"`
 
 com="$MYSQLSH --quiet-start=2 --port=$taport --user=root --password=$pass --sql --log-sql=all $more"
+echo "$com";exit
 allcnt='0'
 for sname in $schemas; do
   sccnt='0'

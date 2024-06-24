@@ -21,6 +21,7 @@ portlist="`ima_tolist $portst`"
 from=''
 [ "$howd" = 'debug' ] && from="$MYSQLD_DEBUG"
 [ "$howd" = 'nodebug' ] && from="$MYSQLD_ORIG"
+#echo "debug+$MYSQLD_DEBUG+orig+$MYSQLD_ORIG+";exit
 
 for port in $portlist ; do
   taport="$(($port + $base))"
