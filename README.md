@@ -7,6 +7,9 @@ THE PREVIOUS STATEMENT IS NOT A CLAIM FOR TOOL's  suitability for any purpose wh
 
 Yield: not everything filed as a bug because bug filing is fairly pointless activity in most cases for lack of care of the target audience at the manufacturer of the code. imho.
 
+Y21. 8.4LTS-debug 2024-07-06T01:29:57.675228Z 0 [ERROR] [MY-011908] [InnoDB] [FATAL] Page [page id: space=220689, page number=128] still fixed or dirty
+2024-07-06T01:29:57.675280Z 0 [ERROR] [MY-013183] [InnoDB] Assertion failure: buf0buf.cc:6046:ib::fatal triggered thread 140079692409600
+
 Y20. 8.4LTS-debug Assertion failure: lob0lob.cc:917:trx == nullptr || trx->is_read_uncommitted() in INSERT
 
 Y19. https://bugs.mysql.com/bug.php?id=115405 2024-06-20T01:02:42Z UTC - mysqld got signal 11 executing ALTER
