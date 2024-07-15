@@ -19,6 +19,7 @@ dir="$basedir/$sub"
     $EXIT 1
 }
 
+./grebug.sh /tmp
 $CP -R /tmp "$dir"
 
 $CP -v $boxdir/*.cnf $boxdir/*/*.cnf $boxdir/*/error.log "$dir"

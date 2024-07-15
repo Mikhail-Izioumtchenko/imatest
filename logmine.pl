@@ -59,6 +59,7 @@ my $gdosayoff = 2;
 my $gloadthreads = 0;
 my %ghloadec2count = ();     # cumulative load thread error code -> count
 my %ghloadmsg2count = ();    # cumulative load thread error code stmt kind stmt -> count
+my %ghloadkind2rows = ();    # cumulative load stmt kind -> count rows
 
 sub usage {
     my $msg = $ARG[0];
@@ -78,6 +79,19 @@ EOF
     } else {
         docroak("usage() called. CROAK.");
     }
+}
+
+# 1 ph 2 use newlines
+sub hdump {
+    my $ph = $ARG[0];
+    my $nl = (defined($ARG[1]) and $ARG[1])? "\n" : '';
+    my $rc = '';
+    foreach my $key (sort(keys(%$ph))) { 
+        my $ok = ref($ph->{$key}) eq 'ARRAY'? join(' !!! ',@{$ph->{$key}}) : $ph->{$key};
+        $rc .= ",$nl $key: $ok";
+    }
+    $rc =~ s/, //;
+    return $rc;
 }
 
 # 1: text file pathname
@@ -210,6 +224,8 @@ my %ghprocess = (
 
 my $ec = 0;
 
+my @glall = ();
+
 foreach my $fil (@l2mine) {
     my $plfil = readfile($fil);
     my $kind = getkind($fil,$plfil);
@@ -225,6 +241,7 @@ foreach my $key (sort(keys(%ghloadec2count))) {
 $ec2count =~ s/, //;
 
 my $allfail = '';
+my $alljust = '';
 foreach my $key (sort(keys(%ghloadmsg2count))) {
     my $nl = ($key =~ /TOTL/ and not $key =~ /ETOTL/)? "\n" : '';
     if ($key =~ /^E(GOOD|FAIL)\s+(.*)/) {
@@ -244,6 +261,7 @@ foreach my $key (sort(keys(%ghloadmsg2count))) {
         if ($raf eq 'ALL') {
             $trob = "    --> ALL $tok FAILED";
             $allfail .= " ${tok}x$key";
+            $alljust .= " $key ";
         }
         dosayif($VERBOSE_ANY, "%s%s: %s (%s GOOD, %s FAIL)%s", $nl, $key, $tok, $rag, $raf,$trob);
     } else {
@@ -253,8 +271,34 @@ foreach my $key (sort(keys(%ghloadmsg2count))) {
 }
 dosayif($VERBOSE_ANY, "\n%s\n", $ec2count);
 $allfail =~ s/ETOTL //g;
+$alljust =~ s/ETOTL //g;
 $allfail =~ s/ *-> */ /g;
+$alljust =~ s/ *-> */ /g;
 dosayif($VERBOSE_ANY, "\nALL FAILED:%s\n", $allfail);
+dosayif($VERBOSE_ANY, "\nALL SO FAILED:%s\n", $alljust);
+
+my $gwilldo = ' 1305 1094 1229 1568 ';
+my $n = 0;
+foreach my $t (@glall) {
+    ++$n;
+    foreach my $l (@$t) {
+        $l =~ s/^\s*[^\s:]+:\s//;
+        $l =~ /^ALLFAIL\s+([^\s]+)\s+:/;
+        my $itis = $1;
+        if (not $alljust =~ / $itis /) {
+            #dosayif($VERBOSE_ANY, "%s will do",$itis);
+            next;
+        }
+        my @lsplit = split(/!!!/,$l);
+        foreach my $s (@lsplit) {
+            $s =~ /\s:\s+(\d+)\s+:\s/;
+            my $errc = $1;
+            dosayif($VERBOSE_ANY, "(%s of %s) %s",$itis,$errc,$s) if (not $gwilldo =~ /$errc/);
+        }
+    }
+    dosayif($VERBOSE_ANY, "=== was %s with %s",$n,scalar(@$t)) if (scalar(@$t) > 0);
+}
+dosayif($VERBOSE_ANY, "\nROWS BY KIND: %s\n",hdump(\%ghloadkind2rows,0));
 
 dosayif($VERBOSE_ANY, "+Done\n");
 exit($ec);   # exit EXIT
@@ -461,7 +505,7 @@ sub process_imatest_pl_out {
         if ($lin =~ /imatest\.pl /) {
             $lin =~ s/^.*imatest\.pl +//;
             $lin =~ s/:+ +/ /;
-        } else {
+        } elsif (not $lin =~ /datatypes/i) {
         # #S 965 20240328223355.383341046 stopms.sh : starting as /mnt/c/ima/mud/imatest/stopms.sh 2 wait 60
             $lin =~ s/^ *[^ ]+ +[^ ]+ +[^ ]+ +//;
             $lin =~ s/ +:+ +/ /;
@@ -571,8 +615,11 @@ sub process_load_thread_out {
     my $interim = 0;
     my $final = 0;
     my @lrep = ();
+    my @lallfail = ();
     ++$gloadthreads;
     my @lmust = qw(
+      ROW.COUNTS
+      ALLFAIL
       CROAK
       needed
       FINAL.BY
@@ -590,14 +637,18 @@ sub process_load_thread_out {
         if ($lin =~ /=== INTERIM BY/) {
             $interim = $nlins;
             @lrep = ();
+            @lallfail = ();
             next;
         }
         if ($lin =~ /=== FINAL BY/) {
             $final = $nlins;
             @lrep = ();
+            @lallfail = ();
             next;
         }
-        push(@lrep,$lin);
+        push(@lrep,$lin) if (not $lin =~ /ALLFAIL/);;
+        push(@lallfail,$lin) if ($lin =~ /ALLFAIL/);;
+        #dosayif($VERBOSE_ANY,"#debug+allf+%s",$lin) if ($lin =~ /ALLFAIL/ and $fil =~ /_11_/);
     }
 
     if ($interim == 0 and $final == 0) {
@@ -615,7 +666,6 @@ sub process_load_thread_out {
         $dosay = 1 if ($lin =~ /ERROR STMT KIND COUNTS/);
         $dosay = 1 if ($lin =~ /ERROR COUNTS/);
         if ($dosay) {
-            #dosayif($VERBOSE_MORE, "%s",$lin) if ($dosay);
             if ($lin =~ /ERROR COUNTS/) {
                 my $top = $lin;
                 $top =~ s/.*ERROR COUNTS://;
@@ -632,10 +682,24 @@ sub process_load_thread_out {
                 $top =~ /^ *(E[0-9]+|EFAIL|EGOOD|ETOTL) +(.*): +([0-9]+),? *$/;
                 $ghloadmsg2count{"$1 $2"} += $3;
             }
+            if ($lin =~ / ROW.COUNTS /) {
+#ROW COUNTS EXPLAIN: 7, INSERT: 191, INSERT_U: 1, REPLACE: 61, SELECT: 847, SELECTD: 13, SELECTU: 36, UPDATE: 3536
+                my $top = $lin;
+                $top =~ s/^.*ROW\s+COUNTS\s*//;
+                my @lc = split(/,/,$top);
+                foreach my $s (@lc) {
+                    $s =~ /\s*([^:]+):\s*([\d]+)/;
+                    $ghloadkind2rows{$1} += $2;
+                }
+                #docroak("#debug+%s+%s+",$lin,hdump(\%ghloadkind2rows,0));
+            }
         } else {
             ++$nign;
         }
     }
+    
+    push(@glall,\@lallfail);
 
     dosayif($VERBOSE_ANY, "END %s %s: %s lines, %s ignored\n", $filekind,$fil,$nlins,$nign);
+#docroak("#debug+%s+%s+",$fil,"@lallfail") if ($fil =~ /_11_/);
 }

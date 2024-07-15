@@ -52,7 +52,7 @@ $ECHO ""
 [ "$doc" = 'y' ] && ./count1sa.sh "$port" $schemas
 $ECHO ""
 ./usems.sh "$port"
-[ "$doc" = 'y' ] && ./checktables1sa.sh "$port" $schemas
+[ "$doh" = 'y' ] && ./checktables1sa.sh "$port" $schemas
 $ECHO ""
 
 ./usems.sh "$port"

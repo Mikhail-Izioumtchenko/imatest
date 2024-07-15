@@ -8,11 +8,11 @@ require 5.032;
 
 # style: flexible, mostly per perldoc perlstyle. Follow suit.
 # M1. mandatory: no tabs, 4 blanks indentation
-# M2. mandatory: no case statement, no camelCase
+# M2. no case statement, no camelCase
+# M3. blocks in {} even where a single statement after while or similar is allowed
+# M4. do avoid OO, do not use constant
 # 2. desirable: should look like C. Postfix if is OK and is preferred over postfix unless. 
-# 5. blocks in {} even where a single statement after while or similar is allowed
 # 7. comments start with single #, indent with code if on separate line
-# 8. do avoid OO, do not use constant
 # 9. 1+2 is OK, 1<2 is better written as 1 < 2
 # 10. lowercase names except pseudo constants which should be all UPPERCASE
 # 12. use not and or for logical ops, instead of && etc.
@@ -28,7 +28,7 @@ require 5.032;
 #todo
 # test case for seed
 # flag file to start tracing
-# join subqueries moreALTER finishSET setsqlmode
+# subqueries moreALTERchangecol movecol prepared with binds, better long vals, must longtext , no autoinc in INSERT/insel
 
 use Carp qw(croak shortmess);
 use Data::Dumper qw(Dumper);
@@ -51,7 +51,7 @@ use DBD::mysql;
 STDOUT->autoflush();
 STDERR->autoflush();
 
-my $version = '6.0';
+my $version = '6.44';
 
 $Data::Dumper::Sortkeys = 1;
 
@@ -91,8 +91,6 @@ my $CHECK_ASSERT = 4;
 my $EC_OK = 0;
 my $EC_ERROR = 1;
 
-my $CHECKFILE = 'to_check_file';
-
 my $FDEC = "%05d";
 
 my $DEC_RANGE_MARKER = 'D';
@@ -112,7 +110,6 @@ my $LOB = 'lob';
 my $NEEDS_ON_TRUE = 'needs_on_true';
 my $NO = 'no';
 my $NUMBER_REVERSE_SIGN_LEGITIMATE_P = 'number_reverse_sign_legitimate_p';
-my $NUMBER_REVERSE_SIGN_ILLEGITIMATE_P = 'number_reverse_sign_illegitimate_p';
 my $ONLY_NAMES = 'only_names';
 my $ONLY_NON_NEGATIVE_INTEGERS = 'only_non_negative_integers';
 my $ONLY_POSITIVE_INTEGERS = 'only_positive_integers';
@@ -152,8 +149,9 @@ my $gstrj;
 my $gdosayoff = 2;
 my %ghasopt = ();      # resulting options values hash
 my %ghver = ();      # syntax checker hash
-my %ghtest = ();      # test script hash
-my %ghreal = ();      # test script hash with Rseq and similar processed e.g. 1-7 becomes e.g. 4
+my %ghorig = ();      # test script hash original
+my %ghtest = ();      # test script adjusted
+my %ghreal = ();      # test script hash mostly best to use
 my %ghdt2have = ();      # datatype => 1
 my %ghclass2have = ();      # datatype class => 1
 my %ghsuc2have = ();      # datatype superclass => 1
@@ -164,6 +162,7 @@ my %ghclass2dt = ();      # class => ref array datatypes
 my %ghsuc2dt = ();      # superclass => ref array datatypes
 my %ghsuc2class = ();      # superclass => ref array classes
 my %ghsql2stats = ();      # insert => N
+my %ghdt2cnt = ();      # dt to column count
 my $gstr = '';
 my $gstrlen = 0;
 
@@ -173,10 +172,9 @@ my @glschemas = ();      # schema names
 
 # start table related
 my %ghst2cols = ();      ## schema.table => ref array column names
-my %ghst2pkcols = ();      ## schema.table => ref array pk column names
 my %ghst2pkautoinc = ();      ## schema.table => is pk autoinc 1 or 0
 my %ghst2createtable = ();      ## schema.table => CREATE TABLE
-my %ghst2nvcols = ();      ## schema.table => ref array column names for non virtual columns USED DML
+my %ghst2nvcols = ();      ## schema.table => ref array column names for non virtual columns
 my %ghst2aes = ();      ## schema.table => autoextend size or -1 for not specified
 my %ghst2charset = ();      ## schema.table => default charset mandatory
 my %ghst2col = ();      ## schema.table => default collation or EMPTY
@@ -192,7 +190,6 @@ my @ghstlist = (
 \%ghst2ind,
 \%ghst2createtable,
 \%ghst2cols,
-\%ghst2pkcols,
 \%ghst2nvcols,
 \%ghst2aes,
 \%ghst2charset,
@@ -237,7 +234,8 @@ my %ghstc2isautoinc = ();      # schema.table.column => is autoinc 0, 1 2 if jus
 my %ghstc2virtual = ();      # schema.table.column => column is virtual 1 stored 2 virtual or 0
 my %ghstc2virtex = ();      # schema.table.column => virtual expression or :EMPTY
 my %ghstc2hasdefault = ();      # schema.table.column => has default 1 or 0
-my %ghstc2default = ();      # schema.table => DEFAULT or :EMPTY
+my %ghstc2default = ();      # schema.table.column => DEFAULT or :EMPTY
+my %ghstc2unique = ();      # schema.table.column => likely primary 1 unique 2 or 0
 my @ghstcolist = (
 \%ghstc2suc,
 \%ghstc2class,
@@ -520,19 +518,53 @@ sub process_rseq {
         $val =~ s/!.*//;
         $ghtest{$skey} = $val;
     }
+    my $newval = '';
     my @lcommas = split(/,/, $val);
     my $prob = 1.0/scalar(@lcommas);
     $prob = $ghreal{'missing_probability_replacement'} if ($prob < $ghreal{'missing_probability_replacement'});
     my $n = 0;
-    my %hcomma = ();
-    my $hasprobs = 0;
-    my $lastprob = 0;
     foreach my $lcom (@lcommas) {
         ++$n;
         if ($n != scalar(@lcommas) and not $lcom =~ /:/) {
             dosayif($verbose,"replacing missing probabilities with %s in %s of %s",$prob,$skey,$val);
             $lcom .= ":$prob";
         }
+        $newval .= ",$lcom";
+    }
+    $newval =~ s/^,//;
+    my $adjust = (dorand() < $ghreal{'adjust_p'});
+    if ($adjust) {
+        $newval = '';
+        my $more = (dorand() < $ghreal{'adjust_more_p'});
+        foreach my $lcom (@lcommas) {
+            my $s = $lcom;
+            if ($lcom =~ /(.*):(.*)/) {
+                my ($os,$op) = ($1,$2);
+                my $p = $op;
+                if ($more) {
+                    $p += $ghreal{'adjust_add'};
+                    $p = $op if ($p < 0 or $p > 1);
+                    $p *= $ghreal{'adjust_mult'};
+                } else {
+                    $p -= $ghreal{'adjust_add'};
+                    $p = $op if ($p < 0 or $p > 1);
+                    $p /= $ghreal{'adjust_mult'};
+                }
+                $p = $op if ($p < 0 or $p > 1);
+                $s = "$os:$p";
+            }
+            $newval .= ",$s";
+        }
+        $newval =~ s/^,//;
+        @lcommas = split(/,/, $newval);
+    }
+    $ghtest{$skey} = $newval;
+    $n = 0;
+    my %hcomma = ();
+    my $hasprobs = 0;
+    my $lastprob = 0;
+    foreach my $lcom (@lcommas) {
+        ++$n;
         my @lsem = split(/:/, $lcom);
         # Rule1: not more than one probability per item
         usage("$skey value $val violates Rseq Rule1: not more than one probability per item",__LINE__) if ($check and scalar(@lsem) > 2);
@@ -632,14 +664,17 @@ sub checkscript {
     my $testyaml = $ghasopt{'testyaml'};
     my $rc = $RC_OK;
     my $phv;
-    if (defined($ghtest{$CHECKFILE})) {
-        -f $ghtest{$CHECKFILE} or usage("$ghtest{$CHECKFILE}: file does not exist, or inaccessible, or not a regular file",__LINE__);
-        $phv = doeval("LoadFile('$ghtest{$CHECKFILE}')") or die "bad yaml in file $ghtest{$CHECKFILE}";
+    if (defined($ghtest{'to_check_file'})) {
+        if ($ghtest{'to_check_file'} eq 'default') {
+            $ghtest{'to_check_file'} = $PROGRAM_NAME;
+            $ghtest{'to_check_file'} =~ s/\.pl$/_syntax.yaml/;
+        }
+        -f $ghtest{'to_check_file'} or usage("$ghtest{'to_check_file'}: file does not exist, or inaccessible, or not a regular file",__LINE__);
+        $phv = doeval("LoadFile('$ghtest{'to_check_file'}')") or die "bad yaml in file $ghtest{'to_check_file'}";
     } else {
-        usage("'$CHECKFILE' must be supplied",__LINE__);
+        usage("'to_check_file' must be supplied",__LINE__);
     }
     %ghver = %$phv;
-    dosayif($VERBOSE_DEV, "% start: %s\n%s end", $CHECKFILE, Dumper(\%ghver), $CHECKFILE);
     my $strict = $ghtest{'strict'};
     # check strict
     foreach my $skey (sort(keys(%ghtest))) {
@@ -648,11 +683,11 @@ sub checkscript {
                 my $suf = $skey;
                 $suf =~ s/.*$UKIND//;
                 my @lok = @{$ghtest{'strict_exceptions'}};
-                usage("strict is specified in '$testyaml' but '$skey' is not described in $CHECKFILE '$ghtest{$CHECKFILE}' and $suf is not in strict_exceptions of '@lok'",
+                usage("strict is specified in '$testyaml' but '$skey' is not described in to_check_file '$ghtest{to_check_file}' and $suf is not in strict_exceptions of '@lok'",
                   __LINE__)
                     if (scalar(grep {$_ eq $suf } @lok) == 0);
             } else {
-                usage("strict is specified in '$testyaml' but '$skey' is not described in $CHECKFILE '$ghtest{$CHECKFILE}'",__LINE__)
+                usage("strict is specified in '$testyaml' but '$skey' is not described in to_check_file '$ghtest{to_check_file}'",__LINE__)
                   if ($skey ne 'define');
             }
         }
@@ -673,7 +708,7 @@ sub checkscript {
         }
         foreach my $have (sort(keys(%hsub))) {
             docroak("%s='%s' is defined in %s '%s' but '%s' is not there. CROAK.",
-                    $CHECK_SUBKEYS,"@{$ghver{$CHECK_SUBKEYS}}", $CHECKFILE, $ghtest{$CHECKFILE}, $have)
+                    $CHECK_SUBKEYS,"@{$ghver{$CHECK_SUBKEYS}}", 'to_check_file', $ghtest{'to_check_file'}, $have)
               if (not defined($hcheck{$have}));
         }
     }
@@ -902,27 +937,6 @@ my %ghvgsub = (
 'value_generate_year' => \&value_generate_year
 );
 
-# 1: kind: virtual default where update etc # 2: schema.table.column of the column we are building # returns: (value_generate_sub function_sub operator)
-sub descrcol {
-    my ($kind,$colnam) = @ARG;
-    docroak("No datatype class found for column %s",$colnam) if (not defined($ghstc2class{$colnam}));
-    my $dtclass = $ghstc2class{$colnam};
-    docroak("No datatype found for column %s",$colnam) if (not defined($ghstc2just{$colnam}));
-    my $dt = $ghstc2just{$colnam};
-    $dtclass = lc($dtclass);
-    $dt = lc($dt);
-    my $subvaldt = "value_generate_$dt";
-    my $subvaldtclass = "value_generate_$dtclass";
-    docroak("value_generate_%s nor _%s do not exist for column %s",$subvaldt,$subvaldtclass,$colnam)
-        if (not defined($ghvgsub{$subvaldt}) and not defined($ghvgsub{$subvaldtclass}));
-    my $subval = defined($ghvgsub{$subvaldt})? $subvaldt : $subvaldtclass;
-    my $fundt = "function_${kind}_$dt";
-    my $fundtclass = "function_${kind}_$dtclass";
-    my $fun = defined($ghreal{$fundt})? $fundt : $fundtclass;
-    my $haveop = defined($ghreal{"operator_$dt"})? "operator_$dt" : (defined($ghreal{"operator_$dtclass"})? "operator_$dtclass" : undef);
-    return ($subval, $fun, $haveop);
-}
-
 # 1: s.t 2: c
 sub new_generate_virtual {
     my ($tnam,$col) = @ARG;
@@ -981,16 +995,34 @@ sub new_generate_virtual {
         my $unop = process_rseq($parmunop);
         $unop =~ s/PREFNNN/-/g;
         $tval = "$unop$tval" if ($unop ne $EMPTY);
+        my $op = '';
         if ($termnum < $tlen) {
-            my $op = process_rseq($parmop);
+            $op = process_rseq($parmop);
             $op =~ s/NNN/-/g;
             $op =~ s/_/ /g;
-            $tval = "$tval $op ";
+            if ($op ne $EMPTY) {
+                $tval = "$tval $op ";
+            }
         }
         $suval .= "$tval ";
+        last if ($op eq $EMPTY);
     }
     docroak("bad virtual has \@ '%s'",$suval) if ($suval =~ /\@/);
     return $suval;
+}
+
+sub new_generate_lob_value {
+    my ($dt,$lun,$leun) = @ARG;
+    my $rc = substr($gstr,int(dorand()*$gstrlen),int(dorand()*$lun)) x int(dorand()*$leun);
+    $rc = substr($rc,0,65535) if (length($rc) > 65535);
+    my $len = length($rc);
+    $rc .= substr($rc,0,$lun);
+    my $sep = substr($rc,(int(dorand()*$len)),$lun);
+    my $rep = $len / $lun;
+    my $left = $len - $rep * $lun + 1;
+    my $bit = substr($rc,0,$left);
+    $rc = sprintf("CONCAT(REPEAT('%s',%s),'%s')",$sep,$rep,$bit);
+    return $rc;
 }
 
 # 1: stc # 2: 1 to adjust length
@@ -1038,15 +1070,11 @@ sub new_generate_value {
     } elsif ($dt eq 'varchar') {
         $rc = value_generate_str($colnam,$adjlen,$kind);
     } elsif ($dt eq 'text' or $dt eq 'blob') {
-        $rc = substr($gstr,int(dorand()*$gstrlen),int(dorand()*1024)) x int(dorand()*50);
-        $rc = substr($rc,0,65535) if (length($rc) > 65535);
-        $rc = "'$rc'";
+        $rc = new_generate_lob_value($dt,1025,50);
     } elsif ($dt eq 'mediumtext' or $dt eq 'mediumblob') {
-        $rc = substr($gstr,int(dorand()*$gstrlen),int(dorand()*1024)) x int(dorand()*91);
-        $rc = "'$rc'";
+        $rc = new_generate_lob_value($dt,1025,91);
     } elsif ($dt eq 'longtext' or $dt eq 'longblob') {
-        $rc = substr($gstr,int(dorand()*$gstrlen),int(dorand()*1024)) x int(dorand()*1001);
-        $rc = "'$rc'";
+        $rc = new_generate_lob_value($dt,1025,1001);
     } elsif ($dt eq 'float') {
         $rc = value_generate_float($colnam,$kind);
     } elsif ($dt eq 'double') {
@@ -1082,11 +1110,12 @@ sub new_generate_update_values {
     my ($tnam,$plcols) = @ARG;
     my $verbose = $VERBOSE_ANY;
     my @lrc = ();
+    my $haveone = 0;
     foreach my $col (@$plcols) {
         my $kind = process_rseq('update_kind');
         my $colnam = "$tnam.$col";
         my $dtc = $ghstc2class{$colnam};
-        docroak("no datatype class for %s",$colnam) if (not defined($dtc));
+        docroak("no datatype class for '%s' out of '%s' of size %s",$colnam,"@$plcols",scalar(@$plcols)) if (not defined($dtc));
         my $dt = $ghstc2just{$colnam};
         docroak("no datatype for %s",$colnam) if (not defined($dt));
         if (($dtc eq 'spatial' or $dt eq 'enum' or $dt eq 'set' or $dt eq 'json') and $kind eq 'function') {
@@ -1099,7 +1128,29 @@ sub new_generate_update_values {
                 $kind = ($dt eq 'json' or $dtc eq 'spatial' or $dt eq 'enum' or $dt eq 'set' or $dt eq 'bit')? 'value' : 'function';
                 dosayif($verbose,"fallback from column to %s for %s %s dtc %s dt %s",$kind,$tnam,$colnam,$dtc,$dt);
             } else {
-                push(@lrc,"\`$vcol\`");
+                $vcol =~ s/"//g;
+                if ($ghstc2unique{$colnam}) {
+                    my $suc = $ghstc2suc{$colnam};
+                    if ($suc eq $SUC_NUMERAL) {
+                        $haveone = 1;
+                        my $v = new_generate_value($colnam,1,'any');
+                        push(@lrc,"\`$vcol\`+$v");
+                    } elsif ($suc eq $SUC_CHARLIKE) {
+                        $haveone = 1;
+                        my $v = new_generate_value($colnam,1,'any');
+                        my $i = value_generate_tinyint($colnam,'insel');
+                        push(@lrc,"REVERSE(SUBSTR(CONCAT($col,$v),2,$i))");
+                    } elsif ($suc eq $SUC_DATELIKE) {
+                        $haveone = 1;
+                        my $v = value_generate_smallint($colnam,'update');
+                        push(@lrc,"DATE_ADD(\`$vcol\`,INTERVAL $v DAY)");
+                    } else {
+                        dosayif($verbose,"fallback from column to %s for %s %s dtc %s dt %s",$kind,$tnam,$colnam,$dtc,$dt);
+                        $kind = 'value';
+                    }
+                } else {
+                    push(@lrc,"\`$vcol\`");
+                }
                 next;
             }
         }
@@ -1117,6 +1168,11 @@ sub new_generate_update_values {
                 $need =~ s/\@//;
                 my $val = process_rseq($need);
                 $subrc =~ s/$at/$val/;
+            }
+            while ($subrc =~ /\@COL_([a-z_0-9]+)/) {
+                my $at = $1;
+                my $tcol = new_get_column($tnam,$plcols,$at);
+                $subrc =~ s/\@COL_([a-z_0-9]+)/$tcol/;
             }
             $subrc =~ s/NNN/M/g;
             push(@lrc, $subrc);
@@ -1139,8 +1195,8 @@ sub new_generate_insert_values {
     my $verbose = $VERBOSE_ANY;
     my $rc = '';
     foreach my $col (@$plcols) {
-        my $kind = process_rseq('insert_kind');
         my $colnam = "$tnam.$col";
+        my $kind = $ghstc2isautoinc{$colnam}? 'value' : process_rseq('insert_kind');
         my $dtc = $ghstc2class{$colnam};
         docroak("no datatype class for %s",$colnam) if (not defined($dtc));
         my $dt = $ghstc2just{$colnam};
@@ -1155,6 +1211,7 @@ sub new_generate_insert_values {
                 $kind = ($dt eq 'json' or $dtc eq 'spatial' or $dt eq 'enum' or $dt eq 'set' or $dt eq 'bit')? 'value' : 'function';
                 dosayif($verbose,"fallback from column to %s for %s %s dtc %s dt %s",$kind,$tnam,$colnam,$dtc,$dt);
             } else {
+                $vcol =~ s/"//g;
                 $rc .= ", \`$vcol\`";
                 next;
             }
@@ -1167,6 +1224,11 @@ sub new_generate_insert_values {
             }
             my $subrc = process_rseq($parm);
             $subrc =~ s/;/,/g;
+            while ($subrc =~ /\@COL_([a-z_0-9]+)/) {
+                my $at = $1;
+                my $tcol = scalar(@$plcols) > 0? new_get_column($tnam,$plcols,$at) : new_generate_value($colnam,1,'default');
+                $subrc =~ s/\@COL_([a-z_0-9]+)/$tcol/;
+            }
             while ($subrc =~ /(\@[a-z_0-9]+)/) {
                 my $at = $1;
                 my $need = $at;
@@ -1200,7 +1262,7 @@ sub new_generate_default {
     docroak("no datatype class for %s",$colnam) if (not defined($dtc));
     my $dt = $ghstc2just{$colnam};
     docroak("no datatype for %s",$colnam) if (not defined($dt));
-    if (($dtc eq 'spatial' or $dt eq 'enum') and $kind eq 'function') {
+    if (($dtc eq 'spatial' or $dt eq 'enum' or $dt eq 'timestamp') and $kind eq 'function') {
         $kind = 'value';
         dosayif($verbose,"fallback from function to %s for %s %s, dtc %s",$kind,$tnam,$colnam,$dtc);
     }
@@ -1286,6 +1348,7 @@ sub generate_column_def {
     my $tnam = "$schema.$tabl";
     my $canpk = 1;
     my $coldef = '';
+    $ghstc2unique{$colnam} = 0;
     $ghstc2isautoinc{$colnam} = 0;
     $ghstc2cannull{$colnam} = 1;
     $ghstc2canfull{$colnam} = 0;
@@ -1313,12 +1376,14 @@ sub generate_column_def {
     }
     my $dt = $tclass;
     $ghstc2just{$colnam} = $dt;
+    ++$ghdt2cnt{$dt};
     $ghstc2suc{$colnam} = new_set_suc($dt);
     my $can_autoinc = 0;
     if ($tclass eq 'integer') {
         $can_autoinc = 1;
         $dt = process_rseq('datatype_integer');
         $ghstc2just{$colnam} = $dt;
+        ++$ghdt2cnt{$dt};
         $ghstc2suc{$colnam} = new_set_suc($dt);
         if ($dt eq 'bit') {
             my $len = process_rseq('datatype_bit_len');
@@ -1352,6 +1417,7 @@ sub generate_column_def {
     } elsif ($tclass eq $DECIMAL) {
         $dt = process_rseq('datatype_decimal');
         $ghstc2just{$colnam} = $dt;
+        ++$ghdt2cnt{$dt};
         $ghstc2suc{$colnam} = new_set_suc($dt);
         my $whole = process_rseq('decimal_whole');
         if ($whole ne $EMPTY) {
@@ -1368,10 +1434,12 @@ sub generate_column_def {
     } elsif ($tclass eq 'floating') {
         $dt = process_rseq('datatype_floating');
         $ghstc2just{$colnam} = $dt;
+        ++$ghdt2cnt{$dt};
         $ghstc2suc{$colnam} = new_set_suc($dt);
     } elsif ($tclass eq 'datetime') {
         $dt = process_rseq('datatype_datetime');
         $ghstc2just{$colnam} = $dt;
+        ++$ghdt2cnt{$dt};
         if ($dt eq 'datetime' or $dt eq 'timestamp') {
             my $frac = process_rseq('datetime_fractional');
             $dt .= "($frac)" if ($frac ne $EMPTY);
@@ -1380,6 +1448,7 @@ sub generate_column_def {
         $ghstc2canfull{$colnam} = 1;
         $dt = process_rseq('datatype_character');
         $ghstc2just{$colnam} = $dt;
+        ++$ghdt2cnt{$dt};
         $ghstc2suc{$colnam} = new_set_suc($dt);
         my $len = $dt eq 'char'? process_rseq('datatype_char_len') : process_rseq('datatype_varchar_len');
         $dt .= "($len)";
@@ -1389,6 +1458,7 @@ sub generate_column_def {
     } elsif ($tclass eq 'binary') {
         $dt = process_rseq('datatype_binary');
         $ghstc2just{$colnam} = $dt;
+        ++$ghdt2cnt{$dt};
         $ghstc2suc{$colnam} = new_set_suc($dt);
         my $len = '';
         if ($dt eq 'binary') {
@@ -1409,12 +1479,14 @@ sub generate_column_def {
         $canunique = 0;
         $dt = process_rseq('datatype_lob');
         $ghstc2just{$colnam} = $dt;
+        ++$ghdt2cnt{$dt};
         $ghstc2suc{$colnam} = new_set_suc($dt);
         $ghstc2canfull{$colnam} = 1 if ($dt =~ /text/);
         $keylen = process_rseq('datatype_lob_key_len');
     } elsif ($tclass eq 'enums') {
         $dt = process_rseq('datatype_enums');
         $ghstc2just{$colnam} = $dt;
+        ++$ghdt2cnt{$dt};
         my $len = $dt eq 'enum'? process_rseq('datatype_enum_len') : process_rseq('datatype_set_len');
         $ghstc2len{$colnam} = $len;
         my $vl = '';
@@ -1426,6 +1498,7 @@ sub generate_column_def {
     } elsif ($tclass eq $SPATIAL) {
         $dt = process_rseq('datatype_spatial');
         $ghstc2just{$colnam} = $dt;
+        ++$ghdt2cnt{$dt};
         $srid = process_rseq('spatial_srid');
     }
     if (defined($srid)) {
@@ -1460,7 +1533,7 @@ sub generate_column_def {
     } else {
         $ghstc2cannull{$colnam} = 0;
     }
-    if (dorand() < $ghreal{'column_default_p'} and $pgcandefault) {
+    if ($ghstc2just{$colnam} eq 'timestamp' or (dorand() < $ghreal{'column_default_p'} and $pgcandefault)) {
         my $expr = new_generate_default($tnam,$colnam);
         $dt .= " DEFAULT $expr";
         $ghstc2hasdefault{$colnam} = 1;
@@ -1590,7 +1663,6 @@ sub table_add {
     my @lcols = ();
     my @lind = ();
     my @lnvcols = ();
-    my @lpkcols = ();
 
     my $nlin = 0;
     my $incols = 0;
@@ -1604,13 +1676,14 @@ sub table_add {
         $incols = 1 if ($nlin == 2);    # also in indexes
         $incols = 0 if ($lin =~ /^\)/);
         if ($incols) {
-            my $re = '^\s*(\`|PRIMARY\s+KEY\s+\(\`|(UNIQUE|FULLTEXT|SPATIAL)?\s+?KEY\s+\`)';
+            my $re = '^\s*([\`\"]|PRIMARY\s+KEY\s+\([\`\"]|(UNIQUE|FULLTEXT|SPATIAL)?\s+?KEY\s+[\`\"])';
             docroak("BAD line %s '%s', must be like +%s+ in: %s",$nlin,$lin,$re,$str) unless ($lin =~ /$re/);
-            if ($lin =~ /^\s*\`([^\`]+)\`/) {
+            if ($lin =~ /^\s*[\`\"]([^\`\"]+)[\`\"]/) {
                 my $colname = $1;
                 my $stc = "$tnam.$colname";
                 dosayif($VERBOSE_MORE,"-found column %s.%s",$tnam,$colname);
                 push(@lcols,$colname);
+                $ghstc2unique{$stc} = 0;
                 if (not $lin =~ /\sGENERATED\s+ALWAYS\s+AS\s/) {
                     push(@lnvcols,$colname);
                     dosayif($VERBOSE_MORE,"-non virtual column %s.%s %s",$tnam,$colname,$lin);
@@ -1625,6 +1698,7 @@ sub table_add {
                 my $dt = lc($1);
                 $ghstc2class{$stc} = $ghdt2class{$dt};
                 $ghstc2just{$stc} = $dt;
+                ++$ghdt2cnt{$dt};
                 $ghstc2suc{$stc} = new_set_suc($dt);
                 $ghstc2canfull{$stc} = ($dt eq 'character' or $dt =~ /text/)? 1 : 0;
                 $coldes =~ s/^$dt\(?//;
@@ -1668,6 +1742,7 @@ sub table_add {
                     $coldes =~ s/\s*NULL[,\s]*//;
                 }
                 $coldes =~ s/\s*CHARACTER\s+SET\s+[^\s]* *//;
+                $coldes =~ s/\s*COLLATE\s+[^\s]* *//;
                 if ($coldes =~ s/^\s*DEFAULT\s+(.+),?$//) {
                     docroak("BAD default for %s +%s+ dt +%s+ IN %s",$stc,$dt,$coldes,$lin) if (not defined($1));
                     $ghstc2hasdefault{$stc} = 1;
@@ -1679,13 +1754,13 @@ sub table_add {
                 $coldes =~ s/ON\s+UPDATE\s+CURRENT_TIMESTAMP//;
                 $coldes =~ s/\(\d+\)//;
                 $coldes =~ s/\'[a-zA-Z0-9]*\'//;
+                $coldes =~ s/\([a-zA-Z0-9\`\(\), ]*\)//;
                 docroak("BAD column description for %s, need empty string now: +%s+ dt +%s+ IN %s",$stc,$dt,$coldes,$lin) if ($coldes ne '');
             }
         }
     }
 
     $ghst2cols{$tnam} = \@lcols;
-    $ghst2pkcols{$tnam} = \@lpkcols;
     $ghst2nvcols{$tnam} = \@lnvcols;
 
     docroak("BAD last line +%s+ must end with ) in %s",$last,$str) if (not $last =~ /^\)/);
@@ -1758,6 +1833,14 @@ sub table_add {
             push(@lcot,$cot);
             push(@lcols,(defined($phpart->{'COLUMN_NAME'})? $phpart->{'COLUMN_NAME'} : ':expr'));
             
+        }
+        foreach my $col (@lcols) {
+            next if ($col eq ':expr');
+            if ($ghsti2kind{$sti} =~ /PRIMARY/) {
+                $ghstc2unique{"$tnam.$col"} = 2;
+            } elsif ($ghsti2kind{$sti} =~ /unique/) {
+                $ghstc2unique{"$tnam.$col"} = 2;
+            }
         }
         $ghsti2cols{$sti} = \@lcols;
         $ghsti2lens{$sti} = \@llen;
@@ -1867,6 +1950,7 @@ sub generate_index_clause {
         }
         if (($type eq 'column' or $ispk) and $ghstc2len{$coname} != 0) {
             $rc .= ", $qcol";
+            $ghstc2unique{$coname} = $uniq eq ''? 0 : 1;
             if (($dtc eq 'character' and $type eq 'column' and process_rseq('index_prefix_use') eq 'yes')
                 or $dtc eq $LOB) {
                 my $lenp = process_rseq('index_prefix_len');
@@ -1925,6 +2009,36 @@ sub generate_index_clause {
     return $rc;
 }
 
+sub new_generate_tail {
+    my ($tnam) = @ARG;
+    my $tas = process_rseq('table_autoextend_size');
+    my $tail = '';
+    $tail .= " AUTOEXTEND_SIZE=$tas" if ($tas ne $EMPTY);
+    $tas = process_rseq('table_autoinc');
+    $tail .= " AUTO_INCREMENT=$tas" if ($tas ne $EMPTY);
+    $tas = process_rseq('table_row_format');
+    if ($tas ne $EMPTY) {
+        if ($tas =~ /^COMPRESSED/) {
+            my $kbs = $tas;
+            $kbs =~ s/^COMPRESSED//;
+            $tail .= " ROW_FORMAT=COMPRESSED KEY_BLOCK_SIZE=$kbs";
+        } else {
+            my $toc = process_rseq('table_compression');
+            $tail .= " ROW_FORMAT=$tas KEY_BLOCK_SIZE=0";
+            $tail .= " COMPRESSION='$toc'" if ($toc ne $EMPTY);
+        }
+    }
+    $tas = process_rseq('table_stats_auto_recalc');
+    $tail .= " STATS_AUTO_RECALC=$tas" if ($tas ne $EMPTY);
+    $tas = process_rseq('table_stats_persistent');
+    $tail .= " STATS_PERSISTENT=$tas" if ($tas ne $EMPTY);
+    $tas = process_rseq('table_stats_sample_pages');
+    $tail .= " STATS_SAMPLE_PAGES=$tas" if ($tas ne $EMPTY);
+    $tas = process_rseq('character_set');
+    $tail .= " CHARACTER SET $tas" if ($tas ne $EMPTY);
+    return $tail;
+}
+
 # 1: schema.table
 # 2: if tbd
 # returns CREATE TABLE
@@ -1941,31 +2055,8 @@ sub generate_create_table {
     $pghavevcols = 0;
     $pgcanautoinc = 1 if (dorand() < $ghreal{'table_has_autoinc_p'});
     $tsql .= "CREATE TABLE $tnam (";
-    my $tail = ')';
-    my $tas = process_rseq('table_autoextend_size');
-    $tail .= " AUTOEXTEND_SIZE=$tas" if ($tas ne $EMPTY);
-    $tas = process_rseq('table_autoinc');
-    $tail .= " AUTO_INCREMENT=$tas" if ($tas ne $EMPTY);
-    $tas = process_rseq('table_row_format');
-    if ($tas ne $EMPTY) {
-        if ($tas =~ /^COMPRESSED/) {
-            my $kbs = $tas;
-            $kbs =~ s/^COMPRESSED//;
-            $tail .= " ROW_FORMAT=COMPRESSED KEY_BLOCK_SIZE=$kbs";
-        } else {
-            my $toc = process_rseq('table_compression');
-            $tail .= " ROW_FORMAT=$tas";
-            $tail .= " COMPRESSION='$toc'" if ($toc ne $EMPTY);
-        }
-    }
-    $tas = process_rseq('table_stats_auto_recalc');
-    $tail .= " STATS_AUTO_RECALC=$tas" if ($tas ne $EMPTY);
-    $tas = process_rseq('table_stats_persistent');
-    $tail .= " STATS_PERSISTENT=$tas" if ($tas ne $EMPTY);
-    $tas = process_rseq('table_stats_sample_pages');
-    $tail .= " STATS_SAMPLE_PAGES=$tas" if ($tas ne $EMPTY);
-    $tas = process_rseq('character_set');
-    $tail .= " CHARACTER SET $tas" if ($tas ne $EMPTY);
+    my $tail = new_generate_tail($tnam);
+    $tail = ") $tail";
     my $ncols = process_rseq('columns_total');
     my @lcols = ();
     foreach my $ncol (1..$ncols) {
@@ -2092,7 +2183,13 @@ sub pnotnull {
     return $lex;
 }
 
-# 1: superclass 2: ref array eligible columns 3: where or group
+sub is_numeral_op {
+    my ($op) = @ARG;
+    my $rc = $op =~ /^([+%*-\/&|^-]|DIV|<<|>>)$/? 1 : 0;
+    return $rc ;
+}
+
+# 1: s.t 2: superclass 3: ref array eligible columns 4: where or group 5: operator ~ etc
 sub new_generate_simple {
     my ($tnam,$suc,$pluse,$kind) = @ARG;
     my $suval = '';
@@ -2103,22 +2200,33 @@ sub new_generate_simple {
     my $parmop = $pref."_term_${suc}_operator";
     my $parmfun = $pref."_functions_$suc";
     for my $termnum (1..$tlen) {
+        my $havecol = '';
         my $tdtc = process_rseq($parmdtc);
         my $tdt = $tdtc eq 'json'? $tdtc : process_rseq("datatype_$tdtc");
         my $tkind = process_rseq($pref.'_term_item_kind');
         my $tval = '';
+        if ($tkind eq 'column') {
+            my $col = new_get_column($tnam,$pluse,$tdt);
+            $havecol = $col;
+            $havecol =~ s/[\`\"]//g;
+            if ($ghstc2suc{"$tnam.$havecol"} ne $suc) {
+                $havecol = '';
+                $tkind = 'function';
+            } else {
+                $tval = $col;
+                if ($kind eq 'group') {
+                    my $ga = process_rseq('group_aggregate_kind');
+                    $ga =~ s/NNN/M/g;
+                    $ga = "$ga($tval)";
+                    $ga =~ s/_DISTINCT\(/(DISTINCT /;
+                    $tval = $ga;
+                }
+            }
+        }
         if ($tkind eq 'value') {
             $tval = new_generate_value("$tdtc:$tdt",0,'any');
-        } elsif ($tkind eq 'column') {
-            $tval = $pluse->[dorand()*scalar(@$pluse)];
-            if ($kind eq 'group') {
-                my $ga = process_rseq('group_aggregate_kind');
-                $ga =~ s/NNN/M/g;
-                $ga = "$ga($tval)";
-                $ga =~ s/_DISTINCT\(/(DISTINCT /;
-                $tval = $ga;
-            }
-        } else { # function
+        }
+        if ($tkind eq 'function') {
             my $tfun = process_rseq($parmfun);
             while ($tfun =~ /\@(SELF|COL)/) { #todo sub
                 if ($tfun =~ /\@COL_([a-z]+)/) {
@@ -2126,7 +2234,7 @@ sub new_generate_simple {
                     my $tcol = new_get_column($tnam,$pluse,$typ);
                     $tfun =~ s/\@COL_([a-z]+)/$tcol/;
                 } else {
-                    my $tcol = $pluse->[dorand()*scalar(@$pluse)];
+                    my $tcol = new_get_column($tnam,$pluse,$tdt);
                     $tfun =~ s/\@(SELF|COL)/$tcol/;
                 }
             } 
@@ -2136,13 +2244,16 @@ sub new_generate_simple {
         my $unop = process_rseq($parmunop);
         $unop =~ s/PREFNNN/-/g;
         $tval = "$unop$tval" if ($unop ne $EMPTY);
+        my $op = '';
         if ($termnum < $tlen) {
-            my $op = process_rseq($parmop);
+            $op = process_rseq($parmop);
             $op =~ s/NNN/-/g;
             $op =~ s/_/ /g;
-            $tval = "$tval $op ";
+            $tval = "$tval $op " if ($op ne $EMPTY); #todo more than +
+            docroak("%s is no good here: +%s+col:%s+suc:%s+%s+%s+this:%s+'%s'",$op,$tnam,$havecol,$suc,$tval,$op,$ghstc2suc{"$tnam.$havecol"},"@$pluse") if (is_numeral_op($op) and $havecol ne '' and $ghstc2suc{"$tnam.$havecol"} ne 'numeral');
         }
         $suval .= "$tval ";
+        last if ($op eq $EMPTY);
     }
     return $suval;
 }
@@ -2155,7 +2266,7 @@ sub new_generate_where {
     return $rc if (dorand() < $ghreal{$parm});
     my $pref = 'where';
     if ($kind eq 'where') {
-        $rc = 'WHERE ';
+        $rc = ' ';
     } else { # group
         $rc = ' HAVING ';
         $pref = 'group_having';
@@ -2165,6 +2276,8 @@ sub new_generate_where {
     push(@lnumcols,$plcols->[0]) if (scalar(@lnumcols) == 0);
     my @lcharcols = grep {$ghstc2suc{"$tnam.$_"} eq $SUC_CHARLIKE} @$plcols;
     push(@lcharcols,$plcols->[0]) if (scalar(@lcharcols) == 0);
+    my @ldatecols = grep {$ghstc2suc{"$tnam.$_"} eq $SUC_DATELIKE} @$plcols;
+    push(@ldatecols,$plcols->[0]) if (scalar(@ldatecols) == 0);
     my $lolen = process_rseq($pref.'_logical_len');
     foreach my $lnum (1..$lolen) {
         my $suc = process_rseq($pref.'_term_overall_class');
@@ -2173,6 +2286,8 @@ sub new_generate_where {
             $pluse = \@lnumcols;
         } elsif ($suc eq 'charlike') {
             $pluse = \@lcharcols;
+        } elsif ($suc eq 'datelike') {
+            $pluse = \@ldatecols;
         } else {
             $pluse = $plcols;
         }
@@ -2193,14 +2308,19 @@ sub new_generate_where {
             my $lbop = process_rseq($parmbin);
             $lbop =~ s/EXCL/!/;
             $lbop =~ s/_/ /;
-            $rc .= $lbop;
-            $suval = new_generate_simple($tnam,$suc,$pluse,$kind);
-            $rc .= " $suval";
+            if ($lbop ne $EMPTY) {
+                $rc .= $lbop;
+                $suval = new_generate_simple($tnam,$suc,$pluse,$kind);
+                $rc .= " $suval";
+            }
         }
         if ($lnum < $lolen) {
             my $bin = process_rseq($pref.'_logical_binary_operator');
             $rc .= " $bin ";
         }
+    }
+    if ($havejoins and $kind eq 'where' and dorand() < process_rseq('select_join_where_parent_p')) {
+        $rc = "($rc)";
     }
     return $rc;
 }
@@ -2247,8 +2367,8 @@ sub stmt_select_generate {
     my $hosel = process_rseq('select_how');
     my $ifgrp = $hosel eq 'all'? 0 : (dorand() < $ghreal{'select_group_by_p'});
     my $joins = process_rseq('select_join_len');
-    my $havejoins = ($joins > 1);
-    my $ltog = $ifgrp? table_columns_subset($tnam,'group_by_column_p','group',$havejoins) : [];
+    my $havejoins = $joins > 1? 1 : 0;
+    my $ltog = $ifgrp? table_columns_subset($tnam,'group_by_column_p','group_by_column_p','group',$havejoins) : [];
     my $tog = '';
     my $tosel = '';
     if ($hosel eq 'all') {
@@ -2259,7 +2379,7 @@ sub stmt_select_generate {
         $sub .= 'C';
     } else {
         if ($ifgrp) {
-            my $ltosel = table_columns_subset($tnam,'group_by_column_p','group',$havejoins);
+            my $ltosel = table_columns_subset($tnam,'group_by_column_p','group_by_column_p','group',$havejoins);
             foreach my $c (@$ltosel) {
                 my @lin = grep {$c eq $_} @$ltog;
                 if (scalar(@lin) == 0) {
@@ -2291,14 +2411,16 @@ sub stmt_select_generate {
                 $tog .= $hav;
             }
         } else {
-            $tosel = table_columns_subset($tnam,$SELECT_COLUMN_P,'select',$havejoins);
+            $tosel = table_columns_subset($tnam,$SELECT_COLUMN_P,$SELECT_COLUMN_P,'select',$havejoins);
         }
     }
     $stmt .= " $tosel FROM $tnam";
+    my @ltjoins = ($tnam);
     if ($joins > 1) {
         $sub .= 'J';
         foreach my $i (2..$joins) {
             my $jtable = table_get();
+            push(@ltjoins,$jtable);
             my $jkind = process_rseq('select_join_kind_simple');
             $jkind .= ' JOIN' unless ($jkind eq 'COMMA' or $jkind eq 'STRAIGHT_JOIN');
             $jkind =~ s/COMMA/,/;
@@ -2306,8 +2428,24 @@ sub stmt_select_generate {
         }
         $stmt =~ s/,$//;
     }
-    my $wher = new_generate_where($tnam,'select_where_all_p','where',$havejoins);
-    $stmt .= " $wher";
+    my $wher = '';
+    my $op = '';
+    my $nj = 0;
+    foreach my $jtnam (@ltjoins) {
+        ++$nj;
+        if ($havejoins and $nj > 1 and dorand() >= process_rseq('select_join_where_table_p')) {
+            next;
+        } else {
+            $wher .= " $op ";
+        }
+        my $subwher = new_generate_where($jtnam,'select_where_all_p','where',$havejoins);
+        $op = process_rseq('where_logical_unary_operator');
+        $subwher = "$op $subwher" if ($op ne $EMPTY);
+        $wher .= $subwher;
+        last if ($nj == scalar(@ltjoins));
+        $op = process_rseq('where_logical_binary_operator');
+    }
+    $stmt .= " WHERE $wher";
     my $hasun = 0;
     my $sbord = '';
     if (dorand() < $ghreal{'select_union_p'}) {
@@ -2318,7 +2456,7 @@ sub stmt_select_generate {
             my $how = process_rseq('select_union_how');
             $stmt .= " $how SELECT $tosel FROM $tnam";
             $wher = new_generate_where($tnam,'select_where_all_p','where',$havejoins);
-            $stmt .= " $wher";
+            $stmt .= " WHERE $wher";
         }
         $sub .= "U";
     }
@@ -2326,7 +2464,7 @@ sub stmt_select_generate {
     if (dorand() < $ghreal{'select_order_by_p'}) {
         my $ord = '';
         if ($ifgrp) {
-            my $plord = table_columns_subset($tnam,'select_order_by_column_p','group',$havejoins);
+            my $plord = table_columns_subset($tnam,'select_order_by_column_p','select_order_by_column_p','group',$havejoins);
             foreach my $c (@$plord) {
                 my @lin = grep {$c eq $_} @$ltog;
                 if (scalar(@lin) == 0) {
@@ -2345,7 +2483,7 @@ sub stmt_select_generate {
                 $ord = join(',',grep {dorand() < $ghreal{'select_order_by_column_p'}} split(/, */,$sbord));
                 $ord = '1' if ($ord eq '');
             } else {
-                $ord = table_columns_subset($tnam,'select_order_by_column_p','select',$havejoins);
+                $ord = table_columns_subset($tnam,'select_order_by_column_p','select_order_by_column_p','select',$havejoins);
             }
         }
         $stmt .= " ORDER BY $ord";
@@ -2361,7 +2499,6 @@ sub stmt_select_generate {
         $stmt .= " FOR $fup";
         $sub .= 'U';
     }
-        #docroak("#debug+%s+",$stmt) if ($joins > 1);
     return $stmt,$sub;
 }
 
@@ -2369,14 +2506,49 @@ sub stmt_select_generate {
 sub stmt_insel_generate {
     # determine schema.table
     my $tnam = table_get();
-    my $stmt .= " INSERT into $tnam SELECT * FROM $tnam";
+    my @lcols = map {/\`/? $_ : "\`$_\`"} @{$ghst2nvcols{$tnam}};
+    my $tocols = join(', ',@lcols);
+    my @lfincols = ();
+    my $haveone = 0;
+    my $haveauto = '';
+    foreach my $col (@lcols) {
+        my $colnam = "$tnam.$col";
+        $colnam =~ s/[\`\"]//g;
+        if ($ghstc2isautoinc{$colnam} and dorand() >= $ghreal{'autoinc_explicit_value_p'}) {
+            push(@lfincols,'NULL');
+            $haveauto = $colnam;
+            next;
+        }
+        if ($ghstc2unique{$colnam}) {
+            my $suc = $ghstc2suc{$colnam};
+            if ($suc eq $SUC_NUMERAL) {
+                $haveone = 1;
+                my $v = new_generate_value($colnam,1,'any');
+                push(@lfincols,"$col+$v");
+            } elsif ($suc eq $SUC_CHARLIKE) {
+                $haveone = 1;
+                my $v = new_generate_value($colnam,1,'any');
+                my $i = value_generate_tinyint($colnam,'insel');
+                push(@lfincols,"REVERSE(SUBSTR(CONCAT($col,$v),2,$i))");
+            } elsif ($suc eq $SUC_DATELIKE) {
+                $haveone = 1;
+                my $v = value_generate_smallint($colnam,'insel');
+                push(@lfincols,"DATE_ADD($col,INTERVAL $v DAY)");
+            } else {
+                push(@lfincols,$col);
+            }
+        } else {
+            push(@lfincols,$col);
+        }
+    }
+    my $cols = join(', ',@lfincols);
+    my $stmt .= " INSERT into $tnam ($tocols) SELECT $cols FROM $tnam";
     my $wher = new_generate_where($tnam,'select_where_all_p','where',0);
-    $stmt .= " $wher";
+    $stmt .= " WHERE $wher";
     return $stmt;
 }
 
-# 1: schema.table.column
-# returns: value as string suitable to add to VALUES
+# 1: schema.table.column # returns: value as string suitable to add to VALUES
 sub value_generate_decimal {
     my ($col,$kind) = @ARG;
     docroak("kind is not defined. CROAK.") if (not defined($kind));
@@ -2400,9 +2572,7 @@ sub value_generate_int {
     my ($col,$kind) = @ARG;
     docroak("kind is not defined. CROAK.") if (not defined($kind));
     my $value = process_rseq('value_int');
-    if ($ghstc2unsigned{$col}) {
-        $value = -$value if ($kind ne 'default' and dorand() < $ghreal{$NUMBER_REVERSE_SIGN_ILLEGITIMATE_P});
-    } else {
+    if (not $ghstc2unsigned{$col}) {
         $value = -$value if (dorand() < $ghreal{$NUMBER_REVERSE_SIGN_LEGITIMATE_P});
     }
     return $value;
@@ -2414,9 +2584,7 @@ sub value_generate_tinyint {
     my ($col,$kind) = @ARG;
     docroak("kind is not defined. CROAK.") if (not defined($kind));
     my $value = process_rseq('value_tinyint');
-    if ($ghstc2unsigned{$col}) {
-        $value = -$value if ($kind ne 'default' and dorand() < $ghreal{$NUMBER_REVERSE_SIGN_ILLEGITIMATE_P});
-    } else {
+    if (not $ghstc2unsigned{$col} and $kind ne 'insel') {
         $value = -$value if (dorand() < $ghreal{$NUMBER_REVERSE_SIGN_LEGITIMATE_P});
     }
     return $value;
@@ -2428,9 +2596,7 @@ sub value_generate_bigint {
     my ($col,$kind) = @ARG;
     docroak("kind is not defined. CROAK.") if (not defined($kind));
     my $value = process_rseq('value_bigint');
-    if ($ghstc2unsigned{$col}) {
-        $value = -$value if ($kind ne 'default' and dorand() < $ghreal{$NUMBER_REVERSE_SIGN_ILLEGITIMATE_P});
-    } else {
+    if (not $ghstc2unsigned{$col}) {
         $value = -$value if (dorand() < $ghreal{$NUMBER_REVERSE_SIGN_LEGITIMATE_P});
     }
     return $value;
@@ -2454,9 +2620,7 @@ sub value_generate_smallint {
     my ($col,$kind) = @ARG;
     docroak("kind is not defined. CROAK.") if (not defined($kind));
     my $value = process_rseq('value_smallint');
-    if ($ghstc2unsigned{$col}) {
-        $value = -$value if ($kind ne 'default' and dorand() < $ghreal{$NUMBER_REVERSE_SIGN_ILLEGITIMATE_P});
-    } else {
+    if (not $ghstc2unsigned{$col}) {
         $value = -$value if (dorand() < $ghreal{$NUMBER_REVERSE_SIGN_LEGITIMATE_P});
     }
     return $value;
@@ -2469,7 +2633,7 @@ sub value_generate_mediumint {
     docroak("kind is not defined. CROAK.") if (not defined($kind));
     my $value = process_rseq('value_mediumint');
     if (not defined($ghstc2unsigned{$col}) or $ghstc2unsigned{$col} == 1) {
-        $value = -$value if ($kind ne 'default' and dorand() < $ghreal{$NUMBER_REVERSE_SIGN_ILLEGITIMATE_P});
+        $value = $value;
     } else {
         $value = -$value if (dorand() < $ghreal{$NUMBER_REVERSE_SIGN_LEGITIMATE_P});
     }
@@ -2894,7 +3058,7 @@ sub stmt_delete_generate {
     # determine schema.table
     my $tnam = table_get();
     my $wher = new_generate_where($tnam,'delete_where_all_p','where',0);
-    $stmt = "DELETE FROM $tnam $wher";
+    $stmt = "DELETE FROM $tnam WHERE $wher";
     return $stmt;
 }
 
@@ -2903,7 +3067,7 @@ sub new_stmt_update_generate {
     my $stmt = '';
     my $tnam = table_get();
     $stmt = "UPDATE $tnam SET";
-    my $plcols = table_columns_subset($tnam,'update_column_p','update',0);
+    my $plcols = table_columns_subset($tnam,'update_column_p','update_pk_column_p','update',0);
     my $plvalues = new_generate_update_values($tnam,$plcols);
     my $set = '';
     my $n = 0;
@@ -2915,7 +3079,7 @@ sub new_stmt_update_generate {
     $set =~ s/^,//;
     $stmt .= $set;
     my $wher = new_generate_where($tnam,'update_where_all_p','where',0);
-    $stmt .= " $wher";
+    $stmt .= " WHERE $wher";
     return $stmt;
 }
 
@@ -2938,7 +3102,7 @@ sub stmt_insert_generate {
     if (dorand() < $ghreal{'insert_on_dup_update_p'}) {
         $kup1 .= '_U';
         $stmt .= " ON DUPLICATE KEY UPDATE";
-        my $plcols = table_columns_subset($tnam,'update_column_p','update',0);
+        my $plcols = table_columns_subset($tnam,'update_column_p','update_pk_column_p','update',0);
         my $plvalues = new_generate_update_values($tnam,$plcols);
         my $set = '';
         my $n = 0;
@@ -2980,14 +3144,6 @@ sub mstime {
 }
 
 # 1: schema.table
-# returns colname
-sub get_table_column {
-    my ($tnam) = @ARG;
-    my $col = $ghst2cols{$tnam}->[int(dorand()*scalar(@{$ghst2cols{$tnam}}))];
-    return $col;
-}
-
-# 1: schema.table
 # returns statement, subtype
 sub stmt_analyze_generate {
     my ($tnam) = @ARG;
@@ -3004,11 +3160,11 @@ sub stmt_analyze_generate {
             if ($how eq 'just') {
         $kup1 .= 'nH';
     } elsif ($how eq 'drop') {
-        my $col = table_columns_subset($tnam,'analyze_column_p','analyze',0);
+        my $col = table_columns_subset($tnam,'analyze_column_p','analyze_column_p','analyze',0);
         $kup1 .= 'dH';
         $stmt .= " DROP HISTOGRAM ON $col"; 
     } else {
-        my $col = table_columns_subset($tnam,'analyze_column_p','analyze',0);
+        my $col = table_columns_subset($tnam,'analyze_column_p','analyze_column_p','analyze',0);
         $kup1 .= 'uH';
         $stmt .= " UPDATE HISTOGRAM ON $col"; 
         my $bus = process_rseq('load_analyze_buckets');
@@ -3025,6 +3181,7 @@ sub stmt_analyze_generate {
 sub stmt_alter_generate {
     my $tnam = $ARG[0];
     my $stmt = '';
+    my $tail = '';
     my $len = process_rseq('load_alter_length');
     my $subt = "ALTER$len";
     for my $clausen (1..$len) {
@@ -3035,6 +3192,10 @@ sub stmt_alter_generate {
             my $cnam = $lcols[int(dorand()*scalar(@lcols))];
             $stmt .= "DROP COLUMN \`$cnam\`, ";
             $subt .= 'dC';
+        } elsif ($kind eq 'TAIL' and $tail eq '') {
+            $tail = new_generate_tail($tnam);
+            $stmt .= "$tail,";
+            $subt .= 'taiL';
         } elsif ($kind eq 'ADD_COL') {
             my $colnam = sprintf("%s.added_col_%s",$tnam,int(dorand()*10000+1000));
             my $coldef = generate_column_def('alter_table',$colnam);
@@ -3061,12 +3222,14 @@ sub stmt_alter_generate {
     return ($stmt,$subt);
 }
 
+# 1 ph 2 use newlines
 sub hdump {
     my $ph = $ARG[0];
     my $nl = (defined($ARG[1]) and $ARG[1])? "\n" : '';
     my $rc = '';
     foreach my $key (sort(keys(%$ph))) { 
-        $rc .= ",$nl $key: $ph->{$key}";
+        my $ok = ref($ph->{$key}) eq 'ARRAY'? join(' !!! ',@{$ph->{$key}}) : $ph->{$key};
+        $rc .= ",$nl $key: $ok";
     }
     $rc =~ s/, //;
     return $rc;
@@ -3091,6 +3254,19 @@ sub server_load_thread {
     my $gldbh;
     my $glabsport;
 
+    my %hcntbykup1 = ();
+
+    my %hneedbyfail = (
+    );
+
+    my %hneedbykind = (
+        'alter' => [],
+    );
+
+    my %hneedbykindexcept = (
+        'alter' => '(DROP.*PRIMARY|Lock.wait|DROP.*exist|was.not.locked|conflicting.read.lock|was.locked.with.a.READ)',
+    );
+
     my %hneed = (
         #'1054' => 10, #only for single load
         '1064' => 10,
@@ -3098,7 +3274,13 @@ sub server_load_thread {
         #'1210' => 10,
         '1674' => 10,
         '3105' => 10,
+        '1292' => 10,
     );
+
+    my %hneedexcept = (
+        '1064' => '(SET +.* +EMPTY=)',
+    );
+
 
     # get random schema
     sub schema_get {
@@ -3137,7 +3319,7 @@ sub server_load_thread {
 
     # 1: schema.table # 2: test parameter to use for selection # 3: kind: if not 'select', do not use virtual columns #          if UPDATE, return ref array, same for GROUP # 4: if have joins
     sub table_columns_subset {
-        my ($tnam, $parm, $kind,$havejoins) = @ARG;
+        my ($tnam, $parm, $pkparm,$kind,$havejoins) = @ARG;
         docroak("empty table name '%s'",$tnam) if (not defined($tnam) or $tnam eq '');
         docroak("no havejoins") if (not defined($havejoins));
         if (not defined($ghst2nvcols{$tnam})) {
@@ -3148,7 +3330,8 @@ sub server_load_thread {
         }
         my @lcall = ($kind eq 'select' or $kind eq 'group' or $kind eq 'analyze')? @{$ghst2cols{$tnam}} : @{$ghst2nvcols{$tnam}};
         @lcall = @{$ghst2cols{$tnam}} if (scalar(@lcall) == 0);
-        my @lc = grep {dorand() < $ghreal{$parm}} @lcall;
+        docroak("no columns for '%s'",$tnam) if (scalar(@lcall) == 0);
+        my @lc = grep {$ghstc2unique{"$tnam.$_"} == 1? dorand() < $ghreal{$pkparm} : dorand() < $ghreal{$parm}} @lcall;
         push(@lc,$lcall[0]) if (scalar(@lc) == 0);
         @lc = map {"$tnam.$_"} @lc if ($havejoins);
         my $rc = ($kind eq 'update' or $kind eq 'group' or $kind eq 'having')? \@lc : join(',',@lc);
@@ -3190,6 +3373,7 @@ sub server_load_thread {
         $rc =~ s/entry\s'[^']*'/entry CONST/g;
         $rc =~ s/functional index\s*'[^']*'/functional index IND/g;
         $rc =~ s/key\s'[^']*'/key KEYNAME/g;
+        $rc =~ s/SAVEPOINT\s+'?[^']+'?/SAVEPOINT SNAME/g;
         $rc =~ s/value:\s?'?[^']*'?/value VALUE/g;
         $rc =~ s/set\s+[^\s]+\s+cannot\s+be\s+used/set CHARSET cannot be used/g;
         $rc =~ s/convert string\s[^\s]+/ convert string STRING/g;
@@ -3274,6 +3458,15 @@ sub server_load_thread {
             dosayif($VERBOSE_ANY, "-   -- %s %s", $key, $str);
         }
         dosayif($VERBOSE_ANY, "- --- thread %s ERROR STMT KIND COUNTS: %s",$tnum,hdump(\%herrkind2count,1));
+        foreach my $k (sort(keys(%hneedbyfail))) {
+            if ($hneedbyfail{$k}->[0] eq '0') {
+                delete($hneedbyfail{$k});
+            } else {
+                shift(@{$hneedbyfail{$k}}) if ($hneedbyfail{$k}->[0] eq '1');
+            }
+        }
+        dosayif($VERBOSE_ANY, "- --- thread %s ALL ERROR KIND STMTS %s",$tnum,hdump(\%hneedbyfail,1));
+        dosayif($VERBOSE_ANY, "- --- thread %s ROW COUNTS %s",$tnum,hdump(\%hcntbykup1,0));
     }
 
 # 1: stmt
@@ -3648,9 +3841,31 @@ sub server_load_thread {
                 }
                 $setval =~ s/,$//;
                 $setval = "'$setval'";
+            } elsif ($setg eq 'gasql') {
+                my $len = process_rseq("set_variable_len_${setg}");
+                $setname = 'sql_mode';
+                foreach my $i (1..$len) {
+                    my $subname = process_rseq("set_variable_name_$setg");
+                    if ($subname eq 'default') {
+                        if ($i == 1) {
+                            $setval = "$subname";
+                            last;
+                        }
+                    } else {
+                        $setval .= "$subname,";
+                    }
+                }
+                $setval =~ s/,$//;
+                $setval = "'$setval'" if (not $setval eq 'default');
             } else {
                 $setname = process_rseq("set_variable_name_${setg}");
                 $setval = process_rseq("set_variable_value_${setg}");
+                if ($setname eq $EMPTY) {
+                    $setname = '@EMPTY';
+                    $setkind = '';
+                    $setval = '1';
+                }
+                docroak("debug+%s+of %s+and %s+", $setname,$setval,$setg) if ($setname =~ /_debug$/);
             }
             $stmt = "SET $setkind $setname=$setval";
         } elsif ($ksql eq 'savepoint') {
@@ -3705,19 +3920,36 @@ sub server_load_thread {
             my @lstmt = $ksql eq 'recreate_schema'? ("DROP SCHEMA $stmt", "SELECT SLEEP(5)", "CREATE SCHEMA $stmt") : ($stmt);
             my $rc;
             foreach my $sstmt (@lstmt) {
-                $rc = $gldbh->do($sstmt); #debug
-                #my $sth = $gldbh->prepare($sstmt);
-                #$rc = $sth->execute();
-                $err = $gldbh->err();
-                $errstr = $gldbh->errstr();
-                #$rows = $sth->rows;
-                #docroak("#debug+%s+%s+",$rows,$stmt) if $rows > 1 and $stmt =~ /^SELECT/;
-                printf($msql "%s; %s: %s\n", $sstmt,$err,$errstr);
+                docroak('statement has unresolved @COL: "%s"',$sstmt) if ($sstmt =~ /\@(COL|SELF)_/ or $sstmt =~ /\@[a-z]{4}./);
+                if (dorand() < process_rseq('stmt_prepare_p')) {
+                    my $sth = $gldbh->prepare($sstmt);
+                    docroak("undef stmt handle for '%s'",$sstmt) if (not defined($sth));
+                    $rc = $sth->execute();
+                    $err = $sth->err();
+                    $errstr = $sth->errstr();
+                    $rows = $sth->rows;
+                } else {
+                    $rc = $gldbh->do($sstmt);
+                    $err = $gldbh->err();
+                    $errstr = $gldbh->errstr();
+                    $rows = 0;
+                }
+                $hcntbykup1{$kup1} += $rows if ($rows >= 0);
+                my ($sec, $mks) = gettimeofday();
+                printf($msql "%s.%06d %s; %s: %s\n", $sec, $mks, $sstmt,$err,$errstr);
             }
             dosayif($VERBOSE_MORE, "done perl ksql: %s",$ksql);
-            if (defined($hneed{$err}) and $hneed{$err} > 0) {
-                $stmt =~ s/[a-z0-9]{1000}/LONG1000_/gi;
-                $stmt =~ s/(LONG1000_)+/MANYLONG1000_/gi;
+            $stmt =~ s/[a-z0-9]{1000}/LONG1000_/gi;
+            $stmt =~ s/(LONG1000_)+/MANYLONG1000_/gi;
+            if ($err ne '') {
+                if (not defined($hneedbyfail{$kup1})) {
+                    $hneedbyfail{$kup1} = ['1'];
+                }
+                push(@{$hneedbyfail{$kup1}},"ALLFAIL $kup1 : $stmt : $err : $errstr") if ($hneedbyfail{$kup1}->[0] ne '0');
+            } else {
+                $hneedbyfail{$kup1} = ['0'];
+            }
+            if ((defined($hneed{$err}) and $hneed{$err} > 0) or (defined($hneedbykind{$ksql}) and $err ne '' and not $errstr =~ /$hneedbykindexcept{$ksql}/i)) {
                 dosayif($VERBOSE_ANY,"needed #%s %s %s: %s",$hneed{$err},$err,$errstr,$stmt);
                 --$hneed{$err};
             }
@@ -4116,6 +4348,7 @@ sub init_db {
                 $ghdbh{$absport} = doconnect(\$adbh,$absport,1,0);
             }
             my @lcnf = map {"SET PERSIST $_"} split("\n",$ghreal{$confarg});
+            unshift(@lcnf,'RESET PERSIST');
             foreach my $sets (@lcnf) {
                 dosayif($VERBOSE_ANY,"port %s handle %s for %s",$absport,$ghdbh{$absport},$sets);
                 runreport($sets,$ghdbh{$absport},$absport,$VERBOSE_ANY);
@@ -4134,7 +4367,7 @@ sub init_db {
     return $rc;
 }
 
-# start execution. Execution starts HERE.
+# start execution. Execution starts #HERE.
 GetOptions(\%ghasopt, @LOPT) or usage("invalid options supplied",__LINE__);
 scalar(@ARGV) == 0 or usage("no arguments are allowed",__LINE__);
 foreach my $soname (sort(keys(%HDEFOPT))) {
@@ -4163,7 +4396,9 @@ dosayif($VERBOSE_ANY, "random seed is %s for this script version %s", $rseed, $v
 my $phv = doeval("LoadFile('$test_script')") or die "bad yaml in file $test_script";
 %ghtest = %$phv;
 $phv = dclone(\%ghtest);
+my $phc = dclone(\%ghtest);
 %ghreal = %$phv;
+%ghorig = %$phc;
 $ENV{_imatest_tmpdir} = doeval($ghreal{'tmpdir'});
 $ENV{_imatest_load_filebase} = "master_thread";      # will change in load threads
 
@@ -4327,7 +4562,10 @@ foreach my $pid (sort(keys(%ghlpids)), sort(keys(%ghtermpids), sort(keys(%ghchep
     }
 }
 
+dosayif($VERBOSE_ANY, "-DATATYPES FOR %s ORIGINAL TABLES WITH %s columns: %s\n",scalar(my @l=sort(keys(%ghst2createtable))),scalar(my @m=sort(keys(%ghstc2just))),hdump(\%ghdt2cnt,0));
+
 my $ec = 0;
 dosayif($VERBOSE_ANY,"exiting with exit code %s", $ec);
 dosayif($VERBOSE_ANY,"See also %s", $ghasopt{$SEE_ALSO}) if (defined($ghasopt{$SEE_ALSO}));
+# end execution. Execution ends HERE.
 exit($ec);

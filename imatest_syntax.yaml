@@ -23,7 +23,16 @@ strict:
   mandatory: True
   allowed: [True, False]
   supported: [True, False]
-# preferred alphabethical order from here on, _ before a, numbers before letters, shorter values first
+adjust_add:
+  mandatory: True
+adjust_mult:
+  mandatory: True
+adjust_more_p:
+  mandatory: True
+  allowed: probability
+adjust_p:
+  mandatory: True
+  allowed: probability
 analyze_column_p:
   mandatory: True
   allowed: probability
@@ -292,6 +301,9 @@ group_having_functions_any:
 group_having_functions_charlike:
   mandatory: True
   allowed: Rseq       
+group_having_functions_datelike:
+  mandatory: True
+  allowed: Rseq       
 group_having_functions_numeral:
   mandatory: True
   allowed: Rseq       
@@ -314,27 +326,39 @@ group_having_term_any_datatype_class:
 group_having_term_any_operator:
   mandatory: True
   allowed: Rseq       
-  only_values_allowed: %,+,*,NNN,/,DIV,&,<<,>>,^,|
+  only_values_allowed: %,+,*,NNN,/,DIV,&,<<,>>,^,|,EMPTY
 group_having_term_binary_any_operator:
   mandatory: True
   allowed: Rseq       
-  only_values_allowed: LIKE,NOT_LIKE,NOT_REGEXP,REGEXP,RLIKE,=,EXCL=,<>,>,<,>=,<=,<=>
+  only_values_allowed: LIKE,NOT_LIKE,NOT_REGEXP,REGEXP,RLIKE,=,EXCL=,<>,>,<,>=,<=,<=>,EMPTY
 group_having_term_binary_charlike_operator:
   mandatory: True
   allowed: Rseq       
-  only_values_allowed: LIKE,NOT_LIKE,NOT_REGEXP,REGEXP,RLIKE,=,EXCL=,<>,>,<,>=,<=,<=>
+  only_values_allowed: LIKE,NOT_LIKE,NOT_REGEXP,REGEXP,RLIKE,=,EXCL=,<>,>,<,>=,<=,<=>,EMPTY
+group_having_term_binary_datelike_operator:
+  mandatory: True
+  allowed: Rseq       
+  only_values_allowed: LIKE,NOT_LIKE,NOT_REGEXP,REGEXP,RLIKE,=,EXCL=,<>,>,<,>=,<=,<=>,EMPTY
 group_having_term_binary_numeral_operator:
   mandatory: True
   allowed: Rseq       
-  only_values_allowed: =,EXCL=,<>,>,<,>=,<=,<=>
+  only_values_allowed: =,EXCL=,<>,>,<,>=,<=,<=>,EMPTY
 group_having_term_charlike_datatype_class:
   mandatory: True
   allowed: Rseq       
   only_values_allowed: character,binary,lob,character
+group_having_term_datelike_datatype_class:
+  mandatory: True
+  allowed: Rseq       
+  only_values_allowed: datetime,timestamp,date,time,year
 group_having_term_charlike_operator:
   mandatory: True
   allowed: Rseq       
-  only_values_allowed: %,+,*,NNN,/,DIV,&,<<,>>,^,|
+  only_values_allowed: %,+,*,NNN,/,DIV,&,<<,>>,^,|,EMPTY
+group_having_term_datelike_operator:
+  mandatory: True
+  allowed: Rseq       
+  only_values_allowed: %,+,*,NNN,/,DIV,&,<<,>>,^,|,EMPTY
 group_having_term_item_kind:
   mandatory: True
   allowed: Rseq       
@@ -354,16 +378,20 @@ group_having_term_numeral_len:
 group_having_term_numeral_operator:
   mandatory: True
   allowed: Rseq       
-  only_values_allowed: %,+,*,NNN,/,DIV,&,<<,>>,^,|
+  only_values_allowed: %,+,*,NNN,/,DIV,&,<<,>>,^,|,EMPTY
 group_having_term_overall_class:
   mandatory: True
   allowed: Rseq       
-  only_values_allowed: numeral,charlike,any
+  only_values_allowed: numeral,charlike,any,datelike
 group_having_term_unary_any_operator:
   mandatory: True
   allowed: Rseq       
   only_values_allowed: PREFNNN,~,EMPTY
 group_having_term_unary_charlike_operator:
+  mandatory: True
+  allowed: Rseq       
+  only_values_allowed: PREFNNN,~,EMPTY
+group_having_term_unary_datelike_operator:
   mandatory: True
   allowed: Rseq       
   only_values_allowed: PREFNNN,~,EMPTY
@@ -537,7 +565,7 @@ load_alter_length:
 load_alter_kind:
   mandatory: True
   allowed: Rseq
-  only_values_allowed: ADD_COL,DROP_COL,ADD_KEY,DROP_KEY,TABLE_EB
+  only_values_allowed: ADD_COL,DROP_COL,ADD_KEY,DROP_KEY,TABLE_EB,TAIL
 load_analyze_local_p:
   mandatory: True
   allowed: probability
@@ -653,9 +681,6 @@ mysql_initial_cnf_ports:
   mandatory: True
 mysql_initial_cnf_targets:
   mandatory: True
-number_reverse_sign_illegitimate_p:
-  mandatory: True
-  allowed: probability
 number_reverse_sign_legitimate_p:
   mandatory: True
   allowed: probability
@@ -728,6 +753,12 @@ select_join_kind_simple:
   mandatory: True
   allowed: Rseq
   only_values_allowed: NATURAL INNER,NATURAL INNER,NATURAL LEFT,NATURAL RIGHT,NATURAL LEFT OUTER,NATURAL RIGHT OUTER,COMMA,INNER,CROSS,STRAIGHT_JOIN
+select_join_where_parent_p:
+  mandatory: True
+  allowed: probability
+select_join_where_table_p:
+  mandatory: True
+  allowed: probability
 select_order_by_column_p:
   mandatory: True
   allowed: probability
@@ -803,12 +834,16 @@ server_termination_wait_timeout:
 set_group:
   mandatory: True
   allowed: Rseq
-  only_values_allowed: g1,g2s,g3b,g4cc,g5ef,g6n,g7bn,g8opt
+  only_values_allowed: g1,g2s,g3b,g4cc,g5ef,g6n,g7bn,g8opt,g9p,gasql
 set_kind:
   mandatory: True
   allowed: Rseq
   only_values_allowed: LOCAL,GLOBAL,PERSIST,PERSIST_ONLY,EMPTY
 set_variable_len_g8opt:
+  mandatory: True
+  allowed: Rseq
+  only_positive_integers: True
+set_variable_len_gasql:
   mandatory: True
   allowed: Rseq
   only_positive_integers: True
@@ -835,6 +870,13 @@ set_variable_name_g7bn:
   allowed: Rseq
 set_variable_name_g8opt:
   mandatory: True
+  allowed: Rseq
+set_variable_name_g9p:
+  mandatory: True
+  allowed: Rseq
+set_variable_name_gasql:
+  mandatory: True
+  allowed: Rseq
 set_variable_value_g1:
   mandatory: True
   allowed: Rseq
@@ -859,6 +901,9 @@ set_variable_value_g7bn:
 set_variable_value_g8opt:
   mandatory: True
   allowed: Rseq
+set_variable_value_g9p:
+  mandatory: True
+  allowed: Rseq
 sleep_final:
   mandatory: True
   allowed: only_non_negative_integers
@@ -868,6 +913,9 @@ sleep_on_assert:
 spatial_srid:
   mandatory: True
   allowed: Rseq
+stmt_prepare_p:
+  mandatory: True
+  allowed: probability
 strict_exceptions:
   mandatory: True
 table_autoextend_size:
@@ -1021,6 +1069,9 @@ update_kind:
   mandatory: True
   allowed: Rseq       
   only_values_allowed: value,function,column,default
+update_pk_column_p:
+  mandatory: True
+  allowed: probability
 update_where_all_p:
   mandatory: True
   allowed: probability
@@ -1119,16 +1170,16 @@ value_varchar_len:
 virtual_columns_per_table:
   mandatory: True
   allowed: Rseq
-virtual_functions_numeral:
-  mandatory: True
-  allowed: Rseq
-virtual_functions_datelike:
+virtual_functions_any:
   mandatory: True
   allowed: Rseq
 virtual_functions_charlike:
   mandatory: True
   allowed: Rseq
-virtual_functions_any:
+virtual_functions_datelike:
+  mandatory: True
+  allowed: Rseq
+virtual_functions_numeral:
   mandatory: True
   allowed: Rseq
 virtual_term_any_datatype_class:
@@ -1138,7 +1189,7 @@ virtual_term_any_datatype_class:
 virtual_term_any_operator:
   mandatory: True
   allowed: Rseq
-  only_values_allowed: %,+,*,NNN,/,DIV,&,<<,>>,^,|
+  only_values_allowed: %,+,*,NNN,/,DIV,&,<<,>>,^,|,EMPTY
 virtual_term_charlike_datatype_class:
   mandatory: True
   allowed: Rseq
@@ -1146,15 +1197,15 @@ virtual_term_charlike_datatype_class:
 virtual_term_datelike_datatype_class:
   mandatory: True
   allowed: Rseq
-  only_values_allowed: datetime,timestamp,date,time,year,timestamp
+  only_values_allowed: datetime,timestamp,date,time,year
 virtual_term_charlike_operator:
   mandatory: True
   allowed: Rseq
-  only_values_allowed: %,+,*,NNN,/,DIV,&,<<,>>,^,|
+  only_values_allowed: %,+,*,NNN,/,DIV,&,<<,>>,^,|,EMPTY
 virtual_term_datelike_operator:
   mandatory: True
   allowed: Rseq
-  only_values_allowed: %,+,*,NNN,/,DIV,&,<<,>>,^,|
+  only_values_allowed: %,+,*,NNN,/,DIV,&,<<,>>,^,|,EMPTY
 virtual_term_item_kind:
   mandatory: True
   allowed: Rseq
@@ -1174,7 +1225,7 @@ virtual_term_numeral_len:
 virtual_term_numeral_operator:
   mandatory: True
   allowed: Rseq
-  only_values_allowed: %,+,*,NNN,/,DIV,&,<<,>>,|,^
+  only_values_allowed: %,+,*,NNN,/,DIV,&,<<,>>,|,^,EMPTY
 virtual_term_unary_any_operator:
   mandatory: True
   allowed: Rseq
@@ -1195,6 +1246,9 @@ where_functions_any:
   mandatory: True
   allowed: Rseq       
 where_functions_charlike:
+  mandatory: True
+  allowed: Rseq       
+where_functions_datelike:
   mandatory: True
   allowed: Rseq       
 where_functions_numeral:
@@ -1219,27 +1273,39 @@ where_term_any_datatype_class:
 where_term_any_operator:
   mandatory: True
   allowed: Rseq       
-  only_values_allowed: %,+,*,NNN,/,DIV,&,<<,>>,^,|
+  only_values_allowed: %,+,*,NNN,/,DIV,&,<<,>>,^,|,EMPTY
 where_term_binary_any_operator:
   mandatory: True
   allowed: Rseq       
-  only_values_allowed: LIKE,NOT_LIKE,NOT_REGEXP,REGEXP,RLIKE,=,EXCL=,<>,>,<,>=,<=,<=>
+  only_values_allowed: LIKE,NOT_LIKE,NOT_REGEXP,REGEXP,RLIKE,=,EXCL=,<>,>,<,>=,<=,<=>,EMPTY
 where_term_binary_charlike_operator:
   mandatory: True
   allowed: Rseq       
-  only_values_allowed: LIKE,NOT_LIKE,NOT_REGEXP,REGEXP,RLIKE,=,EXCL=,<>,>,<,>=,<=,<=>
+  only_values_allowed: LIKE,NOT_LIKE,NOT_REGEXP,REGEXP,RLIKE,=,EXCL=,<>,>,<,>=,<=,<=>,EMPTY
+where_term_binary_datelike_operator:
+  mandatory: True
+  allowed: Rseq       
+  only_values_allowed: LIKE,NOT_LIKE,NOT_REGEXP,REGEXP,RLIKE,=,EXCL=,<>,>,<,>=,<=,<=>,EMPTY
 where_term_binary_numeral_operator:
   mandatory: True
   allowed: Rseq       
-  only_values_allowed: =,EXCL=,<>,>,<,>=,<=,<=>
+  only_values_allowed: =,EXCL=,<>,>,<,>=,<=,<=>,EMPTY
 where_term_charlike_datatype_class:
   mandatory: True
   allowed: Rseq       
   only_values_allowed: character,binary,lob,character
+where_term_datelike_datatype_class:
+  mandatory: True
+  allowed: Rseq
+  only_values_allowed: datetime,timestamp,date,time,year
 where_term_charlike_operator:
   mandatory: True
   allowed: Rseq       
-  only_values_allowed: %,+,*,NNN,/,DIV,&,<<,>>,^,|
+  only_values_allowed: %,+,*,NNN,/,DIV,&,<<,>>,^,|,EMPTY
+where_term_datelike_operator:
+  mandatory: True
+  allowed: Rseq       
+  only_values_allowed: %,+,*,NNN,/,DIV,&,<<,>>,^,|,EMPTY
 where_term_item_kind:
   mandatory: True
   allowed: Rseq       
@@ -1259,16 +1325,20 @@ where_term_numeral_len:
 where_term_numeral_operator:
   mandatory: True
   allowed: Rseq       
-  only_values_allowed: %,+,*,NNN,/,DIV,&,<<,>>,^,|
+  only_values_allowed: %,+,*,NNN,/,DIV,&,<<,>>,^,|,EMPTY
 where_term_overall_class:
   mandatory: True
   allowed: Rseq       
-  only_values_allowed: numeral,charlike,any
+  only_values_allowed: numeral,charlike,any,datelike
 where_term_unary_any_operator:
   mandatory: True
   allowed: Rseq       
   only_values_allowed: PREFNNN,~,EMPTY
 where_term_unary_charlike_operator:
+  mandatory: True
+  allowed: Rseq       
+  only_values_allowed: PREFNNN,~,EMPTY
+where_term_unary_datelike_operator:
   mandatory: True
   allowed: Rseq       
   only_values_allowed: PREFNNN,~,EMPTY

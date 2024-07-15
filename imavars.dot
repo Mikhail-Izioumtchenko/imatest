@@ -50,7 +50,8 @@ WC="${WC:-/bin/wc}"
 
 DEVNULL="${DEVNULL:-/dev/null}"
 
-$EXPORT MYSQL="${MYSQL:-/bin/mysql}"
+#$EXPORT MYSQL="${MYSQL:-/bin/mysql}"
+$EXPORT MYSQL="${MYSQL:-/hardtmp/mysqld/mysql-8.4}"
 # no absolute pathname is important for sandboxes
 $EXPORT MYSQLD="${MYSQLD:-mysqld}"
 $EXPORT MYSQLD_ORIG="${MYSQLD_ORIG:-/hardtmp/mysqld/mysqld-8.4}"

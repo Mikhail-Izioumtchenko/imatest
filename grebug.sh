@@ -26,17 +26,35 @@ ios=`$LS -al $dir/i*out | $WC -l`
   $EXIT 1
 }
 
+crefil="$dir/create.sql"
+$CAT $dir/i*out | $GREP 'CREATE|DROP' | $SED 's/.*executing *//' | $SED 's/: .*//' | $SED 's/$/;/' | $CAT >"$crefil"
 ofils=''
+cfils=''
 for fil in $fos; do
   ofil="$dir/b_`$BASENAME $fil`"
+  cfil="$dir/c_`$BASENAME $fil`"
+  cfils="$cfils $cfil"
   ofils="$ofils $ofil"
   #$ECHO "$ofil"
   $CAT $dir/i*out | $GREP 'CREATE|DROP' | $SED 's/.*executing *//' | $SED 's/: .*//' | $SED 's/$/;/' | $CAT >"$ofil"
-  $CAT $fil | $SED 's/;  *[0-9]* *:.*/;/' | $CAT >>"$ofil"
+  $CAT $fil | $SED 's/^[^ ]* //' | $SED 's/;  *[0-9]* *:.*/;/' | $CAT >>"$ofil"
+  $CAT $fil | $SED 's/^[^ ]* //' | $SED 's/;  *[0-9]* *:.*/;/' | $CAT >"$cfil"
 done
+ordfil="$dir/ordered.sql"
+$CAT $fos | $SORT -k1 | $SED 's/^[^ ]* //' | $SED 's/;  *[0-9]* *:.*/;/' | $CAT >"$ordfil"
 
+$ECHO "=== with schema"
 $LS -al $ofils
 $WC -l $ofils
+$ECHO "=== just schema"
+$LS -al "$crefil"
+$WC -l "$crefil"
+$ECHO "=== without schema"
+$LS -al $cfils
+$WC -l $cfils
+$ECHO "=== without schema merged"
+$LS -al "$ordfil"
+$WC -l "$ordfil"
 $ECHO "\nSee also $dir"
 
 $EXIT 0

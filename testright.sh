@@ -7,13 +7,17 @@ verbose="${2:-0}"
 seeds=""
 [ -z "$3" ] || seeds="--seed $3"
 yaml=""
-tperl='imatest.pl'
+tperl=`pwd`/'imatest.pl'
 
 . `pwd`/imavars.dot
 
+tsyn=`pwd`'/imatest_syntax.yaml'
+tyaml=`pwd`'/imatest.yaml'
 [ -z "$4" ] || {
   yaml="--testyaml $4"
-  tperl="`$DIRNAME $4`/$tperl"
+  tyaml="$4"
+  tsyn=`$ECHO "$tyaml" | $SED 's/\.yaml/_syntax.yaml/'`
+  tperl="`$DIRNAME $4`/`$BASENAME $tperl`"
 }
 echo "Usage: $0 [ports_rel [verbose_N [seed_N [imatest.yaml]]]]"
 echo "  so ports=$ports verbose=$verbose seeds=$seeds testyaml=$yaml _IMATEST_USE=$_IMATEST_USE"
@@ -21,9 +25,9 @@ echo "  so ports=$ports verbose=$verbose seeds=$seeds testyaml=$yaml _IMATEST_US
 sleep 3
 ./stopms.sh "$ports" wait;
 \rm -rf /root/mysql-sandboxes/420$ports/sandboxdata/error.log /tmp/* /tmp/.fin;
-\cp ./imatest.pl ./imatest.yaml ./imatest_syntax.yaml /tmp
-echo "$0 #debug MYSQLSH=$MYSQLSH _IMATEST_USE=$_IMATEST_USE"
+\cp -v "$tperl" "$tyaml" "$tsyn" /tmp
+echo "$0 MYSQLSH=$MYSQLSH _IMATEST_USE=$_IMATEST_USE"
 ./startms.sh "$ports" wait;
-./imatest.sh --file "$tperl" --use 8.3 now --test imatest.yaml --verbose "$verbose" --nodry-run $seeds $yaml 2>&1|tee /tmp/test.out;
+time ./imatest.sh --file "$tperl" --use 8.3 now --test imatest.yaml --verbose "$verbose" --nodry-run $seeds $yaml 2>&1|tee /tmp/test.out;
 ./stopms.sh "$ports" wait
 cp -v /root/mysql-sandboxes/420$ports/sandboxdata/error.log /tmp
