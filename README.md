@@ -5,7 +5,7 @@
 
 THE PREVIOUS STATEMENT IS NOT A CLAIM FOR TOOL's  suitability for any purpose whatsoever.
 
-Yield: not everything filed as a bug because bug filing is fairly pointless activity in most cases for lack of care of the target audience at the manufacturer of the code. imho.
+Yield: not everything filed as a bug because in my experience a public bug is not being looked at much without a simple reproducible testcase. imho.
 
 Y21. 8.4LTS-debug 2024-07-06T01:29:57.675228Z 0 [ERROR] [MY-011908] [InnoDB] [FATAL] Page [page id: space=220689, page number=128] still fixed or dirty
 2024-07-06T01:29:57.675280Z 0 [ERROR] [MY-013183] [InnoDB] Assertion failure: buf0buf.cc:6046:ib::fatal triggered thread 140079692409600
