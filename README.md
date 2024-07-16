@@ -7,6 +7,8 @@ THE PREVIOUS STATEMENT IS NOT A CLAIM FOR TOOL's  suitability for any purpose wh
 
 Yield: not everything filed as a bug because in my experience a public bug is not being looked at much without a simple reproducible testcase. imho.
 
+Y22. [Bug #115612](https://bugs.mysql.com/bug.php?id=115612) 8.4LTS SEGV in ALTER dict_index_validate_max_rec_size()
+
 Y21. 8.4LTS-debug 2024-07-06T01:29:57.675228Z 0 [ERROR] [MY-011908] [InnoDB] [FATAL] Page [page id: space=220689, page number=128] still fixed or dirty
 2024-07-06T01:29:57.675280Z 0 [ERROR] [MY-013183] [InnoDB] Assertion failure: buf0buf.cc:6046:ib::fatal triggered thread 140079692409600
 
