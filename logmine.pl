@@ -448,6 +448,10 @@ sub process_imatest_pl_out {
     my $arebad = 0;
     my $areout = 0;
     my $kind = 'UNKNOWN';
+    my @ltoprint = qw (
+  step.LAST
+  CROAK
+    );
     my @ltoignore = qw (
   replacing.([a-z_]+).of
   (start_destructive_thread|start_load_thread):.random
@@ -479,6 +483,9 @@ sub process_imatest_pl_out {
   start_destructive_thread
   server_destructive_thread
   start_load_thread
+  hakill.*sh
+  wait.*sh
+  new_terminate_servers
   server_load_thread
   and.*and.*and
   Starting.MySQL.instance
@@ -493,6 +500,12 @@ sub process_imatest_pl_out {
     foreach my $lin (@$plfil) {
         ++$nlins;
         chomp($lin);
+        foreach my $top (@ltoprint) {
+            if ($lin =~ /$top/) {
+                dosayif($VERBOSE_ANY, "   === %s",$lin);
+                next LIN;
+            }
+        }
         foreach my $toign (@ltoignore) {
             if ($lin =~ /$toign/) {
                 ++$nign;
@@ -526,7 +539,6 @@ sub process_imatest_pl_out {
     dosayif($VERBOSE_ANY, "END %s %s: %s lines, %s ignored, %s output, %s statements, %s good, %s bad, %s distinct msg numbers\n", $filekind,
       $fil,$nlins,$nign,$areout,$areall,($areall-$arebad),$arebad,$ndifnum);
 }
-#===
 
 # 1: file name
 # 2: kind

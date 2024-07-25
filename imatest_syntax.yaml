@@ -33,7 +33,41 @@ adjust_more_p:
 adjust_p:
   mandatory: True
   allowed: probability
+alter_algorithm:
+  mandatory: True
+  allowed: Rseq
+  only_values_allowed: EMPTY,DEFAULT,INSTANT,COPY,INPLACE
+alter_column_before_p:
+  mandatory: True
+  allowed: probability
+alter_column_kind:
+  mandatory: True
+  allowed: Rseq
+  only_values_allowed: VISIBLE,INVISIBLE,SET_DEFAULT,DROP_DEFAULT
+alter_index_kind:
+  mandatory: True
+  allowed: Rseq
+  only_values_allowed: VISIBLE,INVISIBLE
+alter_kind:
+  mandatory: True
+  allowed: Rseq
+  only_values_allowed: ADD_COL,DROP_COL,ADD_KEY,DROP_KEY,TABLE_EB,TAIL,CHANGE_COL,ALTER_INDEX,ALTER_COLUMN,ADD_CHECK,DROP_CHECK,REMPART
+alter_length:
+  mandatory: True
+  allowed: Rseq
+  only_positive_integers: True
+analyze_buckets:
+  mandatory: True
+  allowed: Rseq
+  only_non_negative_integers: True
 analyze_column_p:
+  mandatory: True
+  allowed: probability
+analyze_kind:
+  mandatory: True
+  allowed: Rseq
+  only_values_allowed: just,drop,update
+analyze_local_p:
   mandatory: True
   allowed: probability
 autoinc_explicit_value_p:
@@ -43,6 +77,13 @@ character_set:
   mandatory: True
   allowed: Rseq
   only_names: True
+check_quick_p:
+  mandatory: True
+  allowed: probability
+check_per_table:
+  mandatory: True
+  allowed: Rseq       
+  only_non_negative_integers: True
 check_thread_err:
   mandatory: True
 check_thread_out:
@@ -85,6 +126,10 @@ create_db:
   mandatory: True
   allowed: [yes, no]
   supported: [yes, no]
+create_table_kind:
+  mandatory: True
+  allowed: Rseq
+  only_values_allowed: select,like,new
 datatype_binary:
   mandatory: True
   allowed: Rseq       
@@ -251,6 +296,10 @@ default_kind:
 delete_where_all_p:
   mandatory: True
   allowed: probability
+destructive_inside:
+  mandatory: True
+  allowed: [yes, no]
+  supported: [yes, no]
 destructive_thread_err:
   mandatory: True
 destructive_thread_out:
@@ -272,6 +321,21 @@ explain:
 float_value_exp:
   mandatory: True
   allowed: Rseq
+flush_how:
+  mandatory: True
+  allowed: Rseq
+  only_values_allowed: PRIVILEGES,OPTIMIZER_COSTS,STATUS,USER_RESOURCES
+flush_local_p:
+  mandatory: True
+  allowed: probability
+flush_tables_how:
+  mandatory: True
+  allowed: Rseq
+  only_values_allowed: EMPTY,WITH READ LOCK,FOR EXPORT
+flush_tables_n:
+  mandatory: True
+  allowed: Rseq
+  only_non_negative_integers: True
 fulltext_index_p:
   mandatory: True
   allowed: probability
@@ -558,87 +622,16 @@ insert_on_dup_update_p:
 integer_unsigned_p:
   mandatory: True
   allowed: probability
-load_alter_length:
-  mandatory: True
+kill_n:
   allowed: Rseq
-  only_positive_integers: True
-load_alter_kind:
   mandatory: True
-  allowed: Rseq
-  only_values_allowed: ADD_COL,DROP_COL,ADD_KEY,DROP_KEY,TABLE_EB,TAIL
-load_analyze_local_p:
-  mandatory: True
-  allowed: probability
-load_analyze_buckets:
-  mandatory: True
-  allowed: Rseq
-  only_non_negative_integers: True
-load_analyze_kind:
-  mandatory: True
-  allowed: Rseq
-  only_values_allowed: just,drop,update
-load_check_quick_p:
-  mandatory: True
-  allowed: probability
-load_create_table_kind:
-  mandatory: True
-  allowed: Rseq
-  only_values_allowed: select,like,new
-load_flush_how:
-  mandatory: True
-  allowed: Rseq
-  only_values_allowed: PRIVILEGES,OPTIMIZER_COSTS,STATUS,USER_RESOURCES
-load_flush_local_p:
-  mandatory: True
-  allowed: probability
-load_flush_tables_how:
-  mandatory: True
-  allowed: Rseq
-  only_values_allowed: EMPTY,WITH READ LOCK,FOR EXPORT
-load_flush_tables_n:
-  mandatory: True
-  allowed: Rseq
-  only_non_negative_integers: True
 load_execute_sql:
   mandatory: True
   allowed: [yes, no]
   supported: [yes, no]
-load_kill_n:
-  allowed: Rseq
-  mandatory: True
-load_lock_table_count:
-  mandatory: True
-  allowed: Rseq
-  only_non_negative_integers: True
-load_lock_table_kind:
-  mandatory: True
-  allowed: Rseq
-  only_values_allowed: READ,WRITE
 load_max_stmt:
   mandatory: True
   allowed: only_non_negative_integers
-load_optimize_local_p:
-  mandatory: True
-  allowed: probability
-load_select_limit:
-  mandatory: True
-  allowed: Rseq
-load_show_columns_kind:
-  mandatory: True
-  allowed: Rseq
-  only_values_allowed: EXTENDED,FULL,BOTH,EMPTY
-load_show_status_how:
-  mandatory: True
-  allowed: Rseq
-  only_values_allowed: GLOBAL,SESSION,EMPTY
-load_show_tables_kind:
-  mandatory: True
-  allowed: Rseq
-  only_values_allowed: EXTENDED,FULL,BOTH,EMPTY
-load_show_variables_how:
-  mandatory: True
-  allowed: Rseq
-  only_values_allowed: GLOBAL,SESSION,EMPTY
 load_sleep_after_stmt_ms:
   mandatory: True
   allowed: Rseq       
@@ -665,6 +658,14 @@ load_thread_sql:
   mandatory: True
 load_threads:
   mandatory: True
+lock_table_count:
+  mandatory: True
+  allowed: Rseq
+  only_non_negative_integers: True
+lock_table_kind:
+  mandatory: True
+  allowed: Rseq
+  only_values_allowed: READ,WRITE
 missing_probability_replacement:
   mandatory: True
   allowed: probability
@@ -684,10 +685,20 @@ mysql_initial_cnf_targets:
 number_reverse_sign_legitimate_p:
   mandatory: True
   allowed: probability
+optimize_local_p:
+  mandatory: True
+  allowed: probability
 part_direction:
   mandatory: True
   allowed: Rseq       
   only_values_allowed: asc,desc,EMPTY
+partition_hash_expression:
+  mandatory: True
+  allowed: Rseq       
+partition_key_columns:
+  mandatory: True
+  allowed: Rseq       
+  only_non_negative_integers: True
 parts_per_index:
   allowed: Rseq       
   mandatory: True
@@ -759,6 +770,9 @@ select_join_where_parent_p:
 select_join_where_table_p:
   mandatory: True
   allowed: probability
+select_limit:
+  mandatory: True
+  allowed: Rseq
 select_order_by_column_p:
   mandatory: True
   allowed: probability
@@ -819,11 +833,15 @@ server_termination_duration_on_sigstop:
 server_termination_every_seconds:
   allowed: Rseq       
   mandatory: True
-  only_non_negative_integers: True
+  only_positive_integers: True
 server_termination_how:
   allowed: Rseq
   mandatory: True
   only_values_allowed: shutdown,shutkill,kill,sigkill,sigstop
+server_termination_how_end:
+  mandatory: True
+  allowed: no, shutdown, kill, sigkill
+  supported: no, shutdown, kill, sigkill
 server_termination_wait:
   allowed: yes, no
   supported: yes, no
@@ -904,6 +922,22 @@ set_variable_value_g8opt:
 set_variable_value_g9p:
   mandatory: True
   allowed: Rseq
+show_columns_kind:
+  mandatory: True
+  allowed: Rseq
+  only_values_allowed: EXTENDED,FULL,BOTH,EMPTY
+show_status_how:
+  mandatory: True
+  allowed: Rseq
+  only_values_allowed: GLOBAL,SESSION,EMPTY
+show_tables_kind:
+  mandatory: True
+  allowed: Rseq
+  only_values_allowed: EXTENDED,FULL,BOTH,EMPTY
+show_variables_how:
+  mandatory: True
+  allowed: Rseq
+  only_values_allowed: GLOBAL,SESSION,EMPTY
 sleep_final:
   mandatory: True
   allowed: only_non_negative_integers
@@ -933,19 +967,27 @@ table_compression:
   allowed: Rseq       
   only_values_allowed: ZLIB,LZ4,NONE,EMPTY
 table_has_autoinc_p:
+  mandatory: True
   allowed: probability
-  mandatory: True
 table_name_format:
-  allowed: Rseq       
   mandatory: True
+  allowed: Rseq       
   only_names: True
-table_row_format:
-  allowed: Rseq       
+table_partition_kind:
   mandatory: True
+  allowed: Rseq       
+  only_values_allowed: EMPTY,KEY,HASH
+table_partitions:
+  mandatory: True
+  allowed: Rseq       
+  only_positive_integers: True
+table_row_format:
+  mandatory: True
+  allowed: Rseq       
   only_values_allowed: DYNAMIC,COMPACT,REDUNDANT,COMPRESSED1,COMPRESSED2,COMPRESSED4,COMPRESSED8,COMPRESSED16,EMPTY
 table_stats_auto_recalc:
-  allowed: Rseq       
   mandatory: True
+  allowed: Rseq       
 table_stats_persistent:
   allowed: Rseq       
   mandatory: True

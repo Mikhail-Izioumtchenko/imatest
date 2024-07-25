@@ -4,7 +4,6 @@ define: &port 4
 create_db: yes
 check_thread_ports: *port
 port_writer: *port
-check_thread_ports: *port
 ports_destructive: *port
 port_load: *port
 mysql_initial_cnf_ports: *port
@@ -12,30 +11,26 @@ schemas: 8
 #load_thread_sql: qw(/dev/null)
 txn_use: yes
 # light START
-tables_per_schema: 8
-load_threads: 1Xset,11,1Xall,1Xddl,1Xsimple,1Xs,1Xb2,1Xb3
-load_threads: 1
+tables_per_schema: 4
+tables_per_schema: 96
+load_threads: 1,1Xi,1Xalter,1Xs,1Xdml
+load_threads: 0Xsets,1Xset,4Xa,1Xi,0Xu,0Xd,1Xinsel,0Xr,1,0Xall,1Xddl,0Xdml,1Xs,0Xsigkill
 server_terminate: no
 test_duration_seconds: 180
 load_thread_restart: yes
-# light END
-# heavy START
-tables_per_schema: 8
-tables_per_schema: 43
-server_terminate: yes
-load_threads: 1
-test_duration_seconds: 2400
-load_thread_restart: yes
-destructive_threads: 1Xb2,1
 destructive_threads: 1
-# heavy END
+destructive_inside: yes
+server_termination_how: sigkill!shutdown:0.01,shutkill:0.1,kill:0.5,sigkill:0.1,sigstop:0.01,shutdown
+server_termination_how_end: sigkill
+server_termination_every_seconds: 180!120-180:0.5,120-240
+# light END
 
-adjust_add: 0.000003
-adjust_mult: 1.03
-adjust_more_p: 0.6
-adjust_p: 0.004
+adjust_add: 0.00004
+adjust_mult: 1.07
+adjust_more_p: 0.4
+adjust_p: 0.006
 
-stmt_prepare_p: 0.5
+stmt_prepare_p: 0.9
 
 reconnect_timeout: 600
 load_max_stmt: 000
@@ -53,26 +48,38 @@ terminate_on_assert: yes
 #load_thread_out: qw(/dev/null)
 load_thread_err: qw(/dev/null)
 
-load_sql_class_k_all: insert:0.5,savepoint:0.001,set:0.01,kill_connection:0.001,kill_query:0.001,flush_tables:0.001,flush:0.001,show_variables:0.001,show_tables:0.001,show_table_status:0.001,show_status:0.001,show_columns:0.001,set_txn_isolation:0.001,lock_table:0.0001,unlock_table:0.001,lock_instance_for_backup:0.00001,unlock_instance:0.0001,insert:0.5,show_open_tables:0.001,show_parse_tree:0.001,drop_table:0.00001,recreate_schema:0.000001,alter:0.1,create_table:0.001,analyze:0.001,optimize:0.001,checksum:0.001,replace:0.2,insel:0.3,update:0.1,delete:0.1,check:0.001,select:0.1,insert
-load_sql_class: select:0.4,insert:0.4,insel:0.7,set:0.001,show_columns:0.0001,set_txn_isolation:0.001,lock_table:0,unlock_table:0,lock_instance_for_backup:0,unlock_instance:0,insert:0.5,show_open_tables:0.0001,show_parse_tree:0,drop_table:0.0001,recreate_schema:0.000001,alter:0.1,create_table:0.001,analyze:0.0001,optimize:0.0001,checksum:0.0001,replace:0.1,insel:0.1,update:0.1,delete:0.01,check:0.00001,select:0.8,insert
-load_sql_class_k_set: set:0.1,insert:0.5,update:0.5,replace:0.5,select
-load_sql_class_k_b2: set:0.001,insert:0.1,insel:0.1,replace:0.1,update:0.1,delete:0,check:0,alter:0.01,select
-load_sql_class_k_b3: insert:0.1,insel:0.2,replace:0.1,update:0.1,analyze:0,checksum:0,show_parse_tree:0,alter:0.01,insert
-load_sql_class_k_simple: select:0.5,insert:0.2,insel:0.1,alter:0.01,create_table:0.001,set_txn_isolation:0.001,update:0.1,replace:0.1,select
-load_sql_class_k_ddl: alter:0.1,create_table:0.01,drop_table:0.00001,alter
+define: &define_sql_class_list select,insert,insel,set,show_columns,set_txn_isolation,lock_table,unlock_table,lock_instance_for_backup,unlock_instance,show_open_tables,show_parse_tree,drop_table,recreate_schema,alter,create_table,analyze,optimize,checksum,replace,insel,update,delete,check,insert
+define: &define_sql_class_dml select,insert,insel,update,replace,delete,insert
+
+load_sql_class: insert:0.5,savepoint:0.001,set:0.01,kill_connection:0.001,kill_query:0.001,flush_tables:0.001,flush:0.001,show_variables:0.001,show_tables:0.001,show_table_status:0.001,show_status:0.001,show_columns:0.001,set_txn_isolation:0.001,lock_table:0.0001,unlock_table:0.001,lock_instance_for_backup:0.00001,unlock_instance:0.0001,insert:0.5,show_open_tables:0.001,show_parse_tree:0.001,drop_table:0.00001,recreate_schema:0.000001,alter:0.1,create_table:0.1,analyze:0.001,optimize:0.001,checksum:0.001,replace:0.2,insel:0.3,update:0.1,delete:0.1,check:0.001,select:0.1,insert
+load_sql_class_k_all: *define_sql_class_list
+load_sql_class_k_sets: set:0.1,insert:0.5,update:0.5,replace:0.5,select
+load_sql_class_k_sigkill: set:0.001,insert:0.1,insel:0.1,replace:0.1,update:0.1,delete:0,check:0,alter:0.01,select
+load_sql_class_k_dml: *define_sql_class_dml
+load_sql_class_k_a: alter
+load_sql_class_k_i: insert
+load_sql_class_k_insel: insel
+load_sql_class_k_d: delete
+load_sql_class_k_set: set
+load_sql_class_k_u: update
+load_sql_class_k_r: replace
+load_sql_class_k_ddl: alter:0.1,create_table:0.1,drop_table:0.00001,alter
 load_sql_class_k_s: select
-load_alter_length_k_ddl: 1:0.99,1-3
-load_alter_length: 1:0.999,2
-load_alter_kind_k_ddl: ADD_KEY:0.2,TABLE_EB:0.001,ADD_COL:0.001,DROP_COL:0.0001,DROP_KEY:0.01,TAIL:0.01,ADD_KEY
-load_alter_kind_k_simple: ADD_KEY:0.1,ADD_COL:0.1,DROP_COL:0.01,DROP_KEY:0.01,ADD_KEY
+alter_length_k_ddl: 1:0.99,1-3
+alter_length: 1:0.99,2-4
+alter_column_before_p: 0.1
+alter_algorithm: EMPTY,DEFAULT,INSTANT,COPY,INPLACE
+alter_index_kind: VISIBLE,INVISIBLE
+alter_column_kind: VISIBLE,INVISIBLE,SET_DEFAULT,DROP_DEFAULT
+alter_kind_k_ddl: ADD_KEY:0.2,TABLE_EB:0.001,ALTER_INDEX:0.1,ADD_COL:0.01,DROP_COL:0.0001,DROP_KEY:0.01,TAIL:0.01,ADD_KEY
 server_termination_how: shutdown:0.01,shutkill:0.1,kill:0.5,sigkill:0.1,sigstop:0.01,shutdown
-server_termination_how_k_b2: sigkill
+server_termination_how_k_sigkill: sigkill
 server_termination_every_seconds: 120-180:0.5,120-240
-server_termination_every_seconds_k_b2: 100-250
+server_termination_every_seconds_k_sigkill: 100-250
 ports_destructive_how_many: 1
-#ports_destructive_k_b2: 3
+#ports_destructive_k_sigkill: 3
 destructive_thread_sleep: 5
-#port_load_k_b2: 3
+#port_load_k_sigkill: 3
 
 missing_probability_replacement: 0.001
 
@@ -130,7 +137,7 @@ define: &functions_character CONCAT(@SELF;@COL_character),CONCAT(@SELF;@SELF),PI
 # general test parameters
 
 strict: True
-strict_exceptions: [ "ddl", "b2", "b3", "3", "s", "simple", "all", "set" ]
+strict_exceptions: [ ddl, sigkill, s, dml, all, set, a, r, i, insel, sets, u, d ]
 
 # TO_CHECK_FILE file against which contents of the test file are checked. Absolute path is OK.
 to_check_file: default
@@ -161,11 +168,6 @@ mysql_initial_cnf_ports: *port
 mysql_initial_cnf: |
    log_error_verbosity=3
    innodb_buffer_pool_size=134217728
-mysql_initial_cnf_ports_k_3: 3
-mysql_initial_cnf_k_3: |
-   log_error_verbosity=3
-   innodb_buffer_pool_size=33554432
-   innodb_buffer_pool_instances=2
 
 # test load
 server_terminate_shutdown: $ENV{IMASTOPMANY} $ENV{_imatest_ports_destructive_rel}
@@ -209,9 +211,9 @@ txn_savepoints: 1-10:0.9,1-129:0.1,1-2
 txn_savepoint_how: SET,ROLLBACK,RELEASE
 txn_end_how: commit:0.99,rollback
 txn_maxlength_ms: 10000-30000:0.1,100-200:0.01,1000-2000:0.99,3000-100000
-txn_maxlength_ms_k_simple: 100000-500000:0.9,1-10000
+txn_maxlength_ms_k_dml: 100000-500000:0.9,1-10000
 txn_maxlength_stmt: 10-100:0.5,10-1000:0.5,1-2:0.9,1-10:0.9,1-1000
-txn_maxlength_stmt_k_simple: 10-1000:0.5,1-200:0.9,1-1000
+txn_maxlength_stmt_k_dml: 10-1000:0.5,1-200:0.9,1-1000
 txn_isolation_kind: read_committed:0.1,read_uncommitted:0.01,repeatable_read:0.999,serializable:0.0001,repeatable_read
 txn_isolation_how: GLOBAL:0.000001,SESSION:0.01,EMPTY
 
@@ -228,10 +230,16 @@ table_stats_auto_recalc: 1:0.1,0:0.001,EMPTY
 table_stats_persistent: 0:0.001,1:0.1,EMPTY
 table_stats_sample_pages: 1:0.1,1-40:0.1,1-999:0.1,EMPTY
 
-table_has_autoinc_p: 0.2
+table_partition_kind: HASH:0.5,KEY:0.2,EMPTY
+table_partitions: 4-8,1-2,5-10
+partition_key_columns: 0,1,2-5,2-40,1
+partition_hash_expression: FLOOR(@COL_integer),FLOOR(ABS(@COL_integer)),MOD(FLOOR(@COL_integer);CEIL(@COL_integer)),@COL_integer,@COL_integer+@COL_integer,@COL_integer*@COL_integer
+
+table_has_autoinc_p: 0.1
 table_autoinc_kind: KEY:0.00001,UNIQUE:0.001,PRIMARY
 columns_total: 4-8:0.5,4-40:0.5,1-70:0.01,4-10
 indexes_per_table: 0:0.1,1-2:0.5,1-5:0.9,0-65:0.01,0-4 
+check_per_table: 0:0.1,1-2:0.1,1-5:0.1,0-1
 parts_per_index: 1:0.99,1-2:0.1,1-4:0.1,1-10:0.1,ALL:0.1,1-2
 index_part_type: function:0.01,column
 index_unique_p: 0.01
@@ -274,16 +282,16 @@ group_aggregate_kind: NNNAX,NNNIN,AVG,SUNNN,COUNT,COUNT_DISTINCT,GROUP_CONCAT,ST
 group_rollup_p: 0.01
 group_having_none_p: 0.9
 
-load_show_columns_kind: EXTENDED,FULL,BOTH,EMPTY
-load_show_tables_kind: EXTENDED,FULL,BOTH,EMPTY
-load_show_status_how: GLOBAL,SESSION,EMPTY
-load_show_variables_how: GLOBAL:0.01,SESSION:0.5,EMPTY
+show_columns_kind: EXTENDED,FULL,BOTH,EMPTY
+show_tables_kind: EXTENDED,FULL,BOTH,EMPTY
+show_status_how: GLOBAL:0.9,SESSION,EMPTY
+show_variables_how: GLOBAL:0.01,SESSION:0.5,EMPTY
 #https://bugs.mysql.com/bug.php?id=115349 2024-06-15: mysql-8.4.0/sql/dd/impl/cache/dictionary_client.cc:945: bool dd::cache::Dictionary_client::acquire(const K&, const T**, bool*, bool*) [with K = dd::Item_name_key; T = dd::Column_statistics]: Assertion `MDL_checker::is_read_locked(m_thd, *object)' failed.
-load_flush_how: PRIVILEGES,STATUS,USER_RESOURCES!OPTIMIZER_COSTS
-load_flush_tables_how: EMPTY,WITH READ LOCK,FOR EXPORT
-load_flush_tables_n: 0:0.2,1:0.2,1-2:0.9,0-5:0.1,1
-load_flush_local_p: 0.99
-load_kill_n: 1-10000:0.5,100-100000
+flush_how: PRIVILEGES,STATUS,USER_RESOURCES,OPTIMIZER_COSTS
+flush_tables_how: EMPTY:0.9,WITH READ LOCK:0.1,FOR EXPORT:0.1,EMPTY
+flush_tables_n: 0:0.2,1:0.2,1-2:0.9,0-5:0.1,1
+flush_local_p: 0.99
+kill_n: 1-10000,100-100000,1000-10000,10000-20000
 
 update_column_p: 0.1
 update_pk_column_p: 0.3
@@ -476,17 +484,17 @@ group_having_logical_unary_operator: NOT:0.01,EMPTY
 group_having_logical_binary_operator: AND,OR,XOR
 group_having_logical_len: 1:0.99,1-2:0.99,1-3:0.99,1-4:0.99,1-10:0.01,1
 
-load_alter_kind: TAIL:0.01,ADD_KEY:0.1,TABLE_EB:0.001,ADD_COL:0.001,DROP_COL:0.001,DROP_KEY:0.1,ADD_KEY
-load_create_table_kind: select:0.01,like:0.02,new
-load_analyze_local_p: 0.9
+alter_kind: REMPART:0.1,ADD_CHECK:0.1,DROP_CHECK:0.5,ALTER_COLUMN:0.1,ALTER_INDEX:0.1,CHANGE_COL:0.1,TAIL:0.1,ADD_KEY:0.1,TABLE_EB:0.001,ADD_COL:0.1,DROP_COL:0.01,DROP_KEY:0.1,ADD_KEY
+create_table_kind: select:0.01,like:0.1,new
+analyze_local_p: 0.5
 #https://bugs.mysql.com/bug.php?id=115349 2024-06-15: mysql-8.4.0/sql/dd/impl/cache/dictionary_client.cc:945: bool dd::cache::Dictionary_client::acquire(const K&, const T**, bool*, bool*) [with K = dd::Item_name_key; T = dd::Column_statistics]: Assertion `MDL_checker::is_read_locked(m_thd, *object)' failed.
-load_analyze_kind: just!drop:0.5,update:0.5,just
-load_analyze_buckets: 1,5,20,100
-load_check_quick_p: 0.1
-load_lock_table_count: 1:0.999,1-3
-load_lock_table_kind: READ,WRITE
-load_optimize_local_p: 0.9
-load_select_limit: EMPTY:0.99,0-100:0.5,1-1000:0.5,EMPTY
+analyze_kind: just:0.9,drop:0.5,update:0.5,just
+analyze_buckets: 1,5,20,100
+check_quick_p: 0.1
+lock_table_count: 1:0.999,1-3
+lock_table_kind: READ:0.9,WRITE
+optimize_local_p: 0.5
+select_limit: EMPTY:0.99,0-100:0.5,1-1000:0.5,EMPTY
 
 #bug#mysql-8.3.0/sql/opt_explain.cc:2099: bool explain_query_specification(THD*, const THD*, Query_term*, enum_parsing_context): Assertion `ret || !explain_thd->is_error()' failed. 8.4, too
 explain: explain:0.01,EMPTY!explain_analyze:0.001,EMPTY
@@ -494,14 +502,14 @@ explain: explain:0.01,EMPTY!explain_analyze:0.001,EMPTY
 column_visibility: EMPTY:0.999,invisible:0.001,visible:0.01,EMPTY
 autoinc_explicit_value_p: 0.00001
 
-datatype_class: lob:0.1,character:0.1,integer:0.9,decimal:0.1,floating:0.5,datetime:0.1,binary:0.01,enums:0.001,json:0.001,lob:0.8,spatial:0.001,character
+datatype_class: lob:0.1,character:0.1,integer:0.1,decimal:0.1,floating:0.1,datetime:0.1,binary:0.1,enums:0.001,json:0.001,lob:0.1,spatial:0.001,character
 datatype_integer: tinyint:0.1,smallint:0.5,mediumint:0.5,bigint:0.5,int:0.5,boolean:0.001,bit:0.001,int
 datatype_spatial: polygon,multipolygon,geometrycollection,point,multilinestring,multipoint,geometry,linestring 
 datatype_decimal: decimal:0.999,numeric
 datatype_floating: float:0.9,double
 datatype_character: char:0.01,varchar
 datatype_binary: binary:0.01,varbinary
-datatype_lob: longtext:0.9,tinyblob:0.01,tinytext:0.1,blob:0.01,text:0.1,mediumblob:0.01,mediumtext:0.01,longblob:0.01,longtext:0.9,text
+datatype_lob: tinyblob:0.01,tinytext:0.1,blob:0.01,text:0.1,mediumblob:0.01,mediumtext:0.01,longblob:0.01,longtext:0.9,text
 datatype_enums: enum:0.999,set
 datatype_datetime: datetime:0.1,date:0.01,timestamp:0.99,time:0.001,year:0.001,timestamp
 

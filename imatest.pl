@@ -28,7 +28,7 @@ require 5.032;
 #todo
 # test case for seed
 # flag file to start tracing
-# subqueries moreALTERchangecol movecol prepared with binds, better long vals, must longtext , no autoinc in INSERT/insel
+# subqueries moreALTER prepared with binds, must longtext, recreate and N tables after destr or every N sec partition, select on I_S sys P_S
 
 use Carp qw(croak shortmess);
 use Data::Dumper qw(Dumper);
@@ -51,7 +51,7 @@ use DBD::mysql;
 STDOUT->autoflush();
 STDERR->autoflush();
 
-my $version = '6.44';
+my $version = '6.45';
 
 $Data::Dumper::Sortkeys = 1;
 
@@ -175,6 +175,7 @@ my %ghst2cols = ();      ## schema.table => ref array column names
 my %ghst2pkautoinc = ();      ## schema.table => is pk autoinc 1 or 0
 my %ghst2createtable = ();      ## schema.table => CREATE TABLE
 my %ghst2nvcols = ();      ## schema.table => ref array column names for non virtual columns
+my %ghst2pkcols = ();      ## schema.table => ref array column names for PK columns, entire cols
 my %ghst2aes = ();      ## schema.table => autoextend size or -1 for not specified
 my %ghst2charset = ();      ## schema.table => default charset mandatory
 my %ghst2col = ();      ## schema.table => default collation or EMPTY
@@ -184,12 +185,15 @@ my %ghst2sampl = ();      ## schema.table => stats sample pages or -1
 my %ghst2kbs = ();      ## schema.table => key block size or -1
 my %ghst2rof = ();      ## schema.table => row format or 'EMPTY'
 my %ghst2comp = ();      ## schema.table => compression or 'EMPTY'
-my %ghst2ind = ();      ## schema.table => ref list non pk index names and PRIMARY for primary if exists
+my %ghst2ind = ();      ## schema.table => ref array non pk index names and PRIMARY for primary if exists
+my %ghst2check = ();      ## schema.table => ref array check constraints without check itself
 my @ghstlist = (
+\%ghst2check,
 \%ghst2pkautoinc,
 \%ghst2ind,
 \%ghst2createtable,
 \%ghst2cols,
+\%ghst2pkcols,
 \%ghst2nvcols,
 \%ghst2aes,
 \%ghst2charset,
@@ -937,6 +941,25 @@ my %ghvgsub = (
 'value_generate_year' => \&value_generate_year
 );
 
+sub new_postprocess_fun {
+    my ($tfun,$tnam,$pluse) = @ARG;
+    my $rc = '';
+    return $rc if (scalar(@$pluse) == 0);
+    while ($tfun =~ /\@(SELF|COL)/) {
+        my $tcol = '';
+        if ($tfun =~ /\@COL_([a-z]+)/) {
+            my $typ = $1;
+            $tcol = new_get_column($tnam,$pluse,$typ);
+            $tfun =~ s/\@COL_([a-z]+)/$tcol/;
+        } else {
+            $tcol = $pluse->[dorand()*scalar(@$pluse)];
+            $tfun =~ s/\@(SELF|COL)/$tcol/;
+        }
+    }
+    $tfun =~ s/;/,/g;
+    $rc = $tfun;
+    return $rc;
+}
 # 1: s.t 2: c
 sub new_generate_virtual {
     my ($tnam,$col) = @ARG;
@@ -978,18 +1001,7 @@ sub new_generate_virtual {
             $tval = $pluse->[dorand()*scalar(@$pluse)];
         } else { # function
             my $tfun = process_rseq($parmfun);
-            while ($tfun =~ /\@(SELF|COL)/) {
-                my $tcol = '';
-                if ($tfun =~ /\@COL_([a-z]+)/) {
-                    my $typ = $1;
-                    $tcol = new_get_column($tnam,$pluse,$typ);
-                    $tfun =~ s/\@COL_([a-z]+)/$tcol/;
-                } else {
-                    $tcol = $pluse->[dorand()*scalar(@$pluse)];
-                    $tfun =~ s/\@(SELF|COL)/$tcol/;
-                }
-            }
-            $tfun =~ s/;/,/g;
+            $tfun = new_postprocess_fun($tfun,$tnam,$pluse);
             $tval = $tfun;
         }
         my $unop = process_rseq($parmunop);
@@ -1339,9 +1351,7 @@ my $pgcolsnonpk = 0;         # how many non pk cols we have
 my $pgcanautoinc = 0;        # can we have autoinc in table
 my $pgcandefault = 0;        # can column have default
 my $pghasautoinc = 0;        # do we have autoinc in table
-# 1: kind: create_table, alter_table. Not used. Yet?
-# 2: column name e.g. s.t.col1
-# return: column definition e.g. col1 INTEGER
+# 1: kind: create_table, alter_table # 2: column name e.g. s.t.col1 # return: column definition e.g. col1 INTEGER
 sub generate_column_def {
     my ($kind,$colnam) = @ARG;
     my ($schema,$tabl,$cnam) = split(/\./,$colnam);
@@ -1406,6 +1416,7 @@ sub generate_column_def {
                 my $how = process_rseq('table_autoinc_kind');
                 if ($how eq 'PRIMARY') {
                     $ghst2pkautoinc{$tnam} = 1;
+                    push(@{$ghst2pkcols{$tnam}},$cnam);
                     $dt .= " PRIMARY KEY";
                 } elsif ($how eq 'UNIQUE') {
                     $dt .= " UNIQUE";
@@ -1539,6 +1550,7 @@ sub generate_column_def {
         $ghstc2hasdefault{$colnam} = 1;
         $ghstc2default{$colnam} = $expr;
     }
+    $cnam = "\`$cnam\`" if ($kind eq 'alter_table');
     $coldef = "$cnam $dt";
     $ghstc2just{$colnam} = lc($ghstc2just{$colnam});
     return $coldef;
@@ -1669,6 +1681,7 @@ sub table_add {
     my $last = '';
     foreach my $lin (@lstr) {
         chomp($lin);
+        next if ($lin =~ /^\/\*/ or $lin =~ /^PARTITIONS\s.*\*\//);
         $last = $lin;
         ++$nlin;
         docroak("BAD line 1 '%s', must be ( in: %s",$lin,$str) unless ($nlin != 1 or $lin eq '(');
@@ -1676,7 +1689,7 @@ sub table_add {
         $incols = 1 if ($nlin == 2);    # also in indexes
         $incols = 0 if ($lin =~ /^\)/);
         if ($incols) {
-            my $re = '^\s*([\`\"]|PRIMARY\s+KEY\s+\([\`\"]|(UNIQUE|FULLTEXT|SPATIAL)?\s+?KEY\s+[\`\"])';
+            my $re = '^\s*([\`\"]|PRIMARY\s+KEY\s+\([\`\"]|CONSTRAINT\s+.*\s+CHECK\s+|(UNIQUE|FULLTEXT|SPATIAL)?\s+?KEY\s+[\`\"])';
             docroak("BAD line %s '%s', must be like +%s+ in: %s",$nlin,$lin,$re,$str) unless ($lin =~ /$re/);
             if ($lin =~ /^\s*[\`\"]([^\`\"]+)[\`\"]/) {
                 my $colname = $1;
@@ -1755,6 +1768,7 @@ sub table_add {
                 $coldes =~ s/\(\d+\)//;
                 $coldes =~ s/\'[a-zA-Z0-9]*\'//;
                 $coldes =~ s/\([a-zA-Z0-9\`\(\), ]*\)//;
+                $coldes =~ s/\/\*.*\*\///g;
                 docroak("BAD column description for %s, need empty string now: +%s+ dt +%s+ IN %s",$stc,$dt,$coldes,$lin) if ($coldes ne '');
             }
         }
@@ -1780,11 +1794,32 @@ sub table_add {
     $last =~ s/\s//g;
     docroak("BAD last +%s+ not all eliminated in %s",$last,$str) if ($last ne '');
 
+    # check constraint
+    $stmt = "SELECT *, CONCAT(TABLE_SCHEMA,'.',TABLE_NAME,'.',CONSTRAINT_NAME) CON_ID FROM information_schema.table_constraints WHERE TABLE_SCHEMA = '$schema' AND TABLE_NAME = '$table' AND CONSTRAINT_TYPE = 'CHECK'";
+    my $key = 'CON_ID';
+    $ghst2check{$tnam} = [];
+    my $phcheck = gethashref($dbh,$absport,$stmt,$key);
+    if (not defined($phcheck)) {
+        if ($strict) {
+            docroak("For %s failed to gethasref of %s with key column %s",$tnam,$stmt,$key);
+        } else {
+            my $err = $dbh->err();
+            my $errstr = $dbh->errstr();
+            my $rc = $RC_WARNING;
+            dosayif($VERBOSE_ANY,"For '%s' failed to gethashref of %s with key column %s, rc %s, %s: %s",$tnam,$stmt,$key,$rc,$err,$errstr);
+            return $rc;
+        }
+    }
+    foreach my $check (sort(keys(%$phcheck))) {
+        push(@{$ghst2check{$tnam}},$phcheck->{$check}->{'CONSTRAINT_NAME'});
+    }
+
     # indexes
+    $ghst2pkcols{$tnam} = [];
     $stmt = "SELECT *, CONCAT(INDEX_NAME,'.',REPEAT('0',5-LENGTH(SEQ_IN_INDEX)),SEQ_IN_INDEX) PART_ID FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = '$schema' AND TABLE_NAME = '$table'";
-    my $key = 'PART_ID';
+    $key = 'PART_ID';
     $ghst2ind{$tnam} = [];
-    my $phind = gethashref($dbh,$absport,"SELECT *, CONCAT(INDEX_NAME,'.',REPEAT('0',5-LENGTH(SEQ_IN_INDEX)),SEQ_IN_INDEX) PART_ID FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = '$schema' AND TABLE_NAME = '$table'",$key);
+    my $phind = gethashref($dbh,$absport,"SELECT *, CONCAT(INDEX_NAME,'.',REPEAT('0',5-LENGTH(SEQ_IN_INDEX)),SEQ_IN_INDEX) PART_ID FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = '$schema' AND TABLE_NAME = '$table'",$key); #todo refactor
     if (not defined($phind)) {
         if ($strict) {
             docroak("For %s failed to gethasref of %s with key column %s",$tnam,$stmt,$key);
@@ -1814,6 +1849,7 @@ sub table_add {
             my $phpart = $phind->{$part};
             if ($phpart->{'INDEX_NAME'} eq 'PRIMARY') {
                 $ghsti2kind{$sti} = 'PRIMARY';
+                push(@lcols,(defined($phpart->{'COLUMN_NAME'})? $phpart->{'COLUMN_NAME'} : ':expr'));
             } elsif ($phpart->{'INDEX_TYPE'} eq 'BTREE') {
                 $ghsti2kind{$sti} = $phpart->{'NON_UNIQUE'} == 0? 'unique' : 'key';
             } else {
@@ -1832,6 +1868,8 @@ sub table_add {
             push(@llen,$len);
             push(@lcot,$cot);
             push(@lcols,(defined($phpart->{'COLUMN_NAME'})? $phpart->{'COLUMN_NAME'} : ':expr'));
+            push(@lcols,(defined($phpart->{'COLUMN_NAME'})? $phpart->{'COLUMN_NAME'} : ':expr'));
+            push(@{$ghst2pkcols{$tnam}},$phpart->{'COLUMN_NAME'}) if (defined($phpart->{'COLUMN_NAME'}) and not defined($phpart->{'SUB_PART'}));
             
         }
         foreach my $col (@lcols) {
@@ -1962,8 +2000,14 @@ sub generate_index_clause {
                     $lenp = $lenp eq $EMPTY? $ghstc2len{$coname} - $keylen + 3072 : $lenp - $keylen + 3072;
                     $enough = 1;
                 }
-                $rc .= "($lenp)" if ($lenp ne $EMPTY);
+                if ($lenp ne $EMPTY) {
+                    $rc .= "($lenp)";
+                } else {
+                    push(@{$ghst2pkcols{$tnam}},$thiscol) if ($ispk);
+                }
                 last PART if ($enough);
+            } else {
+                push(@{$ghst2pkcols{$tnam}},$thiscol) if ($ispk);
             }
         } else { #function
             $rc =~ s/PRIMARY//;
@@ -2039,8 +2083,45 @@ sub new_generate_tail {
     return $tail;
 }
 
-# 1: schema.table
-# 2: if tbd
+sub new_generate_partitioning {
+    my ($tnam) = @ARG;
+    my $rc = '';
+    my $pkind = process_rseq('table_partition_kind');
+    return $rc if ($pkind eq $EMPTY);
+    return $rc if ($pkind eq 'KEY' and scalar(@{$ghst2pkcols{$tnam}}) == 0);
+    return $rc if ($pkind eq 'HASH' and scalar(@{$ghst2pkcols{$tnam}}) == 0);
+    if ($pkind eq 'KEY') {
+        my $ncols = process_rseq('partition_key_columns');
+        if ($ncols == 0) {
+            $rc = 'PARTITION BY KEY()'
+        } else {
+            my %hcols = ();
+            foreach my $c (@{$ghst2pkcols{$tnam}}) {
+                $hcols{dorand()} = $c;
+            }
+            my @lcols = ();
+            foreach my $k (sort(keys(%hcols))) {
+                push(@lcols,$hcols{$k});
+            }
+            $ncols = scalar(@lcols) if ($ncols > scalar(@lcols));
+            @lcols = splice(@lcols,0,$ncols);
+            my $byk = join(',',@lcols);
+            $rc = "PARTITION BY KEY($byk)";
+        }
+    } elsif ($pkind eq 'HASH') {
+        my $by = process_rseq('partition_hash_expression');
+        $by = new_postprocess_fun($by,$tnam,$ghst2pkcols{$tnam});
+        $rc = "PARTITION BY HASH($by)";
+    } else {
+        docroak("PARTITION BY '%s' is not supported",$pkind);
+    }
+
+    my $npar = process_rseq('table_partitions');
+    $rc .= " PARTITIONS $npar";
+    return $rc;
+}
+
+# 1: schema.table # 2: if tbd
 # returns CREATE TABLE
 sub generate_create_table {
     my ($tnam,$tbd) = @ARG;
@@ -2052,6 +2133,7 @@ sub generate_create_table {
         $ghst2createtable{$tnam} = ':TBD';
     }
     $ghst2pkautoinc{$tnam} = 0;
+    $ghst2pkcols{$tnam} = [];
     $pghavevcols = 0;
     $pgcanautoinc = 1 if (dorand() < $ghreal{'table_has_autoinc_p'});
     $tsql .= "CREATE TABLE $tnam (";
@@ -2090,9 +2172,17 @@ sub generate_create_table {
             $tsql .= ", KEY($col)";
         }
     }
+    my $cons = process_rseq('check_per_table');
+    foreach my $cnum (1..$cons) {
+        my $con = new_generate_where($tnam,'select_where_all_p','check',0);
+        $tsql .= ", CONSTRAINT CHECK ($con), ";
+    }
     $tsql .= $tail;
     $tsql =~ s/,\s*,/,/g;
     $tsql =~ s/,\s*\)/)/g;
+    my $tpar = new_generate_partitioning($tnam);
+    $tsql .= " $tpar";
+    #docroak("#debug+%s+",$tsql) if ($tpar ne '' and $tpar =~ /HASH/);
     return $tsql;
 }
 
@@ -2193,7 +2283,7 @@ sub is_numeral_op {
 sub new_generate_simple {
     my ($tnam,$suc,$pluse,$kind) = @ARG;
     my $suval = '';
-    my $pref = $kind eq 'where'? 'where': 'group_having';
+    my $pref = ($kind eq 'where' or $kind eq 'check')? 'where': 'group_having';
     my $parmdtc = $pref."_term_${suc}_datatype_class";
     my $tlen = process_rseq($suc eq 'numeral'? $pref.'_term_numeral_len' : $pref.'_term_non_numeral_len');
     my $parmunop = $pref."_term_unary_${suc}_operator";
@@ -2203,7 +2293,7 @@ sub new_generate_simple {
         my $havecol = '';
         my $tdtc = process_rseq($parmdtc);
         my $tdt = $tdtc eq 'json'? $tdtc : process_rseq("datatype_$tdtc");
-        my $tkind = process_rseq($pref.'_term_item_kind');
+        my $tkind = ($kind eq 'check' and $termnum == 1)? 'column' : process_rseq($pref.'_term_item_kind');
         my $tval = '';
         if ($tkind eq 'column') {
             my $col = new_get_column($tnam,$pluse,$tdt);
@@ -2263,15 +2353,17 @@ sub new_generate_where {
     my ($tnam,$parm,$kind,$havejoins) = @ARG;
     docroak("no havejoins") if (not defined($havejoins));
     my $rc = '';
-    return $rc if (dorand() < $ghreal{$parm});
+    return $rc if ($kind ne 'check' and dorand() < $ghreal{$parm});
     my $pref = 'where';
-    if ($kind eq 'where') {
+    if ($kind eq 'where' or $kind eq 'check') {
         $rc = ' ';
     } else { # group
         $rc = ' HAVING ';
         $pref = 'group_having';
     }
-    my $plcols = $ghst2cols{$tnam};
+    my @lallowed = @{$ghst2cols{$tnam}};
+    @lallowed = grep {not $ghstc2isautoinc{"$tnam.$_"}} @lallowed if ($kind eq 'check');
+    my $plcols = \@lallowed;
     my @lnumcols = grep {$ghstc2suc{"$tnam.$_"} eq $SUC_NUMERAL} @$plcols;
     push(@lnumcols,$plcols->[0]) if (scalar(@lnumcols) == 0);
     my @lcharcols = grep {$ghstc2suc{"$tnam.$_"} eq $SUC_CHARLIKE} @$plcols;
@@ -2340,10 +2432,10 @@ sub get_table_key {
 
 sub stmt_lock_table_generate {
     my $stmt = 'LOCK TABLE';
-    my $hom = process_rseq('load_lock_table_count');
+    my $hom = process_rseq('lock_table_count');
     foreach my $i (1..$hom) {
         my $tnam = table_get();
-        my $how = process_rseq('load_lock_table_kind');
+        my $how = process_rseq('lock_table_kind');
         $stmt .= " $tnam $how,";
     }
     $stmt =~ s/,$//;
@@ -2446,6 +2538,7 @@ sub stmt_select_generate {
         $op = process_rseq('where_logical_binary_operator');
     }
     $stmt .= " WHERE $wher";
+    $stmt =~ s/\s*WHERE\s*$//i;
     my $hasun = 0;
     my $sbord = '';
     if (dorand() < $ghreal{'select_union_p'}) {
@@ -2457,6 +2550,7 @@ sub stmt_select_generate {
             $stmt .= " $how SELECT $tosel FROM $tnam";
             $wher = new_generate_where($tnam,'select_where_all_p','where',$havejoins);
             $stmt .= " WHERE $wher";
+            $stmt =~ s/\s*WHERE\s*$//i;
         }
         $sub .= "U";
     }
@@ -2489,7 +2583,7 @@ sub stmt_select_generate {
         $stmt .= " ORDER BY $ord";
         $sub .= 'O';
     }
-    my $lim = process_rseq('load_select_limit');
+    my $lim = process_rseq('select_limit');
     if ($lim ne $EMPTY) {
         $stmt .= " LIMIT $lim";
         $sub .= 'L';
@@ -2545,6 +2639,7 @@ sub stmt_insel_generate {
     my $stmt .= " INSERT into $tnam ($tocols) SELECT $cols FROM $tnam";
     my $wher = new_generate_where($tnam,'select_where_all_p','where',0);
     $stmt .= " WHERE $wher";
+    $stmt =~ s/\s*WHERE\s*$//i;
     return $stmt;
 }
 
@@ -3036,7 +3131,7 @@ sub value_generate_varchar {
 sub stmt_create_table_generate {
     my ($tnam) = @ARG;
     my $stmt = "CREATE TABLE $tnam";
-    my $kup1 = process_rseq('load_create_table_kind');
+    my $kup1 = process_rseq('create_table_kind');
     if ($kup1 eq 'like') {
         my $tal = table_get();
         $stmt = "$stmt LIKE $tal";
@@ -3149,8 +3244,8 @@ sub stmt_analyze_generate {
     my ($tnam) = @ARG;
     my $stmt = 'ANALYZE';
     my $kup1 = $stmt;
-    my $how = process_rseq('load_analyze_kind');
-    if (dorand() < $ghreal{'load_analyze_local_p'}) {
+    my $how = process_rseq('analyze_kind');
+    if (dorand() < $ghreal{'analyze_local_p'}) {
         $stmt .= ' LOCAL';
         $kup1 .= 'L';
     } else {
@@ -3167,7 +3262,7 @@ sub stmt_analyze_generate {
         my $col = table_columns_subset($tnam,'analyze_column_p','analyze_column_p','analyze',0);
         $kup1 .= 'uH';
         $stmt .= " UPDATE HISTOGRAM ON $col"; 
-        my $bus = process_rseq('load_analyze_buckets');
+        my $bus = process_rseq('analyze_buckets');
         if ($bus != 0) {
             $kup1 .= 'B';
             $stmt .= " WITH $bus BUCKETS";
@@ -3182,12 +3277,11 @@ sub stmt_alter_generate {
     my $tnam = $ARG[0];
     my $stmt = '';
     my $tail = '';
-    my $len = process_rseq('load_alter_length');
+    my $len = process_rseq('alter_length');
     my $subt = "ALTER$len";
     for my $clausen (1..$len) {
-        my $kind = process_rseq('load_alter_kind');
+        my $kind = process_rseq('alter_kind');
         if ($kind eq 'DROP_COL') {
-            # select column to drop
             my @lcols = @{$ghst2cols{$tnam}};
             my $cnam = $lcols[int(dorand()*scalar(@lcols))];
             $stmt .= "DROP COLUMN \`$cnam\`, ";
@@ -3199,26 +3293,87 @@ sub stmt_alter_generate {
         } elsif ($kind eq 'ADD_COL') {
             my $colnam = sprintf("%s.added_col_%s",$tnam,int(dorand()*10000+1000));
             my $coldef = generate_column_def('alter_table',$colnam);
+            my $add = 'aC';
+            if (dorand() < $ghreal{'alter_column_before_p'}) {
+                my @lcols = map {"AFTER \`$_\`"} @{$ghst2cols{$tnam}};
+                push(@lcols,'FIRST');
+                my $cnam = $lcols[int(dorand()*scalar(@lcols))];
+                $coldef .= " $cnam";
+                $add = 'aoC';
+            }
             $stmt .= "ADD COLUMN $coldef, ";
-            $subt .= 'aC';
+            $subt .= $add;
+        } elsif ($kind eq 'CHANGE_COL') {
+            my @lcols = @{$ghst2cols{$tnam}}; #todo refactor
+            my $cnam = $lcols[int(dorand()*scalar(@lcols))];
+            my $coldef = generate_column_def('alter_table',"$tnam.$cnam");
+            my $add = 'cC';
+            if (dorand() < $ghreal{'alter_column_before_p'}) {
+                @lcols = map {"AFTER \`$_\`"} grep {$_ ne $cnam} @lcols;#todo refactor
+                push(@lcols,'FIRST');
+                my $cb = $lcols[int(dorand()*scalar(@lcols))];
+                $coldef .= " $cb";
+                $add = 'coC';
+            }
+            $stmt .= "CHANGE COLUMN \`$cnam\` $coldef, ";
+            $subt .= $add;
         } elsif ($kind eq 'DROP_KEY') {
             my $key = get_table_key($tnam);
             $stmt .= $key eq 'PRIMARY'? "DROP PRIMARY KEY, " : "DROP KEY \`$key\`, ";
             $subt .= 'dK';
+        } elsif ($kind eq 'ALTER_INDEX') {
+            my $key = get_table_key($tnam);
+            my $how = process_rseq('alter_index_kind');
+            $stmt .= "ALTER INDEX \`$key\` $how, ";
+            $subt .= 'aI';
+        } elsif ($kind eq 'ALTER_COLUMN') {
+            my @lcols = @{$ghst2cols{$tnam}}; #todo refactor
+            my $cnam = $lcols[int(dorand()*scalar(@lcols))];
+            my $add = 'lC';
+            my $how = process_rseq('alter_column_kind');
+            if ($how eq 'DROP_DEFAULT') {
+                $how =~ s/_/ /;
+                $add = 'ddC';
+            } elsif ($how =~ /VISIBLE/) {
+                $how = "SET $how";
+                $add = 'viC';
+            } else {
+                my $def = new_generate_default($tnam,"$tnam.$cnam");
+                $def = "($def)" if ($def =~ /[()]/);
+                $how = "SET DEFAULT $def";
+                $add = 'sdC';
+            }
+            $stmt .= "ALTER COLUMN \`$cnam\` $how, ";
+            $subt .= $add;
         } elsif ($kind eq 'ADD_KEY') {
             my $iline = generate_index_clause($tnam,int(dorand()*10000+1000));
             return '' if ($iline =~ /^\s*$/);
             $stmt .= "ADD $iline, ";
             $subt .= 'aK';
+        } elsif ($kind eq 'DROP_CHECK') {
+            my $hom = scalar(@{$ghst2check{$tnam}});
+            my $con = $hom == 0? 'createme' : $ghst2check{$tnam}->[int(dorand()*$hom)];
+            $stmt .= "DROP CHECK $con, ";
+            $subt .= 'dK';
+        } elsif ($kind eq 'ADD_CHECK') {
+            my $con = new_generate_where($tnam,'select_where_all_p','check',0);
+            $stmt .= "ADD CONSTRAINT CHECK ($con), ";
+            $subt .= 'aK';
         } elsif ($kind eq 'TABLE_EB') {
             $stmt .= "ENGINE=InnoDB, ";
             $subt .= 'eB';
+        } elsif ($kind eq 'REMPART') {
+            $stmt .= "REMOVE PARTITIONING, ";
+            $subt .= 'rP';
         } else {
             docroak("ALTER kind %s is not supported",$kind);
         }
     }
     $stmt =~ s/, *$//;
+    my $alg = process_rseq('alter_algorithm');
+    $stmt .= ", ALGORITHM $alg" if ($alg ne $EMPTY);
     $stmt = "ALTER TABLE $tnam $stmt";
+            #docroak("#debug+%s+",$stmt) if ($stmt =~ /DROP CHECK/ and not $stmt =~ /createme/);
     return ($stmt,$subt);
 }
 
@@ -3648,7 +3803,7 @@ sub server_load_thread {
         } elsif ($ksql eq 'check') {
             $tnam = table_get();
             $stmt = "$ksql TABLE $tnam";
-            if (dorand() < $ghreal{'load_check_quick_p'}) {
+            if (dorand() < $ghreal{'check_quick_p'}) {
                 $stmt .= ' QUICK';
                 $kup1 = 'CHECKQ';
             } else {
@@ -3658,20 +3813,20 @@ sub server_load_thread {
             $stmt = 'FLUSH';
             $kup1 = 'FLUSH_TABLES';
             my $loc = '';
-            if (dorand() < $ghreal{'load_flush_local_p'}) {
+            if (dorand() < $ghreal{'flush_local_p'}) {
                 $loc = ' LOCAL';
                 $kup1 .= '_L_';
             } else {
                 $kup1 .= '_G_';
             }
-            my $how = process_rseq('load_flush_tables_how');
+            my $how = process_rseq('flush_tables_how');
             $how =~ s/_/ /g;
             if ($how eq $EMPTY) {
                 $how = '';
                 $kup1 .= '_E';
             }
             my $tables = '';
-            my $nt = process_rseq('load_flush_tables_n');
+            my $nt = process_rseq('flush_tables_n');
             $nt = 1 if ($nt == 0 and $how eq 'FOR EXPORT');
             for my $i (1..$nt) {
                 $tnam = table_get();
@@ -3680,11 +3835,11 @@ sub server_load_thread {
             $tables =~ s/^ *, *//;
             $stmt = "$stmt$loc TABLES $tables $how";
         } elsif ($ksql eq 'flush') {
-            my $how = process_rseq('load_flush_how');
+            my $how = process_rseq('flush_how');
             $stmt = 'FLUSH';
             $kup1 = 'FLUSH';
             my $loc = '';
-            if ($how ne 'HOSTS' and dorand() < $ghreal{'load_flush_local_p'}) {
+            if ($how ne 'HOSTS' and dorand() < $ghreal{'flush_local_p'}) {
                 $loc = "LOCAL ";
                 $kup1 .= '_L_';
             } else {
@@ -3696,7 +3851,7 @@ sub server_load_thread {
             $tnam = table_get();
             $stmt = 'OPTIMIZE';
             $kup1 = 'OPTIMIZE';
-            if (dorand() < $ghreal{'load_optimize_local_p'}) {
+            if (dorand() < $ghreal{'optimize_local_p'}) {
                 $stmt .= ' LOCAL';
                 $kup1 .= 'L';
             } else {
@@ -3705,7 +3860,7 @@ sub server_load_thread {
             $stmt = "$stmt TABLE $tnam";
         } elsif ($ksql eq 'show_tables') {
             my $snam = schema_get();
-            my $how = process_rseq('load_show_tables_kind');
+            my $how = process_rseq('show_tables_kind');
             $stmt = 'SHOW ';
             if ($how eq 'EXTENDED') {
                 $stmt .= " $how";
@@ -3720,7 +3875,7 @@ sub server_load_thread {
             $stmt .= " TABLES FROM $snam";
         } elsif ($ksql eq 'show_columns') {
             $tnam = table_get();
-            my $how = process_rseq('load_show_columns_kind');
+            my $how = process_rseq('show_columns_kind');
             $stmt = 'SHOW ';
             if ($how eq 'EXTENDED') {
                 $stmt .= " $how";
@@ -3738,7 +3893,7 @@ sub server_load_thread {
             ($stmt,$kup1) = stmt_analyze_generate($tnam);
         } elsif ($ksql eq 'show_status') {
             $stmt = 'SHOW';
-            my $glo = process_rseq('load_show_status_how');
+            my $glo = process_rseq('show_status_how');
             if ($glo eq 'GLOBAL') {
                 $kup1 .= '_G';
                 $stmt .= ' GLOBAL';
@@ -3752,16 +3907,16 @@ sub server_load_thread {
         } elsif ($ksql eq 'kill_connection') {
             $stmt = 'KILL CONNECTION';
             $kup1 = 'KILL_CONNECTION';
-            my $qn = process_rseq('load_kill_n');
+            my $qn = process_rseq('kill_n');
             $stmt .= " $qn";
         } elsif ($ksql eq 'kill_query') {
             $stmt = 'KILL QUERY';
             $kup1 = 'KILL_CQUERY';
-            my $qn = process_rseq('load_kill_n');
+            my $qn = process_rseq('kill_n');
             $stmt .= " $qn";
         } elsif ($ksql eq 'show_variables') {
             $stmt = 'SHOW';
-            my $glo = process_rseq('load_show_variables_how');
+            my $glo = process_rseq('show_variables_how');
             if ($glo eq 'GLOBAL') {
                 $kup1 .= '_G';
                 $stmt .= ' GLOBAL';
@@ -3917,17 +4072,23 @@ sub server_load_thread {
         my $rows;
         if ($dosql) {
             dosayif($VERBOSE_MORE, "perl ksql: %s",$ksql);
-            my @lstmt = $ksql eq 'recreate_schema'? ("DROP SCHEMA $stmt", "SELECT SLEEP(5)", "CREATE SCHEMA $stmt") : ($stmt);
+            my @lstmt = $ksql eq 'recreate_schema'? ("DROP SCHEMA $stmt", "SELECT SLEEP(0)", "CREATE SCHEMA $stmt") : ($stmt);
             my $rc;
             foreach my $sstmt (@lstmt) {
                 docroak('statement has unresolved @COL: "%s"',$sstmt) if ($sstmt =~ /\@(COL|SELF)_/ or $sstmt =~ /\@[a-z]{4}./);
                 if (dorand() < process_rseq('stmt_prepare_p')) {
                     my $sth = $gldbh->prepare($sstmt);
-                    docroak("undef stmt handle for '%s'",$sstmt) if (not defined($sth));
-                    $rc = $sth->execute();
-                    $err = $sth->err();
-                    $errstr = $sth->errstr();
-                    $rows = $sth->rows;
+                    if (not defined($sth)) {
+                        $err = $gldbh->err();
+                        $errstr = $gldbh->errstr();
+                        $rows = 0;
+                        dosleep(1);
+                    } else {
+                        $rc = $sth->execute();
+                        $err = $sth->err();
+                        $errstr = $sth->errstr();
+                        $rows = $sth->rows;
+                    }
                 } else {
                     $rc = $gldbh->do($sstmt);
                     $err = $gldbh->err();
@@ -3987,9 +4148,66 @@ sub server_load_thread {
     exit $ec;
 }
 
-# 1: thread number, absolute
-# 2: thread kind
-# 3: random seed
+sub new_terminate_servers {
+    my ($isend) = @ARG;
+    my $stepnum = $isend eq ''? 'CURRENT' : 'LAST';
+    my $checkstart = $ghreal{'server_start_control'};
+    my $starttimeout = $ghreal{'server_start_timeout'};
+    my $dowait = $ghreal{'server_termination_wait'};
+    my $waittimeout = $ghreal{$SERVER_TERMINATION_WAIT_TIMEOUT};
+    my @ltarg = ();
+    my $howterm;
+    if ($isend eq '') {
+        $howterm = process_rseq('server_termination_how');
+        my @ldeports = split(/,+/,$ghreal{'ports_destructive'});
+        my $howmany = process_rseq('ports_destructive_how_many');
+        $howmany = scalar(@ldeports) if ($howmany > scalar(@ldeports));
+        @ltarg = @ldeports;
+        @ltarg = splice(@ltarg,0,$howmany);
+    } else {
+        @ltarg = split(/,+/,$ghreal{'check_thread_ports'});
+        $howterm = $isend;
+    }
+    $ENV{'_imatest_ports_destructive_rel'} = join(',',@ltarg);
+    my $howhow = $howterm eq $SHUTKILL? $ghreal{'server_terminate_shutdown'} : $ghreal{"server_terminate_$howterm"};
+    $howhow .= " wait $waittimeout" if ($dowait eq $YES and $howterm ne $SIGSTOP and $howterm ne $SHUTKILL);
+    my $howout = doeval("\"$howhow\"");
+    dosayif($VERBOSE_ANY," terminating server with %s using %s for step %s",$howterm,$howout,$stepnum);
+    my $subec = doeval("system(\"$howhow\")");
+    $subec >>= $EIGHT;
+    dosayif($VERBOSE_ANY," execution of %s resulted in exit code %s for step %s",$howout,$subec,$stepnum);
+
+    return if ($isend ne '');
+
+    # wait for shutkill
+    if ($howterm eq $SHUTKILL) {
+        my $slep = process_rseq('server_terminate_shutkill_before');
+        dosayif($VERBOSE_ANY," sleeping %s seconds before killing server for %s",$slep,$howterm);
+        dosleep($slep);
+        my $howh = $ghreal{'server_terminate_sigkill'};
+        $howh .= $dowait eq $YES? " wait $waittimeout" : '';
+        my $kec = doeval("system(\"$howh\")");
+        $kec >>= $EIGHT;
+        $howout = doeval("\"$howh\"");
+        dosayif($VERBOSE_ANY," execution of %s resulted in exit code %s for step %s",$howout,$kec,$stepnum);
+    }
+    # wait after termination
+    my $after = process_rseq($howhow eq $SIGSTOP? 'server_termination_duration_on_sigstop' : 'server_termination_duration');
+    dosayif($VERBOSE_ANY," will sleep %s seconds after server termination for step %s",$after,$stepnum);
+    # assume server is running atm even on 1st step
+    dosleep($after);
+    # now restart server
+    dosayif($VERBOSE_ANY," starting server for step %s",$stepnum);
+    my $howrestart = $howterm eq $SIGSTOP ?  $ghreal{'server_terminate_unstop'} : $ghreal{$SERVER_RESTART};
+    $howrestart .= " wait $starttimeout" if ($checkstart eq $YES and $howterm ne $SIGSTOP);
+    $howout = doeval("\"$howrestart\"");
+    dosayif($VERBOSE_ANY," restarting server using %s for step %s",$howout,$stepnum);
+    $subec = doeval("system(\"$howrestart\")");
+    dosayif($VERBOSE_ANY," execution of %s resulted in exit code %s for step %s",$howout,$subec,$stepnum);
+    return;
+}
+
+# 1: thread number, absolute # 2: thread kind # 3: random seed
 sub server_destructive_thread {
     my $tnum = $ARG[0];
     my $tkind = $ARG[1];
@@ -4012,7 +4230,7 @@ sub server_destructive_thread {
     }
     
     my $finfile = "$ghreal{'tmpdir'}/$PID.fin";
-    my @ldeports = split(/,+/,$ghreal{'ports_destructive'});
+    my @ldeports = split(/,+/,$ghreal{'ports_destructive'});#
     $ENV{_imatest_destructive_filebase} = "destructive_thread_$tnum";
     my $outto = doeval($ghreal{'destructive_thread_out'});
     my $errto = doeval($ghreal{'destructive_thread_err'});
@@ -4054,42 +4272,7 @@ sub server_destructive_thread {
             }
         }
         # now terminate servers
-        my $howmany = process_rseq('ports_destructive_how_many');
-        $howmany = scalar(@ldeports) if ($howmany > scalar(@ldeports));
-        my @ltarg = @ldeports;
-        @ltarg = splice(@ltarg,0,$howmany);
-        $ENV{'_imatest_ports_destructive_rel'} = join(',',@ltarg);
-        my $howterm = process_rseq('server_termination_how');
-        my $howhow = $howterm eq $SHUTKILL? $ghreal{'server_terminate_shutdown'} : $ghreal{"server_terminate_$howterm"};
-        $howhow .= " wait $waittimeout" if ($dowait eq $YES and $howterm ne $SIGSTOP and $howterm ne $SHUTKILL);
-        my $howout = doeval("\"$howhow\"");
-        dosayif($VERBOSE_ANY," terminating server with %s using %s for step %s",$howterm,$howout,$stepnum);
-        my $subec = doeval("system(\"$howhow\")");
-        $subec >>= $EIGHT;
-        dosayif($VERBOSE_ANY," execution of %s resulted in exit code %s for step %s",$howout,$subec,$stepnum);
-        # wait for shutkill
-        if ($howterm eq $SHUTKILL) {
-            my $slep = process_rseq('server_terminate_shutkill_before');
-            dosayif($VERBOSE_ANY," sleeping %s seconds before killing server for %s",$slep,$howterm);
-            dosleep($slep);
-            my $howh = $ghreal{'server_terminate_sigkill'};
-            $howh .= $dowait eq $YES? " wait $waittimeout" : '';
-            my $kec = doeval("system(\"$howh\")");
-            $kec >>= $EIGHT;
-            dosayif($VERBOSE_ANY," execution of %s resulted in exit code %s for step %s",$howh,$kec,$stepnum);
-        }
-        # wait after termination
-        my $after = process_rseq($howhow eq $SIGSTOP? 'server_termination_duration_on_sigstop' : 'server_termination_duration');
-        dosayif($VERBOSE_ANY," will sleep %s seconds after server termination for step %s",$after,$stepnum);
-        # assume server is running atm even on 1st step
-        dosleep($after);
-        # now restart server
-        dosayif($VERBOSE_ANY," starting server for step %s",$stepnum);
-        my $howrestart = $howterm eq $SIGSTOP ?  $ghreal{'server_terminate_unstop'} : $ghreal{$SERVER_RESTART};
-        $howrestart .= " wait $starttimeout" if ($checkstart eq $YES and $howterm ne $SIGSTOP);
-        dosayif($VERBOSE_ANY," restarting server using %s for step %s",$howrestart,$stepnum);
-        $subec = doeval("system(\"$howrestart\")");
-        dosayif($VERBOSE_ANY," execution of %s resulted in exit code %s for step %s",$howrestart,$subec,$stepnum);
+        new_terminate_servers('');
     }
     dosayif($VERBOSE_ANY, " exiting at %s with exit code %s",time(),$ec);
     exit $ec;
@@ -4418,7 +4601,7 @@ $ghreal{$TEST_DURATION} = process_rseq($TEST_DURATION);
 
 if ($ghreal{'server_terminate'} eq $YES) {
     my $tdes = $ghreal{'destructive_threads'};
-    dosayif($VERBOSE_ANY,"starting test destructive threads: %s",$tdes);
+    dosayif($VERBOSE_ANY,"starting test destructive threads: %s with destructive_inside %s",$tdes,$ghtest{'destructive_inside'});
     my @lodes = split(/,/,$tdes);
     my $talnum = 0;
     my @lseed = ();
@@ -4428,8 +4611,9 @@ if ($ghreal{'server_terminate'} eq $YES) {
         my @lok = split('X',$elem);
         push(@lok,'') if (scalar(@lok) < 2);
         foreach my $tnum (1..$lok[0]) {
-            my $rseed = scalar(@lseed) > $talnum? $lseed[$talnum] : int(dorand()*1000000+100);
             ++$talnum;
+            next if ($talnum == 1 and $ghtest{'destructive_inside'} eq 'yes');
+            my $rseed = scalar(@lseed) > $talnum? $lseed[$talnum] : int(dorand()*1000000+100);
             $trc = start_destructive_thread($talnum,$lok[1],$rseed);
             docroak("failed to start test destructive thread %s kind=%s rseed=%s. CROAK.",$talnum,$lok[1],$rseed) if ($trc != $RC_OK);
         }
@@ -4460,7 +4644,11 @@ my $fintest = "$ghreal{'tmpdir'}/$PID.fin";
 dosayif($VERBOSE_ANY,"will sleep for %s seconds checking for %s or threads every %s seconds",$slep,$fintest,$interval);
 my $end = time() + $slep;
 my $now = time();
+my $strt = $now;
 my $reload = $ghreal{'load_thread_restart'};
+my $inside = $ghtest{'server_terminate'} eq 'yes' and $ghtest{'destructive_inside'} eq 'yes'? 1 : 0;
+my $destrstep = $inside? process_rseq('server_termination_every_seconds') : 0;
+my $destrlast = time();
 while ($now < $end) {
     if (-f "$fintest") {
         if ($ghreal{'terminate_on_assert'} eq 'yes') {
@@ -4469,6 +4657,12 @@ while ($now < $end) {
         } else {
             dosayif($VERBOSE_ANY,"ignoring %s because terminate_on_assert=no",$fintest);
         }
+    }
+    if ($inside and time() - $destrlast >= $destrstep) {
+        dosayif($VERBOSE_ANY,"time to terminate server because of destructive_inside after step of %s seconds",$destrstep);
+        new_terminate_servers('');
+        $destrstep = process_rseq('server_termination_every_seconds');
+        $destrlast = time();
     }
 # fixme refactor
     foreach my $pid (sort(keys(%ghlpids))) {
@@ -4562,7 +4756,9 @@ foreach my $pid (sort(keys(%ghlpids)), sort(keys(%ghtermpids), sort(keys(%ghchep
     }
 }
 
-dosayif($VERBOSE_ANY, "-DATATYPES FOR %s ORIGINAL TABLES WITH %s columns: %s\n",scalar(my @l=sort(keys(%ghst2createtable))),scalar(my @m=sort(keys(%ghstc2just))),hdump(\%ghdt2cnt,0));
+new_terminate_servers($ghtest{'server_termination_how_end'}) if ($ghtest{'server_termination_how_end'} ne 'no');
+
+dosayif($VERBOSE_ANY, "-RUNTIME %s, PLANNED %s, DATATYPES FOR %s ORIGINAL TABLES WITH %s columns: %s\n",time()-$strt,$ghorig{$TEST_DURATION},scalar(my @l=sort(keys(%ghst2createtable))),scalar(my @m=sort(keys(%ghstc2just))),hdump(\%ghdt2cnt,0));
 
 my $ec = 0;
 dosayif($VERBOSE_ANY,"exiting with exit code %s", $ec);
