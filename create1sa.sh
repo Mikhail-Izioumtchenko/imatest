@@ -14,6 +14,7 @@ mopt=''
   mopt="$*"
   mopt='right' && mopt='innodb_buffer_pool_size=16M disable_log_bin mysql_native_password=ON authentication_policy=mysql_native_password innodb_buffer_pool_dump_at_shutdown=OFF'
 }
+need='4302'
 
 . `pwd`/imavars.dot
 
@@ -23,6 +24,7 @@ mopt=''
   $ECHO "If mysqldOptions are specified as right then the options in Example 1 below are used."
   $ECHO "Example 1: $0 4204 4304 noinit innodb_buffer_pool_size=16M disable_log_bin mysql_native_password=ON authentication_policy=mysql_native_password innodb_buffer_pool_dump_at_shutdown=OFF"
   $ECHO "Example 2: $0 4204 4304 init right"
+  $ECHO "    YOU NEED instance on X port $need up and running!"
   $EXIT 1
 }
 
@@ -42,7 +44,7 @@ pass=`$CAT "$IMAPAS"`
 
 rc='0'
 #com="$ECHO $pass | $MYSQLSH --quiet-start=2 --passwords-from-stdin --execute \"dba.deploySandboxInstance($port, {'portX':$portex$add})\""
-com="mysqlsh --quiet-start=2 --port=4303 --user=root --host 127.0.0.1 --password=m  --mx --js --execute \"dba.deploySandboxInstance($port, {'portX':$portex$add})\""
+com="mysqlsh --quiet-start=2 --port=$need --user=root --host 127.0.0.1 --password=m  --mx --js --execute \"dba.deploySandboxInstance($port, {'portX':$portex$add})\""
 ima_say "$me : executing $com"
 #exit 0 #debug
 $EVAL $com

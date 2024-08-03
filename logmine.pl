@@ -350,6 +350,8 @@ sub process_mysqld_error_log {
         chomp($msg);
         $lev = "Y!$lev" if ($lev =~ /(error|fatal)/i);
         $lev = "Y!signal$lev" if ($lin =~ / signal /);
+        $lev = "Y!assertion$lev" if ($lin =~ /ssert/);
+        $lev = "Y!aborting$lev" if ($lin =~ /borting/);
         my $kind = "$lev:$msgnum:$from";
         $kind =~ s/[[\]]//g;
         ++$hkind2cnt{$kind};

@@ -62,15 +62,15 @@ $ECHO ""
   
   $ECHO ""
   $ECHO "signals and croaks START"
-  hom=`$GREP -i 'ssertion|signal|croak' $tomine | $GREP -v '(hakill1sa.sh|checkms.sh : 0 signals or assertions)' | $WC -l`
-  [ "$hom" -gt 10 ] && $GREP -i 'signal|croak' $tomine | $GREP -v hakill1sa.sh |  $GREP -v '(hakill1sa.sh|checkms.sh : 0 signals or assertions)' | $LESS || $GREP -i 'signal|croak' $tomine | $GREP -v '(hakill1sa.sh|checkms.sh : 0 signals or assertions)'
+  hom=`$GREP -i 'ssert|signal|borting|croak' $tomine | $GREP -v '(hakill1sa.sh|ASSERT|checkms.sh : 0 signals or assertions)' | $WC -l`
+  [ "$hom" -gt 10 ] && $GREP -i 'signal|ssert|borting|croak' $tomine | $GREP -v hakill1sa.sh |  $GREP -v '(hakill1sa.sh|ASSERT|checkms.sh : 0 signals or assertions)' | $LESS || $GREP -i 'signal|ssert|borting|croak' $tomine | $GREP -v '(hakill1sa.sh|ASSERT|checkms.sh : 0 signals or assertions)'
   $ECHO ""
   $ECHO "signals and croaks SHORT"
-  $GREP -i 'ssertion|signal|croak' $tomine | $GREP -v '(hakill1sa.sh|checkms.sh : 0 signals or assertions)' | $GREP -v semi
+  $GREP -i 'ssert|borting|signal|croak' $tomine | $GREP -v '(hakill1sa.sh|ASSERT|checkms.sh : 0 signals or assertions)' | $GREP -v semi
   $ECHO "signals and croaks END with $hom signals and croaks including semicroaks"
   $ECHO ""
   $ECHO "JUST SIGNALS in $elog"
-  $GREP -i 'ssertion|signal' $elog
+  $GREP -i 'ssert|borting|signal' $elog
   $ECHO "SIGNALS END"
   $ECHO ""
   $ECHO "See also $lof"

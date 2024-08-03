@@ -51,7 +51,7 @@ alter_index_kind:
 alter_kind:
   mandatory: True
   allowed: Rseq
-  only_values_allowed: ADD_COL,DROP_COL,ADD_KEY,DROP_KEY,TABLE_EB,TAIL,CHANGE_COL,ALTER_INDEX,ALTER_COLUMN,ADD_CHECK,DROP_CHECK,REMPART
+  only_values_allowed: ADD_COL,DROP_COL,ADD_KEY,DROP_KEY,TABLE_EB,TAIL,CHANGE_COL,ALTER_INDEX,ALTER_COLUMN,ADD_CHECK,DROP_CHECK,REMPART,DOPART,DPART,TPART,COPART
 alter_length:
   mandatory: True
   allowed: Rseq
@@ -639,7 +639,7 @@ load_sleep_after_stmt_ms:
 load_sql_class:
   mandatory: True
   allowed: Rseq
-  only_values_allowed: select,update,insert,delete,insel,drop_table,alter,check,replace,analyze,checksum,optimize,show_open_tables,show_parse_tree,create_table,lock_instance_for_backup,unlock_instance,lock_table,unlock_table,set_txn_isolation,show_columns,show_status,show_table_status,show_tables,show_variables,flush,flush_tables,kill_connection,kill_query,recreate_schema,set,savepoint
+  only_values_allowed: select,update,insert,delete,insel,drop_table,alter,check,replace,analyze,checksum,optimize,show_open_tables,show_parse_tree,create_table,lock_instance_for_backup,unlock_instance,lock_table,unlock_table,set_txn_isolation,show_columns,show_status,show_table_status,show_tables,show_variables,flush,flush_tables,kill_connection,kill_query,recreate_schema,set,savepoint,truncate_table,exep,deap
 load_thread_err:
   mandatory: True
 load_thread_execute_with:
@@ -692,13 +692,24 @@ part_direction:
   mandatory: True
   allowed: Rseq       
   only_values_allowed: asc,desc,EMPTY
-partition_hash_expression:
-  mandatory: True
-  allowed: Rseq       
-partition_key_columns:
+partition_columns:
   mandatory: True
   allowed: Rseq       
   only_non_negative_integers: True
+partition_expression:
+  mandatory: True
+  allowed: Rseq       
+partition_kill:
+  mandatory: True
+  allowed: Rseq       
+  only_non_negative_integers: True
+partition_maxvalue_p:
+  mandatory: True
+  allowed: probability
+partition_values_each:
+  mandatory: True
+  allowed: Rseq       
+  only_positive_integers: True
 parts_per_index:
   allowed: Rseq       
   mandatory: True
@@ -716,6 +727,10 @@ ports_destructive_how_many:
   only_positive_integers: True
 port_writer:
   mandatory: True
+prepare_cnt:
+  mandatory: True
+  allowed: Rseq
+  only_positive_integers: True
 reconnect_timeout:
   mandatory: True
   allowed: only_positive_integers
@@ -764,6 +779,9 @@ select_join_kind_simple:
   mandatory: True
   allowed: Rseq
   only_values_allowed: NATURAL INNER,NATURAL INNER,NATURAL LEFT,NATURAL RIGHT,NATURAL LEFT OUTER,NATURAL RIGHT OUTER,COMMA,INNER,CROSS,STRAIGHT_JOIN
+select_join_sametable_p:
+  mandatory: True
+  allowed: probability
 select_join_where_parent_p:
   mandatory: True
   allowed: probability
@@ -947,9 +965,10 @@ sleep_on_assert:
 spatial_srid:
   mandatory: True
   allowed: Rseq
-stmt_prepare_p:
+stmt_prepare_kind:
   mandatory: True
-  allowed: probability
+  allowed: Rseq
+  only_values_allowed: EMPTY,CLIENT,SERVER
 strict_exceptions:
   mandatory: True
 table_autoextend_size:
@@ -976,7 +995,7 @@ table_name_format:
 table_partition_kind:
   mandatory: True
   allowed: Rseq       
-  only_values_allowed: EMPTY,KEY,HASH
+  only_values_allowed: HASH,LHASH,LIST,LISTC,RANGE,RANGEC,KEY,EMPTY
 table_partitions:
   mandatory: True
   allowed: Rseq       
@@ -989,11 +1008,17 @@ table_stats_auto_recalc:
   mandatory: True
   allowed: Rseq       
 table_stats_persistent:
-  allowed: Rseq       
   mandatory: True
+  allowed: Rseq       
 table_stats_sample_pages:
-  allowed: Rseq       
   mandatory: True
+  allowed: Rseq       
+table_internal_p:
+  mandatory: True
+  allowed: probability
+table_temporary_p:
+  mandatory: True
+  allowed: probability
 tables_per_schema:
   mandatory: True
 terminate_on_assert:

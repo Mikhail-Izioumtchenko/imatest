@@ -29,5 +29,5 @@ sleep 3
 echo "$0 MYSQLSH=$MYSQLSH _IMATEST_USE=$_IMATEST_USE"
 ./startms.sh "$ports" wait;
 time ./imatest.sh --file "$tperl" --use 8.3 now --test imatest.yaml --verbose "$verbose" --nodry-run $seeds $yaml 2>&1|tee /tmp/test.out;
-./stopms.sh "$ports" wait
+#./stopms.sh "$ports" wait
 cp -v /root/mysql-sandboxes/420$ports/sandboxdata/error.log /tmp
