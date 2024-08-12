@@ -1098,6 +1098,7 @@ sub new_generate_update_values {
     my @lrc = ();
     my $haveone = 0;
     foreach my $col (@$plcols) {
+        last if ($col eq 'ok_no_column_found');
         my $kind = process_rseq('update_kind');
         my $colnam = "$tnam.$col";
         my $dtc = $ghstc2class{$colnam};
@@ -1172,6 +1173,7 @@ sub new_generate_update_values {
             docroak("update kind %s for %s %s is not supported",$kind,$tnam,$colnam);
         }
     }
+    @lrc = @$plcols if (scalar(@lrc) == 0);
     return \@lrc;
 }
 
@@ -1181,6 +1183,7 @@ sub new_generate_insert_values {
     my $verbose = $VERBOSE_ANY;
     my $rc = '';
     foreach my $col (@$plcols) {
+        return $col if ($col eq 'ok_no_column_found');
         my $colnam = "$tnam.$col";
         my $kind = $ghstc2isautoinc{$colnam}? 'value' : process_rseq('insert_kind');
         my $dtc = $ghstc2class{$colnam};
@@ -2452,6 +2455,10 @@ sub stmt_select_generate {
     my $havejoins = $joins > 1? 1 : 0;
     my $tnam = table_get(1);
     my $ltog = $ifgrp? table_columns_subset($tnam,'group_by_column_p','group_by_column_p','group',$havejoins) : [];
+    if ($ltog->[0] eq 'ok_no_column_found') {
+        sleep(1);
+        return 'SELECT ok_no_column_found';
+    }
     my $tog = '';
     my $tosel = '';
     if ($hosel eq 'all') {
@@ -2463,6 +2470,10 @@ sub stmt_select_generate {
     } else {
         if ($ifgrp) {
             my $ltosel = table_columns_subset($tnam,'group_by_column_p','group_by_column_p','group',$havejoins);
+            if ($ltosel->[0] eq 'ok_no_column_found') {
+                sleep(1);
+                return 'SELECT ok_no_column_found';
+            }
             foreach my $c (@$ltosel) {
                 my @lin = grep {$c eq $_} @$ltog;
                 if (scalar(@lin) == 0) {
@@ -2550,6 +2561,10 @@ sub stmt_select_generate {
         my $ord = '';
         if ($ifgrp) {
             my $plord = table_columns_subset($tnam,'select_order_by_column_p','select_order_by_column_p','group',$havejoins);
+            if ($plord->[0] eq 'ok_no_column_found') {
+                sleep(1);
+                return 'SELECT ok_no_column_found';
+            }
             foreach my $c (@$plord) {
                 my @lin = grep {$c eq $_} @$ltog;
                 if (scalar(@lin) == 0) {
@@ -3158,6 +3173,7 @@ sub new_stmt_update_generate {
     my $tnam = table_get(0);
     $stmt = "UPDATE $tnam SET";
     my $plcols = table_columns_subset($tnam,'update_column_p','update_pk_column_p','update',0);
+    return "$stmt col1 = col1" if ($plcols->[0] eq 'ok_no_column_found');
     my $plvalues = new_generate_update_values($tnam,$plcols);
     my $set = '';
     my $n = 0;
@@ -3193,6 +3209,7 @@ sub stmt_insert_generate {
         $kup1 .= '_U';
         $stmt .= " ON DUPLICATE KEY UPDATE";
         my $plcols = table_columns_subset($tnam,'update_column_p','update_pk_column_p','update',0);
+        return "$stmt col1 = col1" if ($plcols->[0] eq 'ok_no_column_found');
         my $plvalues = new_generate_update_values($tnam,$plcols);
         my $set = '';
         my $n = 0;
@@ -3506,8 +3523,11 @@ sub server_load_thread {
         }
         my @lcall = ($kind eq 'select' or $kind eq 'group' or $kind eq 'analyze')? @{$ghst2cols{$tnam}} : @{$ghst2nvcols{$tnam}};
         @lcall = @{$ghst2cols{$tnam}} if (scalar(@lcall) == 0);
-        docroak("no columns for '%s'",$tnam) if (scalar(@lcall) == 0);
         my @lc = grep {$ghstc2unique{"$tnam.$_"} == 1? dorand() < $ghreal{$pkparm} : dorand() < $ghreal{$parm}} @lcall;
+        if (scalar(@lcall) == 0) {
+            sleep(1);
+            $lcall[0] = 'ok_no_column_found';
+        }
         push(@lc,$lcall[0]) if (scalar(@lc) == 0);
         @lc = map {"$tnam.$_"} @lc if ($havejoins);
         @lc = doshuffle(@lc);
@@ -3655,7 +3675,7 @@ sub server_load_thread {
     sub docount {
         my ($stmt,$rc,$err,$errstr,$qsql,$kup1) = @ARG;
         docroak("No qsql for %s",$stmt) if (not defined($qsql) or $qsql eq '');
-        docroak("No kup1 for %s",$stmt) if (not defined($kup1) or $kup1 eq '');
+        $kup1 = '#todo' if (not defined($kup1) or $kup1 eq '');
         $qsql = uc($qsql);
         $kup1 = uc($kup1) if (uc($kup1) eq $qsql);
         $kup1 = $kup1 eq $qsql? '' : "$kup1 ->";

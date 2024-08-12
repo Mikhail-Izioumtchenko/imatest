@@ -13,9 +13,9 @@ txn_use: yes
 # light START
 tables_per_schema: 25
 tables_per_schema: 96
-load_threads: 1,0Xall,0Xddl,0Xi,0Xinsel,0Xu,0Xd,0Xr,0Xa,0Xs,0Xdml,0Xset #dyno
-server_terminate: no
-test_duration_seconds: 239
+load_threads: 2,0Xall,0Xddl,0Xi,0Xinsel,0Xu,0Xd,0Xr,0Xa,0Xs,0Xdml,0Xset #dyno
+server_terminate: yes
+test_duration_seconds: 243
 load_thread_restart: yes
 destructive_threads: 1
 destructive_inside: yes
@@ -167,6 +167,7 @@ mysql_initial_cnf: |
    log_error_verbosity=3
    innodb_buffer_pool_size=134217728
 sql_every_step: |
+   update performance_schema.setup_instruments set enabled = 'YES',timed = 'YES'
    update performance_schema.setup_instruments set enabled = 'YES',timed = 'YES'
    update performance_schema.setup_consumers set enabled = 'YES'
    purge binary logs before now()
