@@ -12,7 +12,8 @@ mopt=''
 [ "$#" -gt 3 ] && {
   shift 3
   mopt="$*"
-  mopt='right' && mopt='innodb_buffer_pool_size=16M disable_log_bin mysql_native_password=ON authentication_policy=mysql_native_password innodb_buffer_pool_dump_at_shutdown=OFF'
+  #mopt='right' && mopt='innodb_buffer_pool_size=16M disable_log_bin mysql_native_password=ON authentication_policy=mysql_native_password innodb_buffer_pool_dump_at_shutdown=OFF'
+  mopt='right' && mopt='innodb_buffer_pool_size=128M disable_log_bin innodb_buffer_pool_dump_at_shutdown=OFF'
 }
 need='4302'
 

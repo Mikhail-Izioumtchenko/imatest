@@ -10,18 +10,21 @@ mysql_initial_cnf_ports: *port
 schemas: 8
 #load_thread_sql: qw(/dev/null)
 txn_use: yes
+load_max_stmt: 10
+load_thread_restart: no
 # light START
-tables_per_schema: 25
+tables_per_schema: 2
 tables_per_schema: 96
-load_threads: 1,0Xall,0Xddl,0Xi,0Xinsel,0Xu,0Xd,0Xr,0Xa,0Xs,0Xdml,0Xset #dyno
+load_threads: 2
+load_threads: 1,0Xall,0Xddl,0Xi,1Xinsel,0Xu,0Xd,0Xr,0Xa,0Xs,0Xdml,0Xset #dyno
 server_terminate: no
-test_duration_seconds: 239
+test_duration_seconds: 238
 load_thread_restart: yes
 destructive_threads: 1
 destructive_inside: yes
 server_termination_how: sigkill!shutdown:0.01,shutkill:0.1,kill:0.5,sigkill:0.1,sigstop:0.01,shutdown
-server_termination_how_end: shutdown
-server_termination_every_seconds: 60
+server_termination_how_end: sigkill
+server_termination_every_seconds: 180,180-240:0.5,180-300
 # light END
 table_temporary_p: 0.1
 table_internal_p: 0.1
